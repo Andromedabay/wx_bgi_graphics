@@ -1,35 +1,5 @@
-Download, build and statically link wxWidgets as the GUI library for your C++ project!
-
-[![Video](/output.gif)](https://www.youtube.com/watch?v=zjNg5HdgNO0)
-
-Full Tutorial: https://www.youtube.com/watch?v=zjNg5HdgNO0
-
-```cmake
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
-
-project(wx_cmake_fetchcontent_template LANGUAGES CXX)
-
-include(FetchContent)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-set(wxBUILD_SHARED OFF)
-
-message(STATUS "Fetching wxWidgets...")
-
-FetchContent_Declare(
-   wxWidgets
-   GIT_REPOSITORY https://github.com/wxWidgets/wxWidgets.git
-   GIT_SHALLOW ON
-)
-FetchContent_MakeAvailable(wxWidgets)
-
-set(SRCS main.cpp)
-
-add_executable(main WIN32 ${SRCS})
-target_link_libraries(main PRIVATE wxcore wxnet)
-```
+# wx_BGIGraphics_Wrapper
+Download, build and statically link wxWidgets as the GUI library for building a Wrapper for OpenGL simulation of Borland-Graphics-Interface (BGI) Library.
 
 ### System Requirements
 
@@ -40,7 +10,8 @@ To get started with this project, ensure you have the following tools and librar
 - **GTK3 Development Libraries (for Linux users):** Necessary for GUI development on Linux platforms.
 
 ### Building the Project
-
+- Updated Build Instructions are in [./examples/demoFreePascal/README.md](./examples/demoFreePascal/README.md).
+  
 #### Debug
 
 Follow these steps to build the project:
@@ -82,5 +53,6 @@ cmake --build build-rel -j
 MIT License. Can be used in closed-source commercial products.
 
 ---
+Depends on C/C++ Templates created by:
 Check out the blog for more! [www.onlyfastcode.com](https://www.onlyfastcode.com)
 ---

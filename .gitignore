@@ -1,3 +1,16 @@
+.vscode
 build
 build-dbg
 .DS_Store
+build32
+build64
+build-*
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.exe
+*.log
+*.pdb
+libimp*.a

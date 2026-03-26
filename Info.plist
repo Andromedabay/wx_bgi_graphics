@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.onlyfastcode.wx_cmake_fetchcontent_template</string>
+    <string>ca.hexword.wx_bgi_opengl</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
     <key>CFBundlePackageType</key>
