@@ -6,6 +6,9 @@ This folder contains a minimal FreePascal program that loads the shared library 
 
 - `demo_bgi_wrapper.pas`
 - `demo_bgi_wrapper_gui.pas`
+- `demo_bgi_api_coverage.pas`
+
+`demo_bgi_api_coverage.pas` is the broader API coverage example. It exercises the expanded classic BGI export surface from FreePascal rather than only drawing a minimal scene.
 
 ## Build and Run (Windows)
 
@@ -60,6 +63,12 @@ This folder contains a minimal FreePascal program that loads the shared library 
    ppcx64 demoFreePascal/demo_bgi_wrapper_gui.pas
    ```
 
+   Coverage example with 64-bit FPC:
+
+   ```bash
+   ppcx64 demoFreePascal/demo_bgi_api_coverage.pas
+   ```
+
 4. Run:
 
    ```bash
@@ -72,10 +81,17 @@ This folder contains a minimal FreePascal program that loads the shared library 
    demoFreePascal/demo_bgi_wrapper_gui.exe
    ```
 
+   Coverage example:
+
+   ```bash
+   demoFreePascal/demo_bgi_api_coverage.exe
+   ```
+
 ## Troubleshooting
 
 - Error `0xc000007b` almost always means 32-bit and 64-bit binaries are mixed.
 - Both console and GUI-subsystem demo variants are provided; subsystem choice does not cause `0xc000007b`.
+- The coverage example should be compiled with the same architecture as the `wx_bgi_opengl` library. On Windows, a 32-bit FreePascal executable cannot load a 64-bit DLL, and vice versa.
 
 ## Linux/macOS
 

@@ -1,15 +1,20 @@
 #pragma once
 
-#include <mutex>
 #include "bgi_types.h"
+
+#include <mutex>
 
 namespace bgi
 {
 
-    // Global rendering mutex — all public API calls lock this before touching gState.
     extern std::mutex gMutex;
-
-    // Single instance of all mutable rendering state.
     extern BgiState gState;
+
+    void resetPaletteState();
+    void resetDrawingState();
+    void resetStateForWindow(int width, int height, bool doubleBuffered);
+    std::vector<std::uint8_t> &activePageBuffer();
+    const std::vector<std::uint8_t> &visualPageBuffer();
+    void syncPagesIfNeeded();
 
 } // namespace bgi
