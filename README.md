@@ -300,7 +300,7 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 
 This code is Open Source and Free to use with no warranties or claims.
   
-This repository is based on Open-Source Code from 4 different source:
+This repository is based on Open-Source Code from 4 different source:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
     2. CMake Template, from lszl84, MIT License  
