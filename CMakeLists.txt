@@ -99,16 +99,31 @@ add_custom_command(
 
 find_package(Python3 COMPONENTS Interpreter)
 
-if(Python3_Interpreter_FOUND)
+find_package(Doxygen QUIET)
+
+if(DOXYGEN_FOUND)
+    set(DOXYGEN_OUTPUT_DIR ${CMAKE_BINARY_DIR}/doxygen)
+    set(DOXYGEN_CONFIG_FILE ${CMAKE_BINARY_DIR}/Doxyfile)
+
+    configure_file(
+        ${CMAKE_SOURCE_DIR}/docs/Doxyfile.in
+        ${DOXYGEN_CONFIG_FILE}
+        @ONLY
+    )
+
     add_custom_target(
         api_docs
-        COMMAND ${Python3_EXECUTABLE}
-                ${CMAKE_SOURCE_DIR}/tools/generate_api_docs.py
-                --output ${CMAKE_SOURCE_DIR}/docs/API_REFERENCE.md
-                ${CMAKE_SOURCE_DIR}/src/wx_bgi.h
-                ${CMAKE_SOURCE_DIR}/src/wx_bgi_ext.h
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Generating API reference markdown"
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Generating Doxygen API documentation"
+        VERBATIM
+    )
+else()
+    add_custom_target(
+        api_docs
+        COMMAND ${CMAKE_COMMAND} -E echo "Doxygen not found. Install Doxygen and re-run CMake configure."
+        COMMAND ${CMAKE_COMMAND} -E false
+        COMMENT "Doxygen is required for api_docs target"
         VERBATIM
     )
 endif()

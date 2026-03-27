@@ -4,7 +4,7 @@ wx BGI Graphics is a C/C++ shared library that implements a large classic BGI-co
 
 ## Objectives
 1. Strive to be as simple and beginner complete as the original BGI library.
-1. Provide a portable graphics backend with a familiar BGI programming model.
+1. Provide a portable graphics backend with a familiar BGI programming model, and some advanced user OpenGL capability.
 
 ## Current Compatibility
 
@@ -101,7 +101,8 @@ The examples are under the ./examples/ folder.
    - GLFW
    - GLEW
    - OpenGL 
-   - CMake 
+   - CMake
+   - Doxygen (for API documentation generation)
 
 ## Compilation Requirements
 
@@ -113,65 +114,181 @@ To build this project yourself, ensure you have the following tools and librarie
 
 ## Building the Project
 
-- Updated FreePascal demo instructions are in [examples/demoFreePascal/README.md](./examples/demoFreePascal/README.md).
-  
-## Debug
+- Updated FreePascal demo instructions are in examples/demoFreePascal/README.md.
 
-Follow these steps to build the project:
+## Build, Test, and Docs on Windows/Linux/macOS
 
-1. **Create a build directory & configure the build:**
-   ```bash
-   cmake -S. -Bbuild
-   ```
+Use the command sets below to run a complete local pipeline: configure, build, test, and generate Doxygen docs.
 
-2. **Build the project:**
-   ```bash
-   cmake --build build -j
-   ```
+### Windows (MSVC, multi-config)
 
-3. **Run automated coverage examples:**
-   ```bash
-   ctest --test-dir build -C Debug --output-on-failure
-   ```
+Debug pipeline:
 
-4. **Generate API reference documentation:**
-   ```bash
-   cmake --build build --target api_docs -j
-   ```
+```powershell
+cmake -S . -B build
+cmake --build build -j --config Debug
+ctest --test-dir build -C Debug --output-on-failure
+cmake --build build --target api_docs -j --config Debug
+```
 
-This will create a `build` directory and compile all necessary artifacts there. The main executable will be located in `build/`.
+Release pipeline:
 
-In the current Windows environment, the C++ and Python coverage examples are exercised automatically. The FreePascal coverage source is included as an example as well, and automated execution is enabled when a matching FreePascal compiler is available for the built DLL architecture.
+```powershell
+cmake -S . -B build
+cmake --build build -j --config Release
+ctest --test-dir build -C Release --output-on-failure
+cmake --build build --target api_docs -j --config Release
+```
 
-Generated API reference output:
+### Linux (single-config)
 
-- `docs/API_REFERENCE.md`
+Debug pipeline:
 
-The shared library output is `wx_bgi_opengl` with platform-specific extension:
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+cmake --build build --target api_docs -j
+```
 
-- `build/Debug/wx_bgi_opengl.dll` on Windows debug builds
+Release pipeline:
+
+```bash
+cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
+cmake --build build-rel -j
+ctest --test-dir build-rel --output-on-failure
+cmake --build build-rel --target api_docs -j
+```
+
+### macOS (single-config)
+
+Debug pipeline:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+cmake --build build --target api_docs -j
+```
+
+Release pipeline:
+
+```bash
+cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
+cmake --build build-rel -j
+ctest --test-dir build-rel --output-on-failure
+cmake --build build-rel --target api_docs -j
+```
+
+Generated API documentation output:
+
+- `build/doxygen/html/index.html` (debug tree)
+- `build-rel/doxygen/html/index.html` (release tree on Linux/macOS)
+
+Shared library output name is `wx_bgi_opengl` with platform-specific extension:
+
+- `build/Debug/wx_bgi_opengl.dll` on Windows Debug
+- `build/Release/wx_bgi_opengl.dll` on Windows Release
 - `build/libwx_bgi_opengl.so` on Linux
 - `build/libwx_bgi_opengl.dylib` on macOS
 
-## Release
+In the current Windows environment, the C++ and Python coverage examples are exercised automatically. The FreePascal coverage source is included as an example as well, and automated execution is enabled when a matching FreePascal compiler is available for the built DLL architecture.
 
-For release build use `--config Release` on Windows:
+## CI Example (GitHub Actions)
 
-```bash
-cmake -S. -Bbuild
-cmake --build build -j --config Release
+The workflow below runs the same Debug command sets shown above on a matrix of Windows, Linux, and macOS.
+
+```yaml
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-docs:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Doxygen (Windows)
+        if: runner.os == 'Windows'
+        run: choco install doxygen.install -y
+
+      - name: Install Doxygen (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen
+
+      - name: Install Doxygen (macOS)
+        if: runner.os == 'macOS'
+        run: brew install doxygen
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build
+
+      - name: Build (Windows Debug)
+        if: runner.os == 'Windows'
+        run: cmake --build build -j --config Debug
+
+      - name: Test (Windows Debug)
+        if: runner.os == 'Windows'
+        run: ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Docs (Windows Debug)
+        if: runner.os == 'Windows'
+        run: cmake --build build --target api_docs -j --config Debug
+
+      - name: Configure (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: cmake --build build -j
+
+      - name: Test (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Docs (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: cmake --build build --target api_docs -j
 ```
 
-Artifacts for both configurations will be generated in the `build` directory.
+  Actual repository workflow file:
 
-On Mac or Linux you'll need to maintain two build trees:
+  - `.github/workflows/CI.yml`
 
-```bash
-cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j
-cmake -S. -Bbuild-rel -DCMAKE_BUILD_TYPE=Release
-cmake --build build-rel -j
-```
+  Release behavior in that workflow (free-tier friendly):
+
+  1. Normal `push`/`pull_request` runs matrix CI in Debug mode on Windows, Linux, and macOS.
+  2. Tag pushes like `v1.2.3` run Release builds, tests, docs generation, and packaging.
+  3. Release artifacts uploaded to GitHub Release:
+    - Windows binary zip
+    - Linux binary tar.gz
+    - macOS binary tar.gz
+    - API docs zip
+    - API docs tar.gz
+  4. Release notes are generated from git commit messages between the previous tag and current tag.
+
+  To create a release from CI:
+
+  ```bash
+  git tag v1.2.3
+  git push origin v1.2.3
+  ```
 
 ## License
 
@@ -184,7 +301,7 @@ This repository is based on Open-Source Code from 4 different source:
     3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license
     4. glew Library, from https://github.com/nigels-com/glew, Custom License
   
-Depends on C/C++ Template created by Luke of @devmindscapetutorilas:
+Depends on C/C++ Template created by Luke of devmindscapetutorilas:
  - [www.onlyfastcode.com](https://www.onlyfastcode.com)
  - [https://devmindscape.com/](https://devmindscape.com/)
  - [https://www.youtube.com/@devmindscapetutorials](https://www.youtube.com/@devmindscapetutorials)
