@@ -144,10 +144,10 @@ This allows for advanced rendering pipelines, temporal effects, or multi‑stage
 ### 5. Multi‑Threaded Rendering Considerations
 
 Multi-Threading Double-Buffers can be dangerous. Why?
-    - The front buffer is a shared resource
-    - If two threads call setVisualBuffer() at the same time, you get race conditions
-    - You may flip mid‑draw, causing tearing or corrupted frames
-    - BGI drawing functions are not thread‑safe unless you explicitly lock them
+- The front buffer is a shared resource
+- If two threads call setVisualBuffer() at the same time, you get race conditions
+- You may flip mid‑draw, causing tearing or corrupted frames
+- BGI drawing functions are not thread‑safe unless you explicitly lock them
   
 Using multiple buffers in a multi‑threaded environment is possible, but requires careful synchronization.
 
@@ -177,14 +177,14 @@ This avoids race conditions and ensures stable rendering.
 
 ### 6. Should You Use More Than 2 Buffers?
 ✔ Yes, if:
-    - You want triple buffering (reduces blocking)
-    - You want multi‑stage pipelines (e.g., one thread draws backgrounds, another draws sprites)
-    - You want temporal effects (motion blur, history buffers)
+- You want triple buffering (reduces blocking)
+- You want multi‑stage pipelines (e.g., one thread draws backgrounds, another draws sprites)
+- You want temporal effects (motion blur, history buffers)
 
 ✖ No, if:
-    - You only need simple animation
-    - You want maximum FPS
-    - You don’t want to manage synchronization
+- You only need simple animation
+- You want maximum FPS
+- You don’t want to manage synchronization
   
 For most real‑time rendering, 2 or 3 buffers is ideal. 3+ buffers is possible but requires careful design.
 
