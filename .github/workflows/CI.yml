@@ -284,7 +284,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen zip \
-            texlive-latex-base texlive-latex-recommended texlive-fonts-recommended latexmk \
+            texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended latexmk \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev
 
