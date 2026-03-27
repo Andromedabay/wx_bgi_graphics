@@ -143,6 +143,9 @@ The text renderer now uses a scalable stroke-font implementation rather than the
 
 The current stroke-font implementation is still lightweight, but it is materially closer to classic BGI behavior than the old bitmap-only path.
 
+## BGI Double Buffering Tutorial
+Please read more about this at [./Tutorial.md](./Tutorial.md)
+
 ## Usage Examples
 The examples are under the ./examples/ folder.
 ### Example - demoFreePascal
@@ -298,11 +301,11 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 This code is Open Source and Free to use with no warranties or claims.
   
 This repository is based on Open-Source Code from 4 different source:
-    1. Hammad Rauf, rauf.hammad@gmail.com, MIT License
-         - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.
-    2. CMake Template, from lszl84, MIT License
-    3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license
-    4. glew Library, from https://github.com/nigels-com/glew, Custom License
+    1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
+         - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
+    2. CMake Template, from lszl84, MIT License  
+    3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license  
+    4. glew Library, from https://github.com/nigels-com/glew, Custom License  
   
 Depends on C/C++ Template created by Luke of devmindscapetutorilas:
  - [www.onlyfastcode.com](https://www.onlyfastcode.com)
