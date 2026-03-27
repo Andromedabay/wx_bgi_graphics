@@ -20,6 +20,7 @@ INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/images/Minimum_Buffers_for_Double_buffering.png"
 FILE_PATTERNS          = *.h *.md *.png
 RECURSIVE              = NO
+IMAGE_PATH             = "@CMAKE_SOURCE_DIR@/images"
 USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"
 
 GENERATE_HTML          = YES

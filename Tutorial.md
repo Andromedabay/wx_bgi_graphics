@@ -58,7 +58,7 @@ Repeat the process for animation.
 
 Destroy buffers and close graphics.
   
-<image src="images/Minimum_Buffers_for_Double_buffering.png" width="738" height="175">Double-buffering minimum requirements</image>
+![Double-buffering minimum requirements](images/Minimum_Buffers_for_Double_buffering.png)
   
 ### 2. Pseudo‑Code (Generic Explanation)
 
@@ -81,7 +81,7 @@ destroy_buffer(backBuffer)
 shutdown_graphics()
 ```
   
-<image src="images/DoubleBuffering.png" width="800" height="800"></image>
+![Double buffering explained](images/DoubleBuffering.png)
   
 
 ### 3. Pseudo‑Code Using Your Actual Library Function Names
