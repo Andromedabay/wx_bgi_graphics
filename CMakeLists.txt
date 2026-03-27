@@ -134,7 +134,7 @@ endif()
 
 set(FPC_CANDIDATES)
 if(WIN32)
-    list(APPEND FPC_CANDIDATES ppcx64)
+    list(APPEND FPC_CANDIDATES ppcrossx64 ppcx64)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
     list(APPEND FPC_CANDIDATES ppcx64)
 else()
