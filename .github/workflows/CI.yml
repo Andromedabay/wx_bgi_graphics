@@ -284,6 +284,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen zip \
+            texlive-latex-base texlive-latex-recommended texlive-fonts-recommended latexmk \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev
 
@@ -292,13 +293,18 @@ jobs:
         run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF
 
       - name: Generate docs
-        run: cmake --build build-rel --target api_docs -j
+        run: |
+          cmake --build build-rel --target api_docs -j
+          cmake --build build-rel --target api_docs_pdf -j
 
       - name: Package docs
         run: |
-          cd build-rel/doxygen
-          zip -r ../../api-docs.zip html
-          tar -czf ../../api-docs.tar.gz html
+          mkdir -p build-rel/doxygen/release-docs
+          cp -r build-rel/doxygen/html build-rel/doxygen/release-docs/html
+          cp build-rel/doxygen/latex/refman.pdf build-rel/doxygen/release-docs/api-docs.pdf
+          cd build-rel/doxygen/release-docs
+          zip -r ../../../api-docs.zip .
+          tar -czf ../../../api-docs.tar.gz .
 
       - name: Upload docs zip
         uses: actions/upload-artifact@v4

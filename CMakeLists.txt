@@ -128,6 +128,7 @@ add_custom_command(
 find_package(Python3 COMPONENTS Interpreter)
 
 find_package(Doxygen QUIET)
+find_package(LATEX COMPONENTS PDFLATEX QUIET)
 
 if(DOXYGEN_FOUND)
     set(DOXYGEN_OUTPUT_DIR ${CMAKE_BINARY_DIR}/doxygen)
@@ -146,12 +147,48 @@ if(DOXYGEN_FOUND)
         COMMENT "Generating Doxygen API documentation"
         VERBATIM
     )
+
+    if(PDFLATEX_COMPILER)
+        if(WIN32)
+            add_custom_target(
+                api_docs_pdf
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
+                COMMAND ${CMAKE_COMMAND} -E chdir ${DOXYGEN_OUTPUT_DIR}/latex make.bat
+                COMMENT "Generating Doxygen PDF documentation"
+                VERBATIM
+            )
+        else()
+            add_custom_target(
+                api_docs_pdf
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
+                COMMAND ${CMAKE_COMMAND} -E chdir ${DOXYGEN_OUTPUT_DIR}/latex ${CMAKE_MAKE_PROGRAM}
+                COMMENT "Generating Doxygen PDF documentation"
+                VERBATIM
+            )
+        endif()
+    else()
+        add_custom_target(
+            api_docs_pdf
+            COMMAND ${CMAKE_COMMAND} -E echo "pdflatex not found. Install a LaTeX distribution (e.g., TeX Live/MiKTeX) and re-run CMake configure."
+            COMMAND ${CMAKE_COMMAND} -E false
+            COMMENT "LaTeX (pdflatex) is required for api_docs_pdf target"
+            VERBATIM
+        )
+    endif()
 else()
     add_custom_target(
         api_docs
         COMMAND ${CMAKE_COMMAND} -E echo "Doxygen not found. Install Doxygen and re-run CMake configure."
         COMMAND ${CMAKE_COMMAND} -E false
         COMMENT "Doxygen is required for api_docs target"
+        VERBATIM
+    )
+
+    add_custom_target(
+        api_docs_pdf
+        COMMAND ${CMAKE_COMMAND} -E echo "Doxygen not found. Install Doxygen and re-run CMake configure."
+        COMMAND ${CMAKE_COMMAND} -E false
+        COMMENT "Doxygen is required for api_docs_pdf target"
         VERBATIM
     )
 endif()

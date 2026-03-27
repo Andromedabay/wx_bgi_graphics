@@ -198,6 +198,7 @@ cmake -S . -B build
 cmake --build build -j --config Debug
 ctest --test-dir build -C Debug --output-on-failure
 cmake --build build --target api_docs -j --config Debug
+cmake --build build --target api_docs_pdf -j --config Debug
 ```
 
 Release pipeline:
@@ -207,6 +208,7 @@ cmake -S . -B build
 cmake --build build -j --config Release
 ctest --test-dir build -C Release --output-on-failure
 cmake --build build --target api_docs -j --config Release
+cmake --build build --target api_docs_pdf -j --config Release
 ```
 
 ### Linux (single-config)
@@ -218,6 +220,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 cmake --build build --target api_docs -j
+cmake --build build --target api_docs_pdf -j
 ```
 
 Release pipeline:
@@ -227,6 +230,7 @@ cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
 cmake --build build-rel -j
 ctest --test-dir build-rel --output-on-failure
 cmake --build build-rel --target api_docs -j
+cmake --build build-rel --target api_docs_pdf -j
 ```
 
 ### macOS (single-config)
@@ -238,6 +242,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 cmake --build build --target api_docs -j
+cmake --build build --target api_docs_pdf -j
 ```
 
 Release pipeline:
@@ -247,12 +252,15 @@ cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
 cmake --build build-rel -j
 ctest --test-dir build-rel --output-on-failure
 cmake --build build-rel --target api_docs -j
+cmake --build build-rel --target api_docs_pdf -j
 ```
 
 Generated API documentation output:
 
 - `build/doxygen/html/index.html` (debug tree)
 - `build-rel/doxygen/html/index.html` (release tree on Linux/macOS)
+- `build/doxygen/latex/refman.pdf` (debug tree PDF)
+- `build-rel/doxygen/latex/refman.pdf` (release tree PDF on Linux/macOS)
 
 Shared library output name is `wx_bgi_opengl` with platform-specific extension:
 
