@@ -6,6 +6,18 @@ wx BGI Graphics is a C/C++ shared library that implements a large classic BGI-co
 1. Strive to be as simple and beginner complete as the original BGI library.
 1. Provide a portable graphics backend with a familiar BGI programming model, and some advanced user OpenGL capability.
 
+## Latest Downloads
+
+- Latest release page: https://github.com/Andromedabay/wx_bgi_graphics/releases/latest
+- Windows x64 binary zip: https://github.com/Andromedabay/wx_bgi_graphics/releases/latest/download/wx_bgi_opengl-windows-x64.zip
+- Linux x64 binary tar.gz: https://github.com/Andromedabay/wx_bgi_graphics/releases/latest/download/wx_bgi_opengl-linux-x64.tar.gz
+- macOS x64 binary tar.gz: https://github.com/Andromedabay/wx_bgi_graphics/releases/latest/download/wx_bgi_opengl-macos-x64.tar.gz
+- API docs site: https://andromedabay.github.io/wx_bgi_graphics/
+- API docs zip: https://github.com/Andromedabay/wx_bgi_graphics/releases/latest/download/api-docs.zip
+- API docs tar.gz: https://github.com/Andromedabay/wx_bgi_graphics/releases/latest/download/api-docs.tar.gz
+
+The download URLs above always point to the newest tagged GitHub Release asset with the matching filename.
+
 ## Current Compatibility
 
 The library now includes classic BGI-style support for:
@@ -196,7 +208,7 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 
 ## CI Example (GitHub Actions)
 
-The workflow below runs the same Debug command sets shown above on a matrix of Windows, Linux, and macOS.
+The YAML block below is an abbreviated example for the Debug pipeline only. The authoritative workflow is `.github/workflows/CI.yml`, which also includes Linux X11/OpenGL setup, Windows Mesa software rendering, macOS hosted-runner limitations, release packaging, release notes, and GitHub Pages deployment for the generated API docs.
 
 ```yaml
 name: ci
@@ -281,7 +293,13 @@ jobs:
     - macOS binary tar.gz
     - API docs zip
     - API docs tar.gz
-  4. Release notes are generated from git commit messages between the previous tag and current tag.
+  4. The generated Doxygen HTML docs are published to GitHub Pages.
+  5. Release notes are generated from git commit messages between the previous tag and current tag.
+
+  To enable GitHub Pages deployment for the first time:
+
+  1. Open repository Settings -> Pages.
+  2. Under Build and deployment, set Source to GitHub Actions.
 
   To create a release from CI:
 
