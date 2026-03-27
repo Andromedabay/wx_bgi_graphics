@@ -39,11 +39,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
+set_target_properties(glfw PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 find_package(OpenGL REQUIRED)
 
 # Build a static GLEW library from fetched sources to keep the build self-contained.
 add_library(glew_static STATIC ${glew_SOURCE_DIR}/src/glew.c)
 add_library(GLEW::GLEW ALIAS glew_static)
+
+set_target_properties(glew_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(glew_static
     PUBLIC
