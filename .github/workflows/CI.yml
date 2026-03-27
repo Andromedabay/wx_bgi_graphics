@@ -35,11 +35,12 @@ jobs:
         shell: pwsh
         run: choco install doxygen.install -y
 
-      - name: Install Doxygen (Linux)
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y doxygen
+          sudo apt-get install -y doxygen \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev xvfb
 
       - name: Install Doxygen (macOS)
         if: runner.os == 'macOS'
@@ -55,6 +56,10 @@ jobs:
         shell: pwsh
         run: cmake --build build -j --config Debug
 
+      - name: Setup Mesa software renderer (Windows/macOS)
+        if: runner.os != 'Linux'
+        uses: ssciwr/setup-mesa-action@v1
+
       - name: Test (Windows Debug)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -65,16 +70,24 @@ jobs:
         shell: pwsh
         run: cmake --build build --target api_docs -j --config Debug
 
-      - name: Configure (Linux/macOS Debug)
-        if: runner.os != 'Windows'
+      - name: Configure (Linux Debug)
+        if: runner.os == 'Linux'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGLFW_BUILD_WAYLAND=OFF
+
+      - name: Configure (macOS Debug)
+        if: runner.os == 'macOS'
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build (Linux/macOS Debug)
         if: runner.os != 'Windows'
         run: cmake --build build -j
 
-      - name: Test (Linux/macOS Debug)
-        if: runner.os != 'Windows'
+      - name: Test (Linux Debug)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ctest --test-dir build --output-on-failure
+
+      - name: Test (macOS Debug)
+        if: runner.os == 'macOS'
         run: ctest --test-dir build --output-on-failure
 
       - name: Docs (Linux/macOS Debug)
@@ -104,11 +117,12 @@ jobs:
         shell: pwsh
         run: choco install doxygen.install -y
 
-      - name: Install Doxygen (Linux)
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y doxygen
+          sudo apt-get install -y doxygen \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev xvfb
 
       - name: Install Doxygen (macOS)
         if: runner.os == 'macOS'
@@ -123,6 +137,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: cmake --build build -j --config Release
+
+      - name: Setup Mesa software renderer (Windows/macOS)
+        if: runner.os != 'Linux'
+        uses: ssciwr/setup-mesa-action@v1
 
       - name: Test (Windows Release)
         if: runner.os == 'Windows'
@@ -144,16 +162,24 @@ jobs:
           if (Test-Path build/Release/wx_bgi_opengl.exp) { Copy-Item build/Release/wx_bgi_opengl.exp out/ }
           Compress-Archive -Path out/* -DestinationPath wx_bgi_opengl-windows-x64.zip -Force
 
-      - name: Configure (Linux/macOS Release)
-        if: runner.os != 'Windows'
+      - name: Configure (Linux Release)
+        if: runner.os == 'Linux'
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF
+
+      - name: Configure (macOS Release)
+        if: runner.os == 'macOS'
         run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
 
       - name: Build (Linux/macOS Release)
         if: runner.os != 'Windows'
         run: cmake --build build-rel -j
 
-      - name: Test (Linux/macOS Release)
-        if: runner.os != 'Windows'
+      - name: Test (Linux Release)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ctest --test-dir build-rel --output-on-failure
+
+      - name: Test (macOS Release)
+        if: runner.os == 'macOS'
         run: ctest --test-dir build-rel --output-on-failure
 
       - name: Docs (Linux/macOS Release)
@@ -207,13 +233,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Doxygen
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y doxygen zip
+          sudo apt-get install -y doxygen zip \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
       - name: Configure (Release)
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF
 
       - name: Generate docs
         run: cmake --build build-rel --target api_docs -j
