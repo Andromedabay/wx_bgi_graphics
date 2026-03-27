@@ -35,6 +35,12 @@ The library now includes classic BGI-style support for:
 
 The exported declarations are available in `src/wx_bgi.h`.
 
+
+## Turbo Pascal/Turbo C/C++ - Drop in Replacement (Well Almost...)
+
+Please see [./examples/bgidemo-pascal/README.md](./examples/bgidemo-pascal/README.md).
+
+
 ## Advanced OpenGL Extension API
 
 In addition to classic BGI, the library now exports an optional non-BGI extension API for modern control paths such as explicit event pumping, context control, swap interval, size queries, frame begin/end, and pixel readback.
