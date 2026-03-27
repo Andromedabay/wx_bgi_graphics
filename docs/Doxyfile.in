@@ -1,0 +1,41 @@
+PROJECT_NAME           = "wx_BGI_Graphics"
+PROJECT_BRIEF          = "Classic BGI-compatible graphics API with modern OpenGL extension API"
+OUTPUT_DIRECTORY       = "@DOXYGEN_OUTPUT_DIR@"
+CREATE_SUBDIRS         = NO
+ALLOW_UNICODE_NAMES    = NO
+
+OPTIMIZE_OUTPUT_FOR_C  = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+EXTRACT_LOCAL_CLASSES  = NO
+
+INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
+                         "@CMAKE_SOURCE_DIR@/src/wx_bgi.h" \
+                         "@CMAKE_SOURCE_DIR@/src/wx_bgi_ext.h" \
+                         "@CMAKE_SOURCE_DIR@/src/bgi_types.h"
+FILE_PATTERNS          = *.h *.md
+RECURSIVE              = NO
+USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+GENERATE_MAN           = NO
+GENERATE_RTF           = NO
+GENERATE_DOCBOOK       = NO
+
+JAVADOC_AUTOBRIEF      = YES
+MULTILINE_CPP_IS_BRIEF = YES
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+
+STRIP_FROM_PATH        = "@CMAKE_SOURCE_DIR@"
+FULL_PATH_NAMES        = YES
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES

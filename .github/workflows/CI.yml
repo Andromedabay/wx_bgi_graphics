@@ -1,0 +1,323 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci-matrix-debug:
+    name: CI Debug (${{ matrix.os }})
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Doxygen (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install doxygen.install -y
+
+      - name: Install Doxygen (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen
+
+      - name: Install Doxygen (macOS)
+        if: runner.os == 'macOS'
+        run: brew install doxygen
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake -S . -B build
+
+      - name: Build (Windows Debug)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build -j --config Debug
+
+      - name: Test (Windows Debug)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Docs (Windows Debug)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build --target api_docs -j --config Debug
+
+      - name: Configure (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: cmake --build build -j
+
+      - name: Test (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Docs (Linux/macOS Debug)
+        if: runner.os != 'Windows'
+        run: cmake --build build --target api_docs -j
+
+  release-build-matrix:
+    name: Release Build (${{ matrix.os }})
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Doxygen (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install doxygen.install -y
+
+      - name: Install Doxygen (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen
+
+      - name: Install Doxygen (macOS)
+        if: runner.os == 'macOS'
+        run: brew install doxygen
+
+      - name: Configure (Windows Release)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake -S . -B build
+
+      - name: Build (Windows Release)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build -j --config Release
+
+      - name: Test (Windows Release)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Docs (Windows Release)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build --target api_docs -j --config Release
+
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item build/Release/wx_bgi_opengl.dll out/
+          if (Test-Path build/Release/wx_bgi_opengl.lib) { Copy-Item build/Release/wx_bgi_opengl.lib out/ }
+          if (Test-Path build/Release/wx_bgi_opengl.exp) { Copy-Item build/Release/wx_bgi_opengl.exp out/ }
+          Compress-Archive -Path out/* -DestinationPath wx_bgi_opengl-windows-x64.zip -Force
+
+      - name: Configure (Linux/macOS Release)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (Linux/macOS Release)
+        if: runner.os != 'Windows'
+        run: cmake --build build-rel -j
+
+      - name: Test (Linux/macOS Release)
+        if: runner.os != 'Windows'
+        run: ctest --test-dir build-rel --output-on-failure
+
+      - name: Docs (Linux/macOS Release)
+        if: runner.os != 'Windows'
+        run: cmake --build build-rel --target api_docs -j
+
+      - name: Package binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p out
+          cp build-rel/libwx_bgi_opengl.so out/
+          tar -czf wx_bgi_opengl-linux-x64.tar.gz -C out .
+
+      - name: Package binary (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p out
+          cp build-rel/libwx_bgi_opengl.dylib out/
+          tar -czf wx_bgi_opengl-macos-x64.tar.gz -C out .
+
+      - name: Upload binary artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary-windows
+          path: wx_bgi_opengl-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Upload binary artifact (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary-linux
+          path: wx_bgi_opengl-linux-x64.tar.gz
+          if-no-files-found: error
+
+      - name: Upload binary artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary-macos
+          path: wx_bgi_opengl-macos-x64.tar.gz
+          if-no-files-found: error
+
+  release-docs-archives:
+    name: Release Docs Archives
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen zip
+
+      - name: Configure (Release)
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
+
+      - name: Generate docs
+        run: cmake --build build-rel --target api_docs -j
+
+      - name: Package docs
+        run: |
+          cd build-rel/doxygen
+          zip -r ../../api-docs.zip html
+          tar -czf ../../api-docs.tar.gz html
+
+      - name: Upload docs zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-docs-zip
+          path: api-docs.zip
+          if-no-files-found: error
+
+      - name: Upload docs tar.gz
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-docs-targz
+          path: api-docs.tar.gz
+          if-no-files-found: error
+
+  release-notes:
+    name: Build Release Notes
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    outputs:
+      notes_file: ${{ steps.notes.outputs.notes_file }}
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate notes from commit messages
+        id: notes
+        run: |
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          PREV_TAG="$(git describe --tags --abbrev=0 "${CURRENT_TAG}^" 2>/dev/null || true)"
+
+          NOTES_FILE="release-notes.md"
+          {
+            echo "## ${CURRENT_TAG}"
+            echo
+            echo "### Changes"
+            echo
+            if [ -n "${PREV_TAG}" ]; then
+              git log "${PREV_TAG}..${CURRENT_TAG}" --pretty=format:'- %h %s'
+            else
+              git log "${CURRENT_TAG}" --pretty=format:'- %h %s'
+            fi
+          } > "${NOTES_FILE}"
+
+          if [ ! -s "${NOTES_FILE}" ]; then
+            echo "## ${CURRENT_TAG}" > "${NOTES_FILE}"
+            echo >> "${NOTES_FILE}"
+            echo "- Initial release." >> "${NOTES_FILE}"
+          fi
+
+          echo "notes_file=${NOTES_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ steps.notes.outputs.notes_file }}
+          if-no-files-found: error
+
+  github-release:
+    name: Publish GitHub Release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs:
+      - release-build-matrix
+      - release-docs-archives
+      - release-notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Show release payload
+        run: find dist -maxdepth 3 -type f | sort
+
+      - name: Read release notes
+        run: cp dist/release-notes/release-notes.md ./release-notes.md
+
+      - name: Publish release with binaries, docs, and notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            dist/release-binary-windows/wx_bgi_opengl-windows-x64.zip
+            dist/release-binary-linux/wx_bgi_opengl-linux-x64.tar.gz
+            dist/release-binary-macos/wx_bgi_opengl-macos-x64.tar.gz
+            dist/release-docs-zip/api-docs.zip
+            dist/release-docs-targz/api-docs.tar.gz
+          fail_on_unmatched_files: true
