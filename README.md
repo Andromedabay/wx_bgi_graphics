@@ -142,6 +142,8 @@ The text renderer now uses a scalable stroke-font implementation rather than the
 - text metrics from `textwidth` and `textheight` now reflect the actual scaled stroke layout more closely
 
 The current stroke-font implementation is still lightweight, but it is materially closer to classic BGI behavior than the old bitmap-only path.
+  
+The library has one shared glyph dataset used by all 5 font profiles (DEFAULT_FONT, TRIPLEX_FONT, SMALL_FONT, SANS_SERIF_FONT, GOTHIC_FONT). The profiles apply different scale, thickness, and slant on top of the same strokes — so adding glyphs once covers all fonts. All printable ASCII Glyphs are included now with Release v1.1.0.
 
 ## BGI Double Buffering Tutorial
 Please read more about this at [./Tutorial.md](./Tutorial.md)

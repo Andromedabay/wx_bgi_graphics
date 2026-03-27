@@ -103,6 +103,207 @@ namespace bgi
         constexpr Stroke kYStrokes[] = {{0, 0, 5, 7}, {10, 0, 5, 7}, {5, 7, 5, 14}};
         constexpr Stroke kZStrokes[] = {{0, 0, 10, 0}, {10, 0, 0, 14}, {0, 14, 10, 14}};
 
+        // ── Missing printable ASCII symbols ──────────────────────────────────────
+
+        // # hash: two vertical bars crossed by two horizontal bars
+        constexpr Stroke kHashStrokes[] = {
+            {3, 2, 3, 12}, {7, 2, 7, 12},
+            {1, 5, 9, 5},  {1, 9, 9, 9}};
+
+        // $ dollar: S-curve with vertical bar through centre
+        constexpr Stroke kDollarStrokes[] = {
+            {5, 0, 5, 14},
+            {9, 3, 7, 1}, {7, 1, 3, 1}, {3, 1, 1, 3}, {1, 3, 1, 5}, {1, 5, 3, 7},
+            {3, 7, 7, 7},
+            {7, 7, 9, 9}, {9, 9, 9, 11}, {9, 11, 7, 13}, {7, 13, 3, 13}, {3, 13, 1, 11}};
+
+        // % percent: upper diamond, diagonal, lower oval
+        constexpr Stroke kPercentStrokes[] = {
+            {1, 2, 3, 0}, {3, 0, 5, 2}, {5, 2, 3, 5}, {3, 5, 1, 2},
+            {0, 14, 10, 0},
+            {5, 9, 8, 9}, {8, 9, 10, 11}, {10, 11, 8, 14}, {8, 14, 5, 14}, {5, 14, 4, 11}, {4, 11, 5, 9}};
+
+        // & ampersand
+        constexpr Stroke kAmpersandStrokes[] = {
+            {7, 0, 9, 2}, {9, 2, 9, 4}, {9, 4, 7, 7},
+            {7, 7, 1, 5}, {1, 5, 1, 2}, {1, 2, 3, 0}, {3, 0, 7, 0},
+            {7, 7, 9, 10}, {9, 10, 9, 12}, {9, 12, 7, 14},
+            {7, 14, 2, 14}, {2, 14, 0, 12}, {0, 12, 0, 9}, {0, 9, 2, 7}, {2, 7, 7, 7}};
+
+        // < less-than
+        constexpr Stroke kLessThanStrokes[] = {
+            {9, 2, 1, 7}, {1, 7, 9, 12}};
+
+        // > greater-than
+        constexpr Stroke kGreaterThanStrokes[] = {
+            {1, 2, 9, 7}, {9, 7, 1, 12}};
+
+        // @ at-sign: outer ring + inner counter + exit tail
+        constexpr Stroke kAtStrokes[] = {
+            {4, 1, 8, 1}, {8, 1, 10, 3}, {10, 3, 10, 11}, {10, 11, 8, 13},
+            {8, 13, 4, 13}, {4, 13, 1, 11}, {1, 11, 1, 3}, {1, 3, 4, 1},
+            {5, 5, 8, 5}, {8, 5, 8, 10}, {8, 10, 5, 10}, {5, 10, 4, 9}, {4, 9, 4, 6}, {4, 6, 5, 5},
+            {8, 11, 10, 13}};
+
+        // ^ caret
+        constexpr Stroke kCaretStrokes[] = {
+            {1, 7, 5, 1}, {5, 1, 9, 7}};
+
+        // ` backtick
+        constexpr Stroke kBacktickStrokes[] = {
+            {3, 0, 5, 3}};
+
+        // { left brace
+        constexpr Stroke kLeftBraceStrokes[] = {
+            {7, 0, 5, 2}, {5, 2, 5, 6}, {5, 6, 3, 7},
+            {3, 7, 5, 8}, {5, 8, 5, 12}, {5, 12, 7, 14}};
+
+        // | vertical pipe
+        constexpr Stroke kPipeStrokes[] = {
+            {5, 0, 5, 14}};
+
+        // } right brace
+        constexpr Stroke kRightBraceStrokes[] = {
+            {3, 0, 5, 2}, {5, 2, 5, 6}, {5, 6, 7, 7},
+            {7, 7, 5, 8}, {5, 8, 5, 12}, {5, 12, 3, 14}};
+
+        // ~ tilde
+        constexpr Stroke kTildeStrokes[] = {
+            {0, 8, 2, 6}, {2, 6, 5, 8}, {5, 8, 8, 6}, {8, 6, 10, 8}};
+
+        // ── Distinct lowercase letter glyphs ─────────────────────────────────────
+        // x-height: y=5..14  ascenders: y=0..14  descender tails reach y=14
+
+        // a – single-story: counter + right stem
+        constexpr Stroke kLowerAStrokes[] = {
+            {2, 5, 8, 5}, {8, 5, 10, 7}, {10, 7, 10, 14},
+            {0, 7, 2, 5}, {0, 7, 0, 12}, {0, 12, 2, 14},
+            {2, 14, 8, 14}, {8, 14, 10, 12}};
+
+        // b – full ascender stem + right bowl
+        constexpr Stroke kLowerBStrokes[] = {
+            {0, 0, 0, 14},
+            {0, 7, 8, 7}, {8, 7, 10, 9}, {10, 9, 10, 12},
+            {10, 12, 8, 14}, {8, 14, 0, 14}};
+
+        // c – open oval
+        constexpr Stroke kLowerCStrokes[] = {
+            {10, 7, 8, 5}, {8, 5, 2, 5}, {2, 5, 0, 7},
+            {0, 7, 0, 12}, {0, 12, 2, 14},
+            {2, 14, 8, 14}, {8, 14, 10, 12}};
+
+        // d – oval + right ascender stem
+        constexpr Stroke kLowerDStrokes[] = {
+            {10, 0, 10, 14},
+            {10, 7, 8, 5}, {8, 5, 2, 5}, {2, 5, 0, 7},
+            {0, 7, 0, 12}, {0, 12, 2, 14}, {2, 14, 10, 14}};
+
+        // e – oval with mid-bar, open right
+        constexpr Stroke kLowerEStrokes[] = {
+            {0, 10, 10, 10},
+            {10, 10, 8, 5}, {8, 5, 2, 5}, {2, 5, 0, 7},
+            {0, 7, 0, 12}, {0, 12, 2, 14},
+            {2, 14, 8, 14}, {8, 14, 10, 12}};
+
+        // f – stem with top hook and crossbar
+        constexpr Stroke kLowerFStrokes[] = {
+            {5, 0, 5, 14}, {5, 2, 7, 0}, {2, 6, 8, 6}};
+
+        // g – counter + descender tail
+        constexpr Stroke kLowerGStrokes[] = {
+            {2, 5, 8, 5}, {8, 5, 10, 7},
+            {10, 7, 10, 11}, {10, 11, 8, 13}, {8, 13, 2, 13},
+            {2, 13, 0, 11}, {0, 11, 0, 7}, {0, 7, 2, 5},
+            {10, 7, 10, 14}, {8, 14, 10, 14}};
+
+        // h – left ascender stem + right arch
+        constexpr Stroke kLowerHStrokes[] = {
+            {0, 0, 0, 14},
+            {0, 7, 8, 7}, {8, 7, 10, 9}, {10, 9, 10, 14}};
+
+        // i – dot + stem
+        constexpr Stroke kLowerIStrokes[] = {
+            {5, 5, 5, 14}, {5, 3, 5, 3}};
+
+        // j – dot + stem + bottom hook (descender)
+        constexpr Stroke kLowerJStrokes[] = {
+            {5, 5, 5, 12}, {5, 12, 3, 14}, {5, 3, 5, 3}};
+
+        // k – stem + upper arm + lower leg
+        constexpr Stroke kLowerKStrokes[] = {
+            {0, 0, 0, 14}, {10, 5, 0, 10}, {3, 9, 10, 14}};
+
+        // l – stem with bottom foot
+        constexpr Stroke kLowerLStrokes[] = {
+            {5, 0, 5, 14}, {5, 14, 8, 14}};
+
+        // m – left leg + two arches
+        constexpr Stroke kLowerMStrokes[] = {
+            {0, 5, 0, 14}, {0, 5, 5, 5}, {5, 5, 5, 14},
+            {5, 5, 10, 5}, {10, 5, 10, 14}};
+
+        // n – left stem + single arch
+        constexpr Stroke kLowerNStrokes[] = {
+            {0, 5, 0, 14}, {0, 5, 8, 5},
+            {8, 5, 10, 7}, {10, 7, 10, 14}};
+
+        // o – closed oval
+        constexpr Stroke kLowerOStrokes[] = {
+            {2, 5, 8, 5}, {8, 5, 10, 7}, {10, 7, 10, 12},
+            {10, 12, 8, 14}, {8, 14, 2, 14}, {2, 14, 0, 12},
+            {0, 12, 0, 7}, {0, 7, 2, 5}};
+
+        // p – left stem (descender) + right bowl
+        constexpr Stroke kLowerPStrokes[] = {
+            {0, 5, 0, 14},
+            {0, 5, 8, 5}, {8, 5, 10, 7}, {10, 7, 10, 11},
+            {10, 11, 8, 13}, {8, 13, 0, 13}};
+
+        // q – right stem (descender) + left oval
+        constexpr Stroke kLowerQStrokes[] = {
+            {10, 5, 10, 14},
+            {10, 5, 2, 5}, {2, 5, 0, 7}, {0, 7, 0, 11},
+            {0, 11, 2, 13}, {2, 13, 10, 13}};
+
+        // r – left stem + short shoulder
+        constexpr Stroke kLowerRStrokes[] = {
+            {0, 5, 0, 14}, {0, 5, 6, 5}, {6, 5, 8, 7}};
+
+        // s – small s-curve
+        constexpr Stroke kLowerSStrokes[] = {
+            {9, 6, 7, 5}, {7, 5, 2, 5}, {2, 5, 0, 7},
+            {0, 7, 2, 9}, {2, 9, 8, 9}, {8, 9, 10, 11},
+            {10, 11, 8, 14}, {8, 14, 2, 14}, {2, 14, 0, 13}};
+
+        // t – stem with crossbar
+        constexpr Stroke kLowerTStrokes[] = {
+            {5, 0, 5, 14}, {2, 6, 8, 6}};
+
+        // u – two stems joined at bottom
+        constexpr Stroke kLowerUStrokes[] = {
+            {0, 5, 0, 12}, {0, 12, 2, 14}, {2, 14, 8, 14},
+            {8, 14, 10, 12}, {10, 12, 10, 5}};
+
+        // v – two diagonals meeting at bottom
+        constexpr Stroke kLowerVStrokes[] = {
+            {0, 5, 5, 14}, {5, 14, 10, 5}};
+
+        // w – double-v
+        constexpr Stroke kLowerWStrokes[] = {
+            {0, 5, 2, 14}, {2, 14, 5, 8}, {5, 8, 8, 14}, {8, 14, 10, 5}};
+
+        // x – crossing diagonals
+        constexpr Stroke kLowerXStrokes[] = {
+            {0, 5, 10, 14}, {10, 5, 0, 14}};
+
+        // y – arms + descending stem
+        constexpr Stroke kLowerYStrokes[] = {
+            {0, 5, 5, 10}, {10, 5, 5, 10}, {5, 10, 3, 14}};
+
+        // z – Z-shape at x-height
+        constexpr Stroke kLowerZStrokes[] = {
+            {0, 5, 10, 5}, {10, 5, 0, 14}, {0, 14, 10, 14}};
+
         const StrokeGlyph kGlyphUnknown{12, kUnknownStrokes, std::size(kUnknownStrokes)};
         const StrokeGlyph kGlyphSpace{6, nullptr, 0};
 
@@ -211,52 +412,81 @@ namespace bgi
 
         StrokeGlyph glyphForChar(unsigned char c)
         {
-            if (c >= 'a' && c <= 'z')
-            {
-                c = static_cast<unsigned char>(c - 'a' + 'A');
-            }
-
             switch (c)
             {
+            // ── Whitespace ────────────────────────────────────────────────────────
             case ' ':
                 return kGlyphSpace;
-            case '-':
-                return {10, kDashStrokes, std::size(kDashStrokes)};
-            case '_':
-                return {10, kUnderscoreStrokes, std::size(kUnderscoreStrokes)};
-            case '.':
-                return {6, kPeriodStrokes, std::size(kPeriodStrokes)};
-            case ':':
-                return {6, kColonStrokes, std::size(kColonStrokes)};
-            case ';':
-                return {6, kSemicolonStrokes, std::size(kSemicolonStrokes)};
-            case ',':
-                return {6, kCommaStrokes, std::size(kCommaStrokes)};
+
+            // ── Punctuation / operators already defined ───────────────────────────
             case '!':
                 return {6, kExclamationStrokes, std::size(kExclamationStrokes)};
-            case '?':
-                return {12, kQuestionStrokes, std::size(kQuestionStrokes)};
-            case '/':
-                return {10, kSlashStrokes, std::size(kSlashStrokes)};
-            case '\\':
-                return {10, kBackslashStrokes, std::size(kBackslashStrokes)};
-            case '+':
-                return {12, kPlusStrokes, std::size(kPlusStrokes)};
-            case '*':
-                return {12, kAsteriskStrokes, std::size(kAsteriskStrokes)};
+            case '"':
+                return {8, kQuoteStrokes, std::size(kQuoteStrokes)};
+            case '\'':
+                return {6, kQuoteStrokes, std::size(kQuoteStrokes)};
             case '(':
                 return {8, kLeftParenStrokes, std::size(kLeftParenStrokes)};
             case ')':
                 return {8, kRightParenStrokes, std::size(kRightParenStrokes)};
-            case '[':
-                return {8, kLeftBracketStrokes, std::size(kLeftBracketStrokes)};
-            case ']':
-                return {8, kRightBracketStrokes, std::size(kRightBracketStrokes)};
+            case '*':
+                return {12, kAsteriskStrokes, std::size(kAsteriskStrokes)};
+            case '+':
+                return {12, kPlusStrokes, std::size(kPlusStrokes)};
+            case ',':
+                return {6, kCommaStrokes, std::size(kCommaStrokes)};
+            case '-':
+                return {10, kDashStrokes, std::size(kDashStrokes)};
+            case '.':
+                return {6, kPeriodStrokes, std::size(kPeriodStrokes)};
+            case '/':
+                return {10, kSlashStrokes, std::size(kSlashStrokes)};
+            case ':':
+                return {6, kColonStrokes, std::size(kColonStrokes)};
+            case ';':
+                return {6, kSemicolonStrokes, std::size(kSemicolonStrokes)};
             case '=':
                 return {12, kEqualStrokes, std::size(kEqualStrokes)};
-            case '\'':
-            case '"':
-                return {8, kQuoteStrokes, std::size(kQuoteStrokes)};
+            case '?':
+                return {12, kQuestionStrokes, std::size(kQuestionStrokes)};
+            case '[':
+                return {8, kLeftBracketStrokes, std::size(kLeftBracketStrokes)};
+            case '\\':
+                return {10, kBackslashStrokes, std::size(kBackslashStrokes)};
+            case ']':
+                return {8, kRightBracketStrokes, std::size(kRightBracketStrokes)};
+            case '_':
+                return {10, kUnderscoreStrokes, std::size(kUnderscoreStrokes)};
+
+            // ── Newly added symbols ───────────────────────────────────────────────
+            case '#':
+                return {12, kHashStrokes, std::size(kHashStrokes)};
+            case '$':
+                return {12, kDollarStrokes, std::size(kDollarStrokes)};
+            case '%':
+                return {14, kPercentStrokes, std::size(kPercentStrokes)};
+            case '&':
+                return {12, kAmpersandStrokes, std::size(kAmpersandStrokes)};
+            case '<':
+                return {10, kLessThanStrokes, std::size(kLessThanStrokes)};
+            case '>':
+                return {10, kGreaterThanStrokes, std::size(kGreaterThanStrokes)};
+            case '@':
+                return {14, kAtStrokes, std::size(kAtStrokes)};
+            case '^':
+                return {10, kCaretStrokes, std::size(kCaretStrokes)};
+            case '`':
+                return {6, kBacktickStrokes, std::size(kBacktickStrokes)};
+            case '{':
+                return {8, kLeftBraceStrokes, std::size(kLeftBraceStrokes)};
+            case '|':
+                return {6, kPipeStrokes, std::size(kPipeStrokes)};
+            case '}':
+                return {8, kRightBraceStrokes, std::size(kRightBraceStrokes)};
+            case '~':
+                return {10, kTildeStrokes, std::size(kTildeStrokes)};
+
+            // ── Digits ────────────────────────────────────────────────────────────
             case '0':
                 return {12, kZeroStrokes, std::size(kZeroStrokes)};
             case '1':
@@ -277,6 +507,8 @@ namespace bgi
                 return {12, kEightStrokes, std::size(kEightStrokes)};
             case '9':
                 return {12, kNineStrokes, std::size(kNineStrokes)};
+
+            // ── Uppercase letters ─────────────────────────────────────────────────
             case 'A':
                 return {12, kAStrokes, std::size(kAStrokes)};
             case 'B':
@@ -329,6 +561,61 @@ namespace bgi
                 return {12, kYStrokes, std::size(kYStrokes)};
             case 'Z':
                 return {12, kZStrokes, std::size(kZStrokes)};
+
+            // ── Lowercase letters (distinct glyphs, not mapped to uppercase) ──────
+            case 'a':
+                return {11, kLowerAStrokes, std::size(kLowerAStrokes)};
+            case 'b':
+                return {11, kLowerBStrokes, std::size(kLowerBStrokes)};
+            case 'c':
+                return {10, kLowerCStrokes, std::size(kLowerCStrokes)};
+            case 'd':
+                return {11, kLowerDStrokes, std::size(kLowerDStrokes)};
+            case 'e':
+                return {10, kLowerEStrokes, std::size(kLowerEStrokes)};
+            case 'f':
+                return {8, kLowerFStrokes, std::size(kLowerFStrokes)};
+            case 'g':
+                return {11, kLowerGStrokes, std::size(kLowerGStrokes)};
+            case 'h':
+                return {11, kLowerHStrokes, std::size(kLowerHStrokes)};
+            case 'i':
+                return {6, kLowerIStrokes, std::size(kLowerIStrokes)};
+            case 'j':
+                return {7, kLowerJStrokes, std::size(kLowerJStrokes)};
+            case 'k':
+                return {10, kLowerKStrokes, std::size(kLowerKStrokes)};
+            case 'l':
+                return {6, kLowerLStrokes, std::size(kLowerLStrokes)};
+            case 'm':
+                return {13, kLowerMStrokes, std::size(kLowerMStrokes)};
+            case 'n':
+                return {11, kLowerNStrokes, std::size(kLowerNStrokes)};
+            case 'o':
+                return {11, kLowerOStrokes, std::size(kLowerOStrokes)};
+            case 'p':
+                return {11, kLowerPStrokes, std::size(kLowerPStrokes)};
+            case 'q':
+                return {11, kLowerQStrokes, std::size(kLowerQStrokes)};
+            case 'r':
+                return {8, kLowerRStrokes, std::size(kLowerRStrokes)};
+            case 's':
+                return {10, kLowerSStrokes, std::size(kLowerSStrokes)};
+            case 't':
+                return {8, kLowerTStrokes, std::size(kLowerTStrokes)};
+            case 'u':
+                return {11, kLowerUStrokes, std::size(kLowerUStrokes)};
+            case 'v':
+                return {11, kLowerVStrokes, std::size(kLowerVStrokes)};
+            case 'w':
+                return {13, kLowerWStrokes, std::size(kLowerWStrokes)};
+            case 'x':
+                return {10, kLowerXStrokes, std::size(kLowerXStrokes)};
+            case 'y':
+                return {11, kLowerYStrokes, std::size(kLowerYStrokes)};
+            case 'z':
+                return {10, kLowerZStrokes, std::size(kLowerZStrokes)};
+
             default:
                 return kGlyphUnknown;
             }
