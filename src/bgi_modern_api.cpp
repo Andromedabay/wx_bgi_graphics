@@ -307,3 +307,40 @@ BGI_API int BGI_CALL wxbgi_read_pixels_rgba8(int x, int y, int width, int height
     bgi::gState.lastResult = bgi::grOk;
     return byteCount;
 }
+
+BGI_API int BGI_CALL wxbgi_write_pixels_rgba8(int x, int y, int width, int height, const unsigned char *inBuffer, int inBufferSize)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked() || inBuffer == nullptr)
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return -1;
+    }
+
+    const int byteCount = checkedByteCount(width, height);
+    if (byteCount < 0 || inBufferSize < byteCount)
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return -1;
+    }
+
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    glfwGetFramebufferSize(bgi::gState.window, &framebufferWidth, &framebufferHeight);
+
+    const long long x2 = static_cast<long long>(x) + static_cast<long long>(width);
+    const long long y2 = static_cast<long long>(y) + static_cast<long long>(height);
+    if (x < 0 || y < 0 || x2 > framebufferWidth || y2 > framebufferHeight)
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return -1;
+    }
+
+    glfwMakeContextCurrent(bgi::gState.window);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glWindowPos2i(x, y);
+    glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, inBuffer);
+
+    bgi::gState.lastResult = bgi::grOk;
+    return byteCount;
+}

@@ -161,6 +161,8 @@ def configure_prototypes(lib):
     lib.wxbgi_end_advanced_frame.restype = ctypes.c_int
     lib.wxbgi_read_pixels_rgba8.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int]
     lib.wxbgi_read_pixels_rgba8.restype = ctypes.c_int
+    lib.wxbgi_write_pixels_rgba8.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int]
+    lib.wxbgi_write_pixels_rgba8.restype = ctypes.c_int
     return callback_type
 
 
@@ -216,6 +218,13 @@ def main() -> int:
 
     require(lib.wxbgi_begin_advanced_frame(0.05, 0.08, 0.12, 1.0, 1, 0) == 0, "wxbgi_begin_advanced_frame failed")
     require(lib.wxbgi_end_advanced_frame(0) == 0, "wxbgi_end_advanced_frame failed")
+    write_pixels = (ctypes.c_ubyte * 16)(
+        255, 32, 32, 255,
+        32, 255, 32, 255,
+        32, 32, 255, 255,
+        255, 255, 32, 255,
+    )
+    require(lib.wxbgi_write_pixels_rgba8(1, 1, 2, 2, write_pixels, 16) > 0, "wxbgi_write_pixels_rgba8 failed")
     pixel = (ctypes.c_ubyte * 4)()
     require(lib.wxbgi_read_pixels_rgba8(0, 0, 1, 1, pixel, 4) > 0, "wxbgi_read_pixels_rgba8 failed")
     require(lib.wxbgi_swap_window_buffers() == 0, "wxbgi_swap_window_buffers failed")

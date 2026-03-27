@@ -122,4 +122,13 @@ BGI_API int BGI_CALL wxbgi_end_advanced_frame(int swapBuffers);
  */
 BGI_API int BGI_CALL wxbgi_read_pixels_rgba8(int x, int y, int width, int height, unsigned char *outBuffer, int outBufferSize);
 
+/**
+ * @brief Writes RGBA8 pixels into the current framebuffer.
+ *
+ * This replaces a rectangular region with caller-provided pixel data and is
+ * useful for texture-less blits, overlays, and framebuffer restore operations.
+ * @return Number of bytes consumed, or a negative value on error.
+ */
+BGI_API int BGI_CALL wxbgi_write_pixels_rgba8(int x, int y, int width, int height, const unsigned char *inBuffer, int inBufferSize);
+
 /** @} */

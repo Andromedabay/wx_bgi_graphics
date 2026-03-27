@@ -192,6 +192,7 @@ function wxbgi_get_gl_string(which: LongInt): PChar; cdecl; external BgiLib;
 function wxbgi_begin_advanced_frame(r, g, b, a: Single; clearColor, clearDepth: LongInt): LongInt; cdecl; external BgiLib;
 function wxbgi_end_advanced_frame(swapBuf: LongInt): LongInt; cdecl; external BgiLib;
 function wxbgi_read_pixels_rgba8(x, y, w, h: LongInt; outBuffer: PByte; outBufferSize: LongInt): LongInt; cdecl; external BgiLib;
+function wxbgi_write_pixels_rgba8(x, y, w, h: LongInt; inBuffer: PByte; inBufferSize: LongInt): LongInt; cdecl; external BgiLib;
 
 procedure Require(Condition: Boolean; const Msg: string);
 begin
@@ -206,6 +207,7 @@ var
   gd, gm, loMode, hiMode, xasp, yasp, InitGraphStatus: LongInt;
   WinW, WinH, FbW, FbH: LongInt;
   ReadBuf: array[0..3] of Byte;
+  WriteBuf: array[0..15] of Byte;
   ElapsedTime: Double;
   ArcInfo: TArcCoords;
   FillInfo: TFillSettings;
@@ -371,6 +373,12 @@ begin
 
   Require(wxbgi_begin_advanced_frame(0.05, 0.08, 0.12, 1.0, 1, 0) = 0, 'wxbgi_begin_advanced_frame failed');
   Require(wxbgi_end_advanced_frame(0) = 0, 'wxbgi_end_advanced_frame failed');
+
+  WriteBuf[0] := 255; WriteBuf[1] := 32;  WriteBuf[2] := 32;  WriteBuf[3] := 255;
+  WriteBuf[4] := 32;  WriteBuf[5] := 255; WriteBuf[6] := 32;  WriteBuf[7] := 255;
+  WriteBuf[8] := 32;  WriteBuf[9] := 32;  WriteBuf[10] := 255; WriteBuf[11] := 255;
+  WriteBuf[12] := 255; WriteBuf[13] := 255; WriteBuf[14] := 32; WriteBuf[15] := 255;
+  Require(wxbgi_write_pixels_rgba8(1, 1, 2, 2, @WriteBuf[0], SizeOf(WriteBuf)) > 0, 'wxbgi_write_pixels_rgba8 failed');
 
   FillChar(ReadBuf, SizeOf(ReadBuf), 0);
   Require(wxbgi_read_pixels_rgba8(0, 0, 1, 1, @ReadBuf[0], SizeOf(ReadBuf)) > 0, 'wxbgi_read_pixels_rgba8 failed');

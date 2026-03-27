@@ -192,6 +192,15 @@ namespace
         require(wxbgi_begin_advanced_frame(0.08f, 0.10f, 0.14f, 1.0f, 1, 0) == 0, "wxbgi_begin_advanced_frame failed");
         require(wxbgi_end_advanced_frame(1) == 0, "wxbgi_end_advanced_frame failed");
 
+        std::array<unsigned char, 16> writePixels = {
+            255, 32, 32, 255,
+            32, 255, 32, 255,
+            32, 32, 255, 255,
+            255, 255, 32, 255};
+        require(
+            wxbgi_write_pixels_rgba8(1, 1, 2, 2, writePixels.data(), static_cast<int>(writePixels.size())) > 0,
+            "wxbgi_write_pixels_rgba8 failed");
+
         std::vector<unsigned char> pixels(4 * 4 * 4);
         require(wxbgi_read_pixels_rgba8(0, 0, 4, 4, pixels.data(), static_cast<int>(pixels.size())) > 0, "wxbgi_read_pixels_rgba8 failed");
         require(wxbgi_swap_window_buffers() == 0, "wxbgi_swap_window_buffers failed");
