@@ -176,10 +176,12 @@ if(FPC_COMPILER)
         OUTPUT ${CMAKE_BINARY_DIR}/bgidemo_pascal/bgidemo${CMAKE_EXECUTABLE_SUFFIX}
         COMMAND ${FPC_COMPILER}
                 -Fu${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal
+                -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
                 -FE${CMAKE_BINARY_DIR}/bgidemo_pascal
                 -FU${CMAKE_BINARY_DIR}/bgidemo_pascal
                 ${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal/bgidemo.pas
         DEPENDS
+            wx_bgi_opengl
             ${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal/bgidemo.pas
             ${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal/Graph.pas
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -200,10 +202,13 @@ if(FPC_COMPILER)
         OUTPUT ${CMAKE_BINARY_DIR}/keyboard_queue_pascal/demo_wxbgi_keyboard_queue${CMAKE_EXECUTABLE_SUFFIX}
         COMMAND ${FPC_COMPILER}
                 -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
                 -FE${CMAKE_BINARY_DIR}/keyboard_queue_pascal
                 -FU${CMAKE_BINARY_DIR}/keyboard_queue_pascal
                 ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas
-        DEPENDS ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas
+        DEPENDS
+            wx_bgi_opengl
+            ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM
     )
@@ -240,10 +245,13 @@ if(BUILD_TESTING)
             OUTPUT ${CMAKE_BINARY_DIR}/pascal_coverage/demo_bgi_api_coverage${CMAKE_EXECUTABLE_SUFFIX}
             COMMAND ${FPC_COMPILER}
                     -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
                     -FE${CMAKE_BINARY_DIR}/pascal_coverage
                     -FU${CMAKE_BINARY_DIR}/pascal_coverage
                     ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_api_coverage.pas
-            DEPENDS ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_api_coverage.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_api_coverage.pas
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             VERBATIM
         )
@@ -264,10 +272,19 @@ if(BUILD_TESTING)
         )
         set_tests_properties(bgi_api_coverage_pascal_build PROPERTIES TIMEOUT 20)
 
-        add_test(
-            NAME bgi_api_coverage_pascal_run
-            COMMAND ${CMAKE_BINARY_DIR}/pascal_coverage/demo_bgi_api_coverage${CMAKE_EXECUTABLE_SUFFIX}
-        )
+        if(UNIX AND NOT APPLE)
+            add_test(
+                NAME bgi_api_coverage_pascal_run
+                COMMAND ${CMAKE_COMMAND} -E env
+                        "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/pascal_coverage:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
+                        ${CMAKE_BINARY_DIR}/pascal_coverage/demo_bgi_api_coverage${CMAKE_EXECUTABLE_SUFFIX}
+            )
+        else()
+            add_test(
+                NAME bgi_api_coverage_pascal_run
+                COMMAND ${CMAKE_BINARY_DIR}/pascal_coverage/demo_bgi_api_coverage${CMAKE_EXECUTABLE_SUFFIX}
+            )
+        endif()
         set_tests_properties(
             bgi_api_coverage_pascal_run
             PROPERTIES
