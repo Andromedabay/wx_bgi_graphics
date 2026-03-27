@@ -56,9 +56,28 @@ jobs:
         shell: pwsh
         run: cmake --build build -j --config Debug
 
-      - name: Setup Mesa software renderer (Windows/macOS)
-        if: runner.os != 'Linux'
-        uses: ssciwr/setup-mesa-action@v1
+      - name: Install Mesa software renderer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # pal1000/mesa-dist-win provides Mesa3D for Windows (llvmpipe/gallium-d3d12).
+          # Placing its DLLs next to the library/test binary gives GLFW a real OpenGL
+          # 2.1 driver that the Windows GDI stub cannot provide on headless CI VMs.
+          $rel = Invoke-RestMethod `
+            'https://api.github.com/repos/pal1000/mesa-dist-win/releases/latest' `
+            -Headers @{ Authorization = "Bearer $env:GITHUB_TOKEN"; 'User-Agent' = 'gh-actions' }
+          $url = ($rel.assets | Where-Object { $_.name -match 'release-msvc\.7z$' }).browser_download_url
+          Invoke-WebRequest $url -OutFile mesa.7z
+          7z x mesa.7z -omesa -y | Out-Null
+          $mesaDir = (Get-ChildItem mesa -Recurse -Filter 'opengl32.dll' |
+                      Where-Object { $_.DirectoryName -match 'x64' } |
+                      Select-Object -First 1).DirectoryName
+          if (-not $mesaDir) { throw 'Mesa x64 opengl32.dll not found in archive' }
+          New-Item -ItemType Directory -Force -Path build\Debug | Out-Null
+          Get-ChildItem $mesaDir -Filter '*.dll' |
+            ForEach-Object { Copy-Item $_.FullName "build\Debug\$($_.Name)" -Force }
 
       - name: Test (Windows Debug)
         if: runner.os == 'Windows'
@@ -138,9 +157,25 @@ jobs:
         shell: pwsh
         run: cmake --build build -j --config Release
 
-      - name: Setup Mesa software renderer (Windows/macOS)
-        if: runner.os != 'Linux'
-        uses: ssciwr/setup-mesa-action@v1
+      - name: Install Mesa software renderer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $rel = Invoke-RestMethod `
+            'https://api.github.com/repos/pal1000/mesa-dist-win/releases/latest' `
+            -Headers @{ Authorization = "Bearer $env:GITHUB_TOKEN"; 'User-Agent' = 'gh-actions' }
+          $url = ($rel.assets | Where-Object { $_.name -match 'release-msvc\.7z$' }).browser_download_url
+          Invoke-WebRequest $url -OutFile mesa.7z
+          7z x mesa.7z -omesa -y | Out-Null
+          $mesaDir = (Get-ChildItem mesa -Recurse -Filter 'opengl32.dll' |
+                      Where-Object { $_.DirectoryName -match 'x64' } |
+                      Select-Object -First 1).DirectoryName
+          if (-not $mesaDir) { throw 'Mesa x64 opengl32.dll not found in archive' }
+          New-Item -ItemType Directory -Force -Path build\Release | Out-Null
+          Get-ChildItem $mesaDir -Filter '*.dll' |
+            ForEach-Object { Copy-Item $_.FullName "build\Release\$($_.Name)" -Force }
 
       - name: Test (Windows Release)
         if: runner.os == 'Windows'
