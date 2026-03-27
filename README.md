@@ -208,77 +208,6 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 
 ## CI Example (GitHub Actions)
 
-The YAML block below is an abbreviated example for the Debug pipeline only. The authoritative workflow is `.github/workflows/CI.yml`, which also includes Linux X11/OpenGL setup, Windows Mesa software rendering, macOS hosted-runner limitations, release packaging, release notes, and GitHub Pages deployment for the generated API docs.
-
-```yaml
-name: ci
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  build-test-docs:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install Doxygen (Windows)
-        if: runner.os == 'Windows'
-        run: choco install doxygen.install -y
-
-      - name: Install Doxygen (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen
-
-      - name: Install Doxygen (macOS)
-        if: runner.os == 'macOS'
-        run: brew install doxygen
-
-      - name: Configure (Windows)
-        if: runner.os == 'Windows'
-        run: cmake -S . -B build
-
-      - name: Build (Windows Debug)
-        if: runner.os == 'Windows'
-        run: cmake --build build -j --config Debug
-
-      - name: Test (Windows Debug)
-        if: runner.os == 'Windows'
-        run: ctest --test-dir build -C Debug --output-on-failure
-
-      - name: Docs (Windows Debug)
-        if: runner.os == 'Windows'
-        run: cmake --build build --target api_docs -j --config Debug
-
-      - name: Configure (Linux/macOS Debug)
-        if: runner.os != 'Windows'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-
-      - name: Build (Linux/macOS Debug)
-        if: runner.os != 'Windows'
-        run: cmake --build build -j
-
-      - name: Test (Linux/macOS Debug)
-        if: runner.os != 'Windows'
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Docs (Linux/macOS Debug)
-        if: runner.os != 'Windows'
-        run: cmake --build build --target api_docs -j
-```
-
   Actual repository workflow file:
 
   - `.github/workflows/CI.yml`
@@ -300,6 +229,8 @@ jobs:
 
   1. Open repository Settings -> Pages.
   2. Under Build and deployment, set Source to GitHub Actions.
+  3. Open repository Settings -> Environments -> github-pages.
+  4. If deployment protection rules are enabled there, allow deployments from release tags such as `v*`, or remove the branch/tag restriction for the `github-pages` environment.
 
   To create a release from CI:
 
