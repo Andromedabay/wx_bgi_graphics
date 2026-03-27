@@ -58,7 +58,7 @@ Repeat the process for animation.
 
 Destroy buffers and close graphics.
   
-<image src="images/DoubleBuffering.png" width="400" height="400"></image>
+<image src="images/Minimum_Buffers_for_Double_buffering.png" width="738" height="175"></image>
   
 ### 2. Pseudo‑Code (Generic Explanation)
 
@@ -80,6 +80,9 @@ end while
 destroy_buffer(backBuffer)
 shutdown_graphics()
 ```
+  
+<image src="images/DoubleBuffering.png" width="800" height="800"></image>
+  
 
 ### 3. Pseudo‑Code Using Your Actual Library Function Names
 
