@@ -48,6 +48,44 @@ In addition to classic BGI, the library now exports an optional non-BGI extensio
 
 This extension API is intended to complement BGI compatibility, not replace it.
 
+### Keyboard Queue Helpers
+
+The extension API also exposes a small keyboard input layer for GUI-style event waits that do not rely on terminal or console input.
+
+- `wxbgi_key_pressed()` reports whether a translated key event is waiting in the internal queue.
+- `wxbgi_read_key()` consumes the next queued key code.
+- `wxbgi_is_key_down(glfwKey)` checks raw key-down state for a GLFW key code such as `GLFW_KEY_ESCAPE` or `GLFW_KEY_LEFT`.
+
+Input is captured from the graphics window through GLFW callbacks.
+
+- Printable keys are queued as normal character codes.
+- Special keys like `Esc`, `Enter`, and `Tab` are queued as their classic ASCII control values.
+- Extended keys use DOS-style compatibility semantics: `wxbgi_read_key()` returns `0` first, then returns the scan code on the next read.
+
+This makes it practical to port old Pascal and BGI programs that used `KeyPressed` and `ReadKey` style control flow without falling back to `Crt`.
+
+### Internal Test Seam Security Policy
+
+To support deterministic CI validation without GUI key injection, the project has optional internal keyboard test seam APIs:
+
+- `wxbgi_test_clear_key_queue()`
+- `wxbgi_test_inject_key_code()`
+- `wxbgi_test_inject_extended_scan()`
+
+Security policy:
+
+- These APIs are compiled only when `WXBGI_ENABLE_TEST_SEAMS=ON`.
+- Default is `OFF` so release/public binaries do not expose synthetic input injection.
+- CI/system tests can enable them explicitly for deterministic keyboard queue checks.
+
+Example test-only configure:
+
+```powershell
+cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
+```
+
+Do not enable this option for production distribution artifacts.
+
 ### Advanced API Usage Example
 
 The snippet below shows a minimal frame loop that mixes classic BGI drawing with the extension API:
@@ -105,6 +143,12 @@ The examples are under the ./examples/ folder.
 
 - `examples/demoFreePascal/demo_bgi_wrapper_gui.pas`
 - `examples/demoFreePascal/demo_bgi_wrapper.pas`
+- `examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas`
+
+### Example - direct keyboard queue
+
+- `examples/cpp/wxbgi_keyboard_queue.cpp`
+- `examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas`
 
 ### Coverage Examples
 
@@ -130,6 +174,7 @@ To build this project yourself, ensure you have the following tools and librarie
 ## Building the Project
 
 - Updated FreePascal demo instructions are in examples/demoFreePascal/README.md.
+- Pascal BGIDemo port instructions are in examples/bgidemo-pascal/README.md.
 
 ## Build, Test, and Docs on Windows/Linux/macOS
 

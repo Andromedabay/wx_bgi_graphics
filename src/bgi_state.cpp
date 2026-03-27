@@ -69,6 +69,7 @@ namespace bgi
         {
             gState.keyQueue.pop();
         }
+        gState.keyDown.fill(0);
         gState.mouseX = 0;
         gState.mouseY = 0;
         resetPaletteState();

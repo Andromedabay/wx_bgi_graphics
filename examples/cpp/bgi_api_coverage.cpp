@@ -171,6 +171,23 @@ namespace
 
         require(wxbgi_is_ready() == 1, "wxbgi_is_ready failed");
         require(wxbgi_poll_events() == 0, "wxbgi_poll_events failed");
+
+    #ifdef WXBGI_ENABLE_TEST_SEAMS
+        require(wxbgi_test_clear_key_queue() == 0, "wxbgi_test_clear_key_queue failed");
+        require(wxbgi_key_pressed() == 0, "wxbgi_key_pressed should be empty after clear");
+        require(wxbgi_read_key() == -1, "wxbgi_read_key should be empty after clear");
+
+        require(wxbgi_test_inject_key_code('A') == 0, "wxbgi_test_inject_key_code failed");
+        require(wxbgi_key_pressed() == 1, "wxbgi_key_pressed missing injected key");
+        require(wxbgi_read_key() == 'A', "wxbgi_read_key mismatch for injected normal key");
+        require(wxbgi_key_pressed() == 0, "wxbgi_key_pressed should be empty after normal key read");
+
+        require(wxbgi_test_inject_extended_scan(75) == 0, "wxbgi_test_inject_extended_scan failed");
+        require(wxbgi_read_key() == 0, "extended key prefix mismatch");
+        require(wxbgi_read_key() == 75, "extended key scan mismatch");
+        require(wxbgi_key_pressed() == 0, "wxbgi_key_pressed should be empty after extended key read");
+    #endif
+
         require(wxbgi_should_close() == 0, "wxbgi_should_close unexpected close flag");
         require(wxbgi_set_window_title("Advanced API Coverage") == 0, "wxbgi_set_window_title failed");
         require(wxbgi_set_vsync(1) == 0, "wxbgi_set_vsync failed");

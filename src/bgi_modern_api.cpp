@@ -71,6 +71,98 @@ BGI_API int BGI_CALL wxbgi_poll_events(void)
     return 0;
 }
 
+BGI_API int BGI_CALL wxbgi_key_pressed(void)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return 0;
+    }
+
+    bgi::gState.lastResult = bgi::grOk;
+    return bgi::gState.keyQueue.empty() ? 0 : 1;
+}
+
+BGI_API int BGI_CALL wxbgi_read_key(void)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    if (bgi::gState.keyQueue.empty())
+    {
+        bgi::gState.lastResult = bgi::grOk;
+        return -1;
+    }
+
+    const int keyCode = bgi::gState.keyQueue.front();
+    bgi::gState.keyQueue.pop();
+    bgi::gState.lastResult = bgi::grOk;
+    return keyCode;
+}
+
+BGI_API int BGI_CALL wxbgi_is_key_down(int key)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked() || key < 0 || key >= static_cast<int>(bgi::gState.keyDown.size()))
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return -1;
+    }
+
+    bgi::gState.lastResult = bgi::grOk;
+    return bgi::gState.keyDown[static_cast<std::size_t>(key)] != 0U ? 1 : 0;
+}
+
+#ifdef WXBGI_ENABLE_TEST_SEAMS
+BGI_API int BGI_CALL wxbgi_test_clear_key_queue(void)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    while (!bgi::gState.keyQueue.empty())
+    {
+        bgi::gState.keyQueue.pop();
+    }
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_inject_key_code(int keyCode)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked() || keyCode < 0 || keyCode > 255)
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return -1;
+    }
+
+    bgi::gState.keyQueue.push(keyCode);
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_inject_extended_scan(int scanCode)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked() || scanCode < 0 || scanCode > 255)
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return -1;
+    }
+
+    bgi::gState.keyQueue.push(0);
+    bgi::gState.keyQueue.push(scanCode);
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+#endif
+
 BGI_API int BGI_CALL wxbgi_should_close(void)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);

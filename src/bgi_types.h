@@ -223,6 +223,7 @@ namespace bgi
         std::string windowTitle{"BGI OpenGL Wrapper"};
         bool doubleBuffered{false};
         std::queue<int> keyQueue;
+        std::array<std::uint8_t, 512> keyDown{};
         int mouseX{0};
         int mouseY{0};
     };

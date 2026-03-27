@@ -28,6 +28,63 @@ BGI_API int BGI_CALL wxbgi_is_ready(void);
  */
 BGI_API int BGI_CALL wxbgi_poll_events(void);
 /**
+ * @brief Reports whether a translated keyboard key event is pending.
+ *
+ * Returns 1 when @ref wxbgi_read_key can consume a queued key, otherwise 0.
+ * Queue contents are generated from GLFW key and character callbacks attached
+ * to the active graphics window.
+ */
+BGI_API int BGI_CALL wxbgi_key_pressed(void);
+/**
+ * @brief Reads the next translated keyboard event from the internal queue.
+ *
+ * Returns a non-negative key code when available, or -1 when no key is pending.
+ * Printable keys arrive as character codes. Special keys such as Escape, Enter,
+ * Tab, and Backspace are mapped to their classic control values. Extended keys
+ * follow DOS-style semantics by emitting 0 followed by the translated scan code
+ * on the next read.
+ */
+BGI_API int BGI_CALL wxbgi_read_key(void);
+/**
+ * @brief Queries whether a raw GLFW key code is currently held down.
+ *
+ * @param key GLFW key code such as `GLFW_KEY_ESCAPE` or `GLFW_KEY_LEFT`.
+ * @return 1 if the key is currently down, 0 if up, or -1 on invalid input.
+ *
+ * This bypasses the translated queue and is useful for real-time key state checks
+ * alongside queued compatibility reads.
+ */
+BGI_API int BGI_CALL wxbgi_is_key_down(int key);
+
+/**
+ * @brief Optional internal test seam APIs.
+ *
+ * These APIs are compiled only when `WXBGI_ENABLE_TEST_SEAMS` is defined at
+ * build time. They are intended for deterministic CI/system testing and should
+ * never be enabled in public production/release builds.
+ */
+#ifdef WXBGI_ENABLE_TEST_SEAMS
+/**
+ * @brief Internal test seam: clears pending translated keyboard queue entries.
+ *
+ * This is intended for automated tests only so CI can verify keyboard queue
+ * behavior without relying on host OS input injection.
+ */
+BGI_API int BGI_CALL wxbgi_test_clear_key_queue(void);
+/**
+ * @brief Internal test seam: injects one translated key code into the queue.
+ *
+ * This bypasses GLFW callbacks and is intended for deterministic automated tests.
+ */
+BGI_API int BGI_CALL wxbgi_test_inject_key_code(int keyCode);
+/**
+ * @brief Internal test seam: injects an extended DOS-style key sequence.
+ *
+ * Enqueues `0` followed by @p scanCode to mirror translated extended key reads.
+ */
+BGI_API int BGI_CALL wxbgi_test_inject_extended_scan(int scanCode);
+#endif
+/**
  * @brief Reports whether the window received a close request.
  *
  * Returns 1 when closing is pending, otherwise 0.

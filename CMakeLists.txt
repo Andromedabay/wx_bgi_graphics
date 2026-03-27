@@ -10,6 +10,14 @@ set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/_deps_fc)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Internal test seams are intentionally OFF by default so release/shared binaries
+# do not expose synthetic input injection entry points.
+option(
+    WXBGI_ENABLE_TEST_SEAMS
+    "Enable internal test seam APIs for automated testing (never enable for public release artifacts)."
+    OFF
+)
+
 # Use static MSVC runtime on Windows (/MT or /MTd) so the binary
 # has no dependency on the MSVC Redistributable.
 if(MSVC)
@@ -83,6 +91,12 @@ target_include_directories(wx_bgi_opengl PUBLIC src)
 target_compile_definitions(wx_bgi_opengl PRIVATE GLEW_STATIC)
 target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL)
 
+if(WXBGI_ENABLE_TEST_SEAMS)
+    # Expose compile-time guard to both the library and consumers of the public
+    # header so declarations/definitions stay in sync during test builds.
+    target_compile_definitions(wx_bgi_opengl PUBLIC WXBGI_ENABLE_TEST_SEAMS=1)
+endif()
+
 if(UNIX AND NOT APPLE)
     target_link_libraries(wx_bgi_opengl PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
@@ -99,6 +113,16 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:bgi_api_coverage_cpp>
+)
+
+add_executable(wxbgi_keyboard_queue_cpp examples/cpp/wxbgi_keyboard_queue.cpp)
+target_link_libraries(wxbgi_keyboard_queue_cpp PRIVATE wx_bgi_opengl glfw)
+
+add_custom_command(
+    TARGET wxbgi_keyboard_queue_cpp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:wxbgi_keyboard_queue_cpp>
 )
 
 find_package(Python3 COMPONENTS Interpreter)
@@ -143,6 +167,57 @@ endif()
 
 unset(FPC_COMPILER CACHE)
 find_program(FPC_COMPILER NAMES ${FPC_CANDIDATES})
+
+if(FPC_COMPILER)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bgidemo_pascal)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/keyboard_queue_pascal)
+
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/bgidemo_pascal/bgidemo${CMAKE_EXECUTABLE_SUFFIX}
+        COMMAND ${FPC_COMPILER}
+                -Fu${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal
+                -FE${CMAKE_BINARY_DIR}/bgidemo_pascal
+                -FU${CMAKE_BINARY_DIR}/bgidemo_pascal
+                ${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal/bgidemo.pas
+        DEPENDS
+            ${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal/bgidemo.pas
+            ${CMAKE_SOURCE_DIR}/examples/bgidemo-pascal/Graph.pas
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        VERBATIM
+    )
+
+    add_custom_target(
+        bgidemo_pascal_build
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                ${CMAKE_BINARY_DIR}/bgidemo_pascal
+        DEPENDS
+            wx_bgi_opengl
+            ${CMAKE_BINARY_DIR}/bgidemo_pascal/bgidemo${CMAKE_EXECUTABLE_SUFFIX}
+    )
+
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/keyboard_queue_pascal/demo_wxbgi_keyboard_queue${CMAKE_EXECUTABLE_SUFFIX}
+        COMMAND ${FPC_COMPILER}
+                -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                -FE${CMAKE_BINARY_DIR}/keyboard_queue_pascal
+                -FU${CMAKE_BINARY_DIR}/keyboard_queue_pascal
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas
+        DEPENDS ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        VERBATIM
+    )
+
+    add_custom_target(
+        wxbgi_keyboard_queue_pascal_build
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                ${CMAKE_BINARY_DIR}/keyboard_queue_pascal
+        DEPENDS
+            wx_bgi_opengl
+            ${CMAKE_BINARY_DIR}/keyboard_queue_pascal/demo_wxbgi_keyboard_queue${CMAKE_EXECUTABLE_SUFFIX}
+    )
+endif()
 
 if(BUILD_TESTING)
     add_test(NAME bgi_api_coverage_cpp COMMAND $<TARGET_FILE:bgi_api_coverage_cpp>)

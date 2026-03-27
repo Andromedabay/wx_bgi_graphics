@@ -7,8 +7,10 @@ This folder contains a minimal FreePascal program that loads the shared library 
 - `demo_bgi_wrapper.pas`
 - `demo_bgi_wrapper_gui.pas`
 - `demo_bgi_api_coverage.pas`
+- `demo_wxbgi_keyboard_queue.pas`
 
 `demo_bgi_api_coverage.pas` is the broader API coverage example. It exercises the expanded classic BGI export surface from FreePascal rather than only drawing a minimal scene.
+`demo_wxbgi_keyboard_queue.pas` is a small direct extension-API sample for `wxbgi_key_pressed`, `wxbgi_read_key`, and `wxbgi_is_key_down`.
 
 ## Build and Run (Windows)
 
@@ -67,6 +69,12 @@ This folder contains a minimal FreePascal program that loads the shared library 
 
    ```bash
    ppcx64 demoFreePascal/demo_bgi_api_coverage.pas
+   ```
+
+   Keyboard queue example with 64-bit FPC:
+
+   ```bash
+   ppcx64 demoFreePascal/demo_wxbgi_keyboard_queue.pas
    ```
 
 4. Run:

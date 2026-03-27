@@ -50,7 +50,8 @@ jobs:
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: cmake -S . -B build
+        # Debug CI enables deterministic keyboard seam checks (test-only surface).
+        run: cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
 
       - name: Build (Windows Debug)
         if: runner.os == 'Windows'
@@ -92,11 +93,13 @@ jobs:
 
       - name: Configure (Linux Debug)
         if: runner.os == 'Linux'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGLFW_BUILD_WAYLAND=OFF
+        # Debug CI enables deterministic keyboard seam checks (test-only surface).
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=ON
 
       - name: Configure (macOS Debug)
         if: runner.os == 'macOS'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+        # Debug CI enables deterministic keyboard seam checks (test-only surface).
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWXBGI_ENABLE_TEST_SEAMS=ON
 
       - name: Build (Linux/macOS Debug)
         if: runner.os != 'Windows'
@@ -154,7 +157,8 @@ jobs:
       - name: Configure (Windows Release)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: cmake -S . -B build
+        # Release artifacts must not expose test seam injection APIs.
+        run: cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=OFF
 
       - name: Build (Windows Release)
         if: runner.os == 'Windows'
@@ -203,11 +207,13 @@ jobs:
 
       - name: Configure (Linux Release)
         if: runner.os == 'Linux'
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF
+        # Release artifacts must not expose test seam injection APIs.
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF
 
       - name: Configure (macOS Release)
         if: runner.os == 'macOS'
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
+        # Release artifacts must not expose test seam injection APIs.
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DWXBGI_ENABLE_TEST_SEAMS=OFF
 
       - name: Build (Linux/macOS Release)
         if: runner.os != 'Windows'
@@ -282,7 +288,8 @@ jobs:
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev
 
       - name: Configure (Release)
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF
+        # Published docs should reflect release-safe API surface (seams OFF).
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF
 
       - name: Generate docs
         run: cmake --build build-rel --target api_docs -j

@@ -20,6 +20,135 @@
 
 namespace
 {
+    void queueKeyCode(int keyCode)
+    {
+        bgi::gState.keyQueue.push(keyCode);
+    }
+
+    void queueExtendedKey(int scanCode)
+    {
+        queueKeyCode(0);
+        queueKeyCode(scanCode);
+    }
+
+    void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+    {
+        (void)window;
+        (void)scancode;
+        (void)mods;
+
+        if (key >= 0 && key < static_cast<int>(bgi::gState.keyDown.size()))
+        {
+            bgi::gState.keyDown[static_cast<std::size_t>(key)] = action != GLFW_RELEASE ? 1U : 0U;
+        }
+
+        if (action != GLFW_PRESS && action != GLFW_REPEAT)
+        {
+            return;
+        }
+
+        switch (key)
+        {
+        case GLFW_KEY_ESCAPE:
+            queueKeyCode(27);
+            break;
+        case GLFW_KEY_ENTER:
+        case GLFW_KEY_KP_ENTER:
+            queueKeyCode(13);
+            break;
+        case GLFW_KEY_TAB:
+            queueKeyCode(9);
+            break;
+        case GLFW_KEY_BACKSPACE:
+            queueKeyCode(8);
+            break;
+        case GLFW_KEY_UP:
+            queueExtendedKey(72);
+            break;
+        case GLFW_KEY_DOWN:
+            queueExtendedKey(80);
+            break;
+        case GLFW_KEY_LEFT:
+            queueExtendedKey(75);
+            break;
+        case GLFW_KEY_RIGHT:
+            queueExtendedKey(77);
+            break;
+        case GLFW_KEY_HOME:
+            queueExtendedKey(71);
+            break;
+        case GLFW_KEY_END:
+            queueExtendedKey(79);
+            break;
+        case GLFW_KEY_PAGE_UP:
+            queueExtendedKey(73);
+            break;
+        case GLFW_KEY_PAGE_DOWN:
+            queueExtendedKey(81);
+            break;
+        case GLFW_KEY_INSERT:
+            queueExtendedKey(82);
+            break;
+        case GLFW_KEY_DELETE:
+            queueExtendedKey(83);
+            break;
+        case GLFW_KEY_F1:
+            queueExtendedKey(59);
+            break;
+        case GLFW_KEY_F2:
+            queueExtendedKey(60);
+            break;
+        case GLFW_KEY_F3:
+            queueExtendedKey(61);
+            break;
+        case GLFW_KEY_F4:
+            queueExtendedKey(62);
+            break;
+        case GLFW_KEY_F5:
+            queueExtendedKey(63);
+            break;
+        case GLFW_KEY_F6:
+            queueExtendedKey(64);
+            break;
+        case GLFW_KEY_F7:
+            queueExtendedKey(65);
+            break;
+        case GLFW_KEY_F8:
+            queueExtendedKey(66);
+            break;
+        case GLFW_KEY_F9:
+            queueExtendedKey(67);
+            break;
+        case GLFW_KEY_F10:
+            queueExtendedKey(68);
+            break;
+        case GLFW_KEY_F11:
+            queueExtendedKey(133);
+            break;
+        case GLFW_KEY_F12:
+            queueExtendedKey(134);
+            break;
+        default:
+            break;
+        }
+    }
+
+    void charCallback(GLFWwindow *window, unsigned int codepoint)
+    {
+        (void)window;
+        if (codepoint <= 0U || codepoint > 255U)
+        {
+            return;
+        }
+
+        if (codepoint == 9U || codepoint == 13U || codepoint == 27U)
+        {
+            return;
+        }
+
+        queueKeyCode(static_cast<int>(codepoint));
+    }
+
     bool initializeWindow(int width, int height, const char *title, int left, int top, bool doubleBuffered)
     {
         if (!bgi::gState.glfwInitialized)
@@ -61,6 +190,8 @@ namespace
 #endif
 
         bgi::resetStateForWindow(width, height, doubleBuffered);
+        glfwSetKeyCallback(bgi::gState.window, keyCallback);
+        glfwSetCharCallback(bgi::gState.window, charCallback);
         bgi::gState.lastResult = bgi::grOk;
         bgi::flushToScreen();
         return true;
