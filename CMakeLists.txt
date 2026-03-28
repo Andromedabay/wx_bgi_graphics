@@ -96,6 +96,9 @@ set(SRCS
     src/bgi_modern_api.cpp
     src/bgi_camera.cpp
     src/bgi_camera_api.cpp
+    src/bgi_ucs.cpp
+    src/bgi_ucs_api.cpp
+    src/bgi_world_api.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
@@ -287,6 +290,9 @@ endif()
 if(BUILD_TESTING)
     add_test(NAME bgi_api_coverage_cpp COMMAND $<TARGET_FILE:bgi_api_coverage_cpp>)
     set_tests_properties(bgi_api_coverage_cpp PROPERTIES TIMEOUT 20)
+
+    add_test(NAME wxbgi_camera_demo_cpp COMMAND $<TARGET_FILE:wxbgi_camera_demo_cpp> --test)
+    set_tests_properties(wxbgi_camera_demo_cpp PROPERTIES TIMEOUT 20)
 
     if(Python3_Interpreter_FOUND)
         add_test(

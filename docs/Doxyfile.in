@@ -13,12 +13,11 @@ EXTRACT_LOCAL_CLASSES  = NO
 INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_ext.h" \
+                         "@CMAKE_SOURCE_DIR@/src/wx_bgi_3d.h" \
                          "@CMAKE_SOURCE_DIR@/src/bgi_types.h" \
                          "@CMAKE_SOURCE_DIR@/Tutorial.md" \
-                         "@CMAKE_SOURCE_DIR@/bgidemo-pascal/README.md" \
-                         "@CMAKE_SOURCE_DIR@/images/DoubleBuffering.png" \
-                         "@CMAKE_SOURCE_DIR@/images/Minimum_Buffers_for_Double_buffering.png"
-FILE_PATTERNS          = *.h *.md *.png
+                         "@CMAKE_SOURCE_DIR@/examples/bgidemo-pascal/README.md"
+FILE_PATTERNS          = *.h *.md
 RECURSIVE              = NO
 IMAGE_PATH             = "@CMAKE_SOURCE_DIR@/images"
 USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"

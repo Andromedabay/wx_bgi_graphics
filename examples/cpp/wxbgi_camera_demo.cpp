@@ -26,6 +26,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 // ---------------------------------------------------------------------------
@@ -68,8 +69,11 @@ static void drawLabel(int x, int y, const char *text, int color)
 // Main
 // ---------------------------------------------------------------------------
 
-int main()
+int main(int argc, char *argv[])
 {
+    // When invoked with --test, draw one frame then exit (for ctest).
+    const bool testMode = (argc >= 2 && std::strcmp(argv[1], "--test") == 0);
+
     constexpr int kW = 1440, kH = 480;
     initwindow(kW, kH, "Camera Demo", 50, 50, 0, 0);
 
@@ -111,36 +115,76 @@ int main()
     updateOrbitCamera();
 
     // ------------------------------------------------------------------
-    // Main loop
+    // Main loop  (runs once in --test mode, interactively otherwise)
     // ------------------------------------------------------------------
-    while (!wxbgi_should_close())
+    bool redrawRequested = true; // draw initial frame once
+    do
     {
-        wxbgi_poll_events();
+        if (!testMode)
+        {
+            wxbgi_poll_events();
 
-        // --- Input -------------------------------------------------------
-        if (glfwGetKey(static_cast<GLFWwindow *>(nullptr), GLFW_KEY_ESCAPE) ==
-            GLFW_PRESS)
-            break;
+            const auto keyDown = [](int key) -> bool
+            {
+                return wxbgi_is_key_down(key) == 1;
+            };
 
-        // 2-D camera pan / zoom / rotate
-        if (wxbgi_is_key_down(GLFW_KEY_W)) wxbgi_cam2d_pan_by("cam2d",  0.f,  4.f);
-        if (wxbgi_is_key_down(GLFW_KEY_S)) wxbgi_cam2d_pan_by("cam2d",  0.f, -4.f);
-        if (wxbgi_is_key_down(GLFW_KEY_A)) wxbgi_cam2d_pan_by("cam2d", -4.f,  0.f);
-        if (wxbgi_is_key_down(GLFW_KEY_D)) wxbgi_cam2d_pan_by("cam2d",  4.f,  0.f);
-        if (wxbgi_is_key_down(GLFW_KEY_EQUAL))     wxbgi_cam2d_zoom_at("cam2d", 1.02f, 0.f, 0.f);
-        if (wxbgi_is_key_down(GLFW_KEY_MINUS))     wxbgi_cam2d_zoom_at("cam2d", 0.98f, 0.f, 0.f);
-        if (wxbgi_is_key_down(GLFW_KEY_Q))         wxbgi_cam2d_set_rotation("cam2d",
-            [&]{ float r = 0.f; wxbgi_cam2d_get_rotation("cam2d", &r); return r + 1.f; }());
-        if (wxbgi_is_key_down(GLFW_KEY_E))         wxbgi_cam2d_set_rotation("cam2d",
-            [&]{ float r = 0.f; wxbgi_cam2d_get_rotation("cam2d", &r); return r - 1.f; }());
+            if (keyDown(GLFW_KEY_ESCAPE))
+                break;
 
-        // 3-D camera orbit
-        bool orbitChanged = false;
-        if (wxbgi_is_key_down(GLFW_KEY_LEFT))  { azimuth   -= 1.f; orbitChanged = true; }
-        if (wxbgi_is_key_down(GLFW_KEY_RIGHT)) { azimuth   += 1.f; orbitChanged = true; }
-        if (wxbgi_is_key_down(GLFW_KEY_UP))    { elevation  = std::min(89.f, elevation + 1.f); orbitChanged = true; }
-        if (wxbgi_is_key_down(GLFW_KEY_DOWN))  { elevation  = std::max(-89.f, elevation - 1.f); orbitChanged = true; }
-        if (orbitChanged) updateOrbitCamera();
+            bool cameraChanged = false;
+
+            // 2-D camera pan / zoom / rotate
+            if (keyDown(GLFW_KEY_W)) { wxbgi_cam2d_pan_by("cam2d",  0.f,  4.f); cameraChanged = true; }
+            if (keyDown(GLFW_KEY_S)) { wxbgi_cam2d_pan_by("cam2d",  0.f, -4.f); cameraChanged = true; }
+            if (keyDown(GLFW_KEY_A)) { wxbgi_cam2d_pan_by("cam2d", -4.f,  0.f); cameraChanged = true; }
+            if (keyDown(GLFW_KEY_D)) { wxbgi_cam2d_pan_by("cam2d",  4.f,  0.f); cameraChanged = true; }
+
+            // Support both main keyboard and numpad +/- for zoom controls.
+            if (keyDown(GLFW_KEY_EQUAL) || keyDown(GLFW_KEY_KP_ADD))
+            {
+                wxbgi_cam2d_zoom_at("cam2d", 1.02f, 0.f, 0.f);
+                cameraChanged = true;
+            }
+            if (keyDown(GLFW_KEY_MINUS) || keyDown(GLFW_KEY_KP_SUBTRACT))
+            {
+                wxbgi_cam2d_zoom_at("cam2d", 0.98f, 0.f, 0.f);
+                cameraChanged = true;
+            }
+
+            if (keyDown(GLFW_KEY_Q))
+            {
+                wxbgi_cam2d_set_rotation("cam2d",
+                    [&]{ float r = 0.f; wxbgi_cam2d_get_rotation("cam2d", &r); return r + 1.f; }());
+                cameraChanged = true;
+            }
+            if (keyDown(GLFW_KEY_E))
+            {
+                wxbgi_cam2d_set_rotation("cam2d",
+                    [&]{ float r = 0.f; wxbgi_cam2d_get_rotation("cam2d", &r); return r - 1.f; }());
+                cameraChanged = true;
+            }
+
+            // 3-D camera orbit
+            bool orbitChanged = false;
+            if (keyDown(GLFW_KEY_LEFT))  { azimuth   -= 1.f; orbitChanged = true; }
+            if (keyDown(GLFW_KEY_RIGHT)) { azimuth   += 1.f; orbitChanged = true; }
+            if (keyDown(GLFW_KEY_UP))    { elevation  = std::min(89.f, elevation + 1.f); orbitChanged = true; }
+            if (keyDown(GLFW_KEY_DOWN))  { elevation  = std::max(-89.f, elevation - 1.f); orbitChanged = true; }
+            if (orbitChanged)
+            {
+                updateOrbitCamera();
+                cameraChanged = true;
+            }
+
+            // Render only when the camera state changes due to keyboard input.
+            redrawRequested = redrawRequested || cameraChanged;
+            if (!redrawRequested)
+            {
+                delay(8);
+                continue;
+            }
+        }
 
         // --- Draw --------------------------------------------------------
         cleardevice();
@@ -148,8 +192,8 @@ int main()
         // ---- Left panel: classic BGI pixel-space (no camera transform) ----
         // Draw dividing lines
         setcolor(7); // LIGHTGRAY
-        line(panelW, 0, panelW, kH - 1);
-        line(panelW * 2, 0, panelW * 2, kH - 1);
+        line(panelW - 1, 0, panelW - 1, kH - 1);
+        line(panelW * 2 - 1, 0, panelW * 2 - 1, kH - 1);
 
         // Classic BGI drawing in the left panel (viewport-clipped)
         setviewport(0, 0, panelW - 1, kH - 1, 1);
@@ -161,80 +205,78 @@ int main()
         drawLabel(10, 25, "No camera transform", 7);
         setviewport(0, 0, kW - 1, kH - 1, 0); // reset to full window
 
-        // ---- Centre panel: 2-D world camera ------------------------------
+        // ---- Centre panel: 2-D world camera (Phase 3 wxbgi_world_* API) ----
         {
-            // Draw a grid in world space through the 2-D camera
-            const char *camName = "cam2d";
+            // Activate the 2-D camera so wxbgi_world_* functions project
+            // through it automatically.
+            wxbgi_cam_set_active("cam2d");
+
+            // World-space grid drawn with wxbgi_world_line (no manual project)
             for (int gx = -200; gx <= 200; gx += 50)
             {
-                float sx1, sy1, sx2, sy2;
-                if (wxbgi_cam_world_to_screen(camName, static_cast<float>(gx), -200.f, 0.f, &sx1, &sy1) &&
-                    wxbgi_cam_world_to_screen(camName, static_cast<float>(gx),  200.f, 0.f, &sx2, &sy2))
-                {
-                    setcolor(gx == 0 ? 10 : 8); // GREEN for Y axis, DARKGRAY otherwise
-                    line(static_cast<int>(sx1), static_cast<int>(sy1),
-                         static_cast<int>(sx2), static_cast<int>(sy2));
-                }
+                setcolor(gx == 0 ? 10 : 8); // GREEN for Y-axis, DARKGRAY otherwise
+                wxbgi_world_line(static_cast<float>(gx), -200.f, 0.f,
+                                 static_cast<float>(gx),  200.f, 0.f);
             }
             for (int gy = -200; gy <= 200; gy += 50)
             {
-                float sx1, sy1, sx2, sy2;
-                if (wxbgi_cam_world_to_screen(camName, -200.f, static_cast<float>(gy), 0.f, &sx1, &sy1) &&
-                    wxbgi_cam_world_to_screen(camName,  200.f, static_cast<float>(gy), 0.f, &sx2, &sy2))
-                {
-                    setcolor(gy == 0 ? 4 : 8); // RED for X axis, DARKGRAY otherwise
-                    line(static_cast<int>(sx1), static_cast<int>(sy1),
-                         static_cast<int>(sx2), static_cast<int>(sy2));
-                }
+                setcolor(gy == 0 ? 4 : 8); // RED for X-axis, DARKGRAY otherwise
+                wxbgi_world_line(-200.f, static_cast<float>(gy), 0.f,
+                                  200.f, static_cast<float>(gy), 0.f);
             }
 
-            // Draw world points
+            // A circle and rectangle in world units
+            setcolor(14); // YELLOW
+            wxbgi_world_circle(0.f, 0.f, 0.f, 80.f);
+
+            setcolor(11); // LIGHTCYAN
+            wxbgi_world_rectangle(-60.f, -60.f, 0.f, 60.f, 60.f, 0.f);
+
+            // World points drawn with wxbgi_world_point
             for (const auto &wp : kWorldPoints)
-            {
-                float sx, sy;
-                if (wxbgi_cam_world_to_screen(camName, wp.x, wp.y, 0.f, &sx, &sy) == 1)
-                    drawCross(static_cast<int>(sx), static_cast<int>(sy), wp.color, 6);
-            }
+                wxbgi_world_point(wp.x, wp.y, 0.f, wp.color);
 
-            // Label
-            {
-                float panX = 0.f, panY = 0.f, zoom = 1.f;
-                wxbgi_cam2d_get_pan(camName, &panX, &panY);
-                wxbgi_cam2d_get_zoom(camName, &zoom);
-                char buf[80];
-                std::snprintf(buf, sizeof(buf), "pan=(%.0f,%.0f) zoom=%.2f", panX, panY, zoom);
-                drawLabel(panelW + 10, 10, "2-D Camera (WASD/+/-/Q/E)", 15);
-                drawLabel(panelW + 10, 25, buf, 7);
-            }
+            // Axis labels using wxbgi_world_outtextxy
+            setcolor(4); wxbgi_world_outtextxy( 110.f,    0.f, 0.f, "+X");
+            setcolor(2); wxbgi_world_outtextxy(   0.f,  110.f, 0.f, "+Y");
+
+            // Status label (screen-space, classic BGI)
+            float panX = 0.f, panY = 0.f, zoom = 1.f;
+            wxbgi_cam2d_get_pan("cam2d", &panX, &panY);
+            wxbgi_cam2d_get_zoom("cam2d", &zoom);
+            char buf[80];
+            std::snprintf(buf, sizeof(buf), "pan=(%.0f,%.0f) zoom=%.2f", panX, panY, zoom);
+            drawLabel(panelW + 10, 10, "2-D World Camera (WASD/+/-/Q/E)", 15);
+            drawLabel(panelW + 10, 25, buf, 7);
+            drawLabel(panelW + 10, 40, "Grid/circle/rect via wxbgi_world_*", 7);
+
+            // Restore default camera for the next panel's classic BGI ops
+            wxbgi_cam_set_active("default");
         }
 
-        // ---- Right panel: 3-D perspective camera -------------------------
+        // ---- Right panel: 3-D perspective camera (Phase 3 world draw) -----
         {
-            const char *camName = "cam3d";
+            wxbgi_cam_set_active("cam3d");
 
-            // Draw world-space axes projected to screen
-            struct { float wx, wy, wz; float tx, ty, tz; int col; } axes[] = {
-                {0,0,0,  100,0,0,    4},  // X – RED
-                {0,0,0,  0,100,0,    2},  // Y – GREEN
-                {0,0,0,  0,0,100,    1},  // Z – BLUE
-            };
-            for (const auto &ax : axes)
-            {
-                float sx1, sy1, sx2, sy2;
-                if (wxbgi_cam_world_to_screen(camName, ax.wx, ax.wy, ax.wz, &sx1, &sy1) == 1 &&
-                    wxbgi_cam_world_to_screen(camName, ax.tx, ax.ty, ax.tz, &sx2, &sy2) == 1)
-                {
-                    setcolor(ax.col);
-                    line(static_cast<int>(sx1), static_cast<int>(sy1),
-                         static_cast<int>(sx2), static_cast<int>(sy2));
-                }
-            }
+            // World-space axes via wxbgi_world_line
+            setcolor(4);  wxbgi_world_line(0,0,0, 100,0,0);    // X – RED
+            setcolor(2);  wxbgi_world_line(0,0,0, 0,100,0);    // Y – GREEN
+            setcolor(1);  wxbgi_world_line(0,0,0, 0,0,100);    // Z – BLUE
 
-            // Draw world points with depth-correct perspective
+            // Axis tip labels via wxbgi_world_outtextxy
+            setcolor(4);  wxbgi_world_outtextxy(105.f,   0.f,   0.f, "X");
+            setcolor(2);  wxbgi_world_outtextxy(  0.f, 105.f,   0.f, "Y");
+            setcolor(1);  wxbgi_world_outtextxy(  0.f,   0.f, 105.f, "Z");
+
+            // A circle in the XY plane and one in the XZ plane
+            setcolor(14); wxbgi_world_circle(0.f, 0.f,  0.f, 60.f); // XY ground
+            setcolor(11); wxbgi_world_circle(0.f, 0.f, 30.f, 40.f); // elevated
+
+            // World points with coloured crosses (manual projection still works)
             for (const auto &wp : kWorldPoints)
             {
                 float sx, sy;
-                if (wxbgi_cam_world_to_screen(camName, wp.x, wp.y, wp.z, &sx, &sy) == 1)
+                if (wxbgi_cam_world_to_screen("cam3d", wp.x, wp.y, wp.z, &sx, &sy) == 1)
                     drawCross(static_cast<int>(sx), static_cast<int>(sy), wp.color, 8);
             }
 
@@ -244,11 +286,20 @@ int main()
                           "az=%.0f el=%.0f (Arrow keys)", azimuth, elevation);
             drawLabel(panelW * 2 + 10, 10, "3-D Perspective Camera", 15);
             drawLabel(panelW * 2 + 10, 25, buf, 7);
+            drawLabel(panelW * 2 + 10, 40, "Axes/circles via wxbgi_world_*", 7);
+
+            wxbgi_cam_set_active("default");
         }
 
         // Present
         wxbgi_swap_window_buffers();
+
+        if (testMode)
+            break;
+
+        redrawRequested = false;
     }
+    while (!testMode && !wxbgi_should_close());
 
     closegraph();
     return 0;

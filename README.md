@@ -32,8 +32,13 @@ The library now includes classic BGI-style support for:
 - text rendering and measurement such as `outtext`, `outtextxy`, `settextstyle`, `settextjustify`, `textwidth`, `textheight`
 - image buffer helpers such as `imagesize`, `getimage`, `putimage`
 - double-buffer style page selection via `setactivepage`, `setvisualpage`, `getactivepage`, `getvisualpage`, `swapbuffers`
+- additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
 
-The exported declarations are available in `src/wx_bgi.h`.
+Public API declarations are available in:
+
+- `src/wx_bgi.h` (classic BGI API)
+- `src/wx_bgi_ext.h` (modern extension helpers)
+- `src/wx_bgi_3d.h` (camera, UCS, world-coordinate extension API)
 
 
 ## Turbo Pascal/Turbo C/C++ - Drop in Replacement (Well Almost...)
@@ -54,6 +59,38 @@ In addition to classic BGI, the library now exports an optional non-BGI extensio
 
 This extension API is intended to complement BGI compatibility, not replace it.
 
+## Camera, UCS, and World-Coordinate API (`wx_bgi_3d.h`)
+
+The project now includes a dedicated camera/UCS extension layer for engineering-style world coordinates while keeping classic BGI behavior unchanged.
+
+Highlights:
+
+- Coordinate system is right-handed, Z-up (XY = ground plane).
+- A default camera named `"default"` is created by `initwindow` / `initgraph`.
+- 3-D camera controls are exposed as `wxbgi_cam_*`.
+- 2-D overhead camera controls (pan/zoom/rotate) are exposed as `wxbgi_cam2d_*`.
+- User coordinate systems are exposed as `wxbgi_ucs_*`.
+- World extents and fit-to-view helpers are exposed via `wxbgi_set_world_extents`, `wxbgi_expand_world_extents`, and `wxbgi_cam_fit_to_extents`.
+- World/UCS drawing wrappers such as `wxbgi_world_line`, `wxbgi_world_circle`, `wxbgi_ucs_line`, and `wxbgi_ucs_outtextxy` project through the active camera into the classic BGI pixel pipeline.
+
+Minimal camera setup example:
+
+```c
+#include "wx_bgi.h"
+#include "wx_bgi_3d.h"
+
+initwindow(1024, 720, "Camera Demo", 0, 0, 1, 1);
+
+wxbgi_cam2d_create("plan");
+wxbgi_cam_set_active("plan");
+wxbgi_cam2d_set_pan("plan", 0.0f, 0.0f);
+wxbgi_cam2d_set_zoom("plan", 1.5f);
+
+setcolor(WHITE);
+wxbgi_world_line(-100.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f);
+wxbgi_world_circle(0.0f, 0.0f, 0.0f, 50.0f);
+```
+
 ### Keyboard Queue Helpers
 
 The extension API also exposes a small keyboard input layer for GUI-style event waits that do not rely on terminal or console input.
@@ -72,7 +109,11 @@ This makes it practical to port old Pascal and BGI programs that used `KeyPresse
 
 ### Internal Test Seam Security Policy
 
-To support deterministic CI validation without GUI key injection, the project has optional internal keyboard test seam APIs:
+The project uses two distinct mechanisms to support deterministic CI testing without a live GUI.
+
+#### Keyboard injection test seams (`WXBGI_ENABLE_TEST_SEAMS`)
+
+The following APIs allow CI to inject synthetic key events into the keyboard queue:
 
 - `wxbgi_test_clear_key_queue()`
 - `wxbgi_test_inject_key_code()`
@@ -83,6 +124,7 @@ Security policy:
 - These APIs are compiled only when `WXBGI_ENABLE_TEST_SEAMS=ON`.
 - Default is `OFF` so release/public binaries do not expose synthetic input injection.
 - CI/system tests can enable them explicitly for deterministic keyboard queue checks.
+- Exercised in `examples/cpp/bgi_api_coverage.cpp` under the `#ifdef WXBGI_ENABLE_TEST_SEAMS` guard.
 
 Example test-only configure:
 
@@ -91,6 +133,17 @@ cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
 ```
 
 Do not enable this option for production distribution artifacts.
+
+#### Camera demo headless mode (`--test` flag)
+
+The camera demo (`wxbgi_camera_demo_cpp`) uses a different, always-available mechanism: passing `--test` on the command line causes it to draw exactly one frame and exit cleanly. This approach requires **no** compile-time option and exposes no synthetic input surface.
+
+```powershell
+# Run manually in headless test mode:
+.\build\Debug\wxbgi_camera_demo_cpp.exe --test
+```
+
+CTest invokes this automatically — see the `wxbgi_camera_demo_cpp` test entry in `CMakeLists.txt`.
 
 ### Advanced API Usage Example
 
@@ -150,6 +203,57 @@ Please read more about this at [./Tutorial.md](./Tutorial.md)
 
 ## Usage Examples
 The examples are under the ./examples/ folder.
+
+### Running Examples Interactively
+
+Commands to launch each example in an interactive session after a Debug build.
+
+#### Windows
+
+```powershell
+# C++ API coverage (opens a window, draws, then closes automatically)
+.\build\Debug\bgi_api_coverage_cpp.exe
+
+# Keyboard queue demo (interactive — press keys, close window to exit)
+.\build\Debug\wxbgi_keyboard_queue_cpp.exe
+
+# Camera demo (interactive — W/A/S/D pan, +/- zoom, arrow keys orbit, Esc to exit)
+.\build\Debug\wxbgi_camera_demo_cpp.exe
+
+# Pascal BGI demo (interactive — requires FreePascal build step first)
+.\build\bgidemo_pascal\bgidemo.exe
+
+# Pascal keyboard queue demo (interactive — requires FreePascal build step first)
+.\build\keyboard_queue_pascal\demo_wxbgi_keyboard_queue.exe
+
+# Python API coverage (exits automatically; pass DLL path as argument)
+python examples\python\bgi_api_coverage.py build\Debug\wx_bgi_opengl.dll
+```
+
+#### Linux / macOS
+
+```bash
+# C++ API coverage
+./build/bgi_api_coverage_cpp
+
+# Keyboard queue demo
+./build/wxbgi_keyboard_queue_cpp
+
+# Camera demo
+./build/wxbgi_camera_demo_cpp
+
+# Pascal BGI demo
+./build/bgidemo_pascal/bgidemo
+
+# Pascal keyboard queue demo
+./build/keyboard_queue_pascal/demo_wxbgi_keyboard_queue
+
+# Python API coverage
+python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so
+```
+
+> **Note:** The camera demo also accepts a `--test` flag (`wxbgi_camera_demo_cpp --test`) which draws one frame and exits immediately — this is the mode used by CTest.
+
 ### Example - demoFreePascal
 
 - `examples/demoFreePascal/demo_bgi_wrapper_gui.pas`
@@ -161,6 +265,10 @@ The examples are under the ./examples/ folder.
 - `examples/cpp/wxbgi_keyboard_queue.cpp`
 - `examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas`
 
+### Example - camera and world-coordinate API
+
+- `examples/cpp/wxbgi_camera_demo.cpp`
+
 ### Coverage Examples
 
 - `examples/cpp/bgi_api_coverage.cpp`
@@ -170,7 +278,8 @@ The examples are under the ./examples/ folder.
 ## Compile-time Dependencies
    - GLFW
    - GLEW
-   - OpenGL 
+   - GLM
+   - OpenGL
    - CMake
    - Doxygen (for API documentation generation)
 
@@ -179,8 +288,12 @@ The examples are under the ./examples/ folder.
 To build this project yourself, ensure you have the following tools and libraries:
 
 - **CMake (Version 3.14 or later):** Essential for building and managing the project files.
-- **C++ Compiler:** Compatible with Clang, GCC, or MSVC. Choose one based on your development environment.
+- **C++20 Compiler:** Compatible with Clang, GCC, or MSVC.
 - **OpenGL-capable system libraries:** Required by GLFW/GLEW on all supported platforms.
+
+Dependency note:
+
+- GLFW 3.4, GLEW 2.2.0, and GLM 1.0.1 are fetched automatically by CMake `FetchContent`; no manual dependency installation is required.
 
 ## Building the Project
 
@@ -310,12 +423,13 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 
 This code is Open Source and Free to use with no warranties or claims.
   
-This repository is based on Open-Source Code from 4 different source:  
+This repository is based on Open-Source Code from 5 different source:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
     2. CMake Template, from lszl84, MIT License  
     3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license  
     4. glew Library, from https://github.com/nigels-com/glew, Custom License  
+    5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
   
 Depends on C/C++ Template created by Luke of devmindscapetutorilas:
  - [www.onlyfastcode.com](https://www.onlyfastcode.com)

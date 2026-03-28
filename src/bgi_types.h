@@ -240,6 +240,51 @@ namespace bgi
         float worldHeight2d{2.f};
     };
 
+    // -------------------------------------------------------------------------
+    // User Coordinate System (UCS)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief A named user coordinate system (UCS).
+     *
+     * A UCS defines a local frame in world space through an origin point and
+     * three orthonormal axes.  The axes must form a right-handed system.
+     *
+     * A UCS named @c "world" (the identity frame) is created automatically on
+     * @c initwindow() / @c initgraph() and cannot be destroyed.  Classic BGI
+     * drawing is unaffected by the UCS system.
+     */
+    struct CoordSystem
+    {
+        // Origin of this UCS in world space.
+        float originX{0.f}, originY{0.f}, originZ{0.f};
+
+        // Orthonormal axes expressed as world-space direction vectors.
+        // These default to the world identity frame (Z-up, right-handed).
+        float xAxisX{1.f}, xAxisY{0.f}, xAxisZ{0.f};
+        float yAxisX{0.f}, yAxisY{1.f}, yAxisZ{0.f};
+        float zAxisX{0.f}, zAxisY{0.f}, zAxisZ{1.f};
+    };
+
+    // -------------------------------------------------------------------------
+    // World extents
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Axis-aligned bounding box (AABB) representing the programmer's
+     *        declared drawing extents in world space.
+     *
+     * Used by @c wxbgi_cam_fit_to_extents() and as a reference extent for
+     * viewport calculations.  @c hasData is @c false until the first call to
+     * @c wxbgi_set_world_extents() or @c wxbgi_expand_world_extents().
+     */
+    struct WorldExtents
+    {
+        float minX{0.f}, minY{0.f}, minZ{0.f};
+        float maxX{0.f}, maxY{0.f}, maxZ{0.f};
+        bool  hasData{false};
+    };
+
     struct BgiState
     {
         GLFWwindow *window{nullptr};
@@ -285,6 +330,13 @@ namespace bgi
         // --- Camera registry ---
         std::unordered_map<std::string, Camera3D> cameras;
         std::string activeCamera{"default"};
+
+        // --- UCS registry ---
+        std::unordered_map<std::string, CoordSystem> ucsSystems;
+        std::string activeUcs{"world"};
+
+        // --- World drawing extents (AABB in world space) ---
+        WorldExtents worldExtents;
     };
 
 } // namespace bgi

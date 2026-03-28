@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "bgi_types.h"
 
@@ -331,5 +331,288 @@ BGI_API void BGI_CALL wxbgi_cam2d_get_rotation(const char *name, float *angleDeg
  */
 BGI_API void BGI_CALL wxbgi_cam2d_set_world_height(const char *name,
                                                     float worldUnitsHigh);
+
+/** @} */
+
+// =============================================================================
+// Phase 2 — User Coordinate System (UCS) API
+// =============================================================================
+
+/** @defgroup wxbgi_ucs_api User Coordinate System (UCS) API
+ *
+ *  A UCS defines a named local coordinate frame inside the Z-up, right-handed
+ *  world space.  It consists of an origin point and three orthonormal axes
+ *  (@e X, @e Y, @e Z) expressed as world-space direction vectors.
+ *
+ *  A UCS named @c "world" (the identity frame) is created automatically on
+ *  @ref initwindow() / @ref initgraph() and cannot be destroyed.
+ *
+ *  All functions accept @c NULL as @p name to target the currently active UCS.
+ *  @{
+ */
+
+/**
+ * @brief Creates a named UCS initialised to the world identity frame.
+ *
+ * If a UCS with @p name already exists it is replaced.
+ *
+ * @param name  UCS identifier string (must not be NULL or empty).
+ * @return 1 on success, 0 on invalid input, −1 if no window is open.
+ */
+BGI_API int BGI_CALL wxbgi_ucs_create(const char *name);
+
+/**
+ * @brief Removes a named UCS from the registry.
+ *
+ * The @c "world" UCS cannot be destroyed.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_destroy(const char *name);
+
+/**
+ * @brief Sets the active UCS used when @c NULL is passed as the UCS name.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_set_active(const char *name);
+
+/**
+ * @brief Returns the name of the currently active UCS.
+ *
+ * The returned pointer is valid until the next call to this function from the
+ * same thread.
+ */
+BGI_API const char *BGI_CALL wxbgi_ucs_get_active(void);
+
+/**
+ * @brief Sets the origin of a UCS in world space.
+ * @param name   UCS name, or NULL for the active UCS.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_set_origin(const char *name,
+                                            float ox, float oy, float oz);
+
+/** @brief Retrieves the current UCS origin. */
+BGI_API void BGI_CALL wxbgi_ucs_get_origin(const char *name,
+                                            float *ox, float *oy, float *oz);
+
+/**
+ * @brief Sets all three axes of a UCS.
+ *
+ * The vectors are orthonormalised automatically (Gram-Schmidt), so it is
+ * sufficient to supply two perpendicular vectors and let the library compute
+ * the third.  The Z axis is recomputed as @p xAxis × @p yAxis.
+ *
+ * @param name  UCS name, or NULL for the active UCS.
+ * @param xx,xy,xz  World-space direction of the local X axis.
+ * @param yx,yy,yz  World-space direction of the local Y axis.
+ * @param zx,zy,zz  World-space direction of the local Z axis
+ *                  (overridden by the cross product after normalisation).
+ */
+BGI_API void BGI_CALL wxbgi_ucs_set_axes(const char *name,
+                                          float xx, float xy, float xz,
+                                          float yx, float yy, float yz,
+                                          float zx, float zy, float zz);
+
+/**
+ * @brief Retrieves all three axes of a UCS as world-space unit vectors.
+ *
+ * Any of the output pointers may be NULL to skip that axis.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_get_axes(const char *name,
+                                          float *xx, float *xy, float *xz,
+                                          float *yx, float *yy, float *yz,
+                                          float *zx, float *zy, float *zz);
+
+/**
+ * @brief Aligns a UCS so that its local Z axis matches a given surface normal.
+ *
+ * Equivalent to calling @ref wxbgi_ucs_set_origin followed by an axis
+ * assignment where Z = @p normal.  The X and Y axes are chosen automatically
+ * to form a complete right-handed frame.
+ *
+ * @param name      UCS name, or NULL for the active UCS.
+ * @param nx,ny,nz  Surface normal (need not be unit length).
+ * @param ox,oy,oz  New UCS origin in world space.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_align_to_plane(const char *name,
+                                                float nx, float ny, float nz,
+                                                float ox, float oy, float oz);
+
+/**
+ * @brief Writes the local-to-world matrix into @p out16 (column-major float[16]).
+ * @param name UCS name, or NULL for the active UCS.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_get_local_to_world_matrix(const char *name,
+                                                           float *out16);
+
+/**
+ * @brief Writes the world-to-local matrix into @p out16 (column-major float[16]).
+ * @param name UCS name, or NULL for the active UCS.
+ */
+BGI_API void BGI_CALL wxbgi_ucs_get_world_to_local_matrix(const char *name,
+                                                           float *out16);
+
+/**
+ * @brief Transforms a world-space point into UCS local coordinates.
+ *
+ * @param name      UCS name, or NULL for the active UCS.
+ * @param wx,wy,wz  World-space input point.
+ * @param lx,ly,lz  Output UCS local coordinates (any may be NULL).
+ */
+BGI_API void BGI_CALL wxbgi_ucs_world_to_local(const char *name,
+                                                float wx, float wy, float wz,
+                                                float *lx, float *ly, float *lz);
+
+/**
+ * @brief Transforms a UCS local point into world-space coordinates.
+ *
+ * @param name      UCS name, or NULL for the active UCS.
+ * @param lx,ly,lz  UCS local input point.
+ * @param wx,wy,wz  Output world-space coordinates (any may be NULL).
+ */
+BGI_API void BGI_CALL wxbgi_ucs_local_to_world(const char *name,
+                                                float lx, float ly, float lz,
+                                                float *wx, float *wy, float *wz);
+
+/** @} */
+
+// =============================================================================
+// Phase 2 — World Extents API
+// =============================================================================
+
+/** @defgroup wxbgi_world_api World Extents API
+ *
+ *  The world extents define an axis-aligned bounding box (AABB) in world space
+ *  that represents the programmer's declared drawing area.  This is used by
+ *  @ref wxbgi_cam_fit_to_extents() and can be queried at any time.
+ *
+ *  The extents start in an "empty" state (no data) and grow as points are added.
+ *  @{
+ */
+
+/**
+ * @brief Sets the world extents to an explicit AABB.
+ *
+ * Replaces any previously set extents.  After this call @c hasData is @c true.
+ */
+BGI_API void BGI_CALL wxbgi_set_world_extents(float minX, float minY, float minZ,
+                                               float maxX, float maxY, float maxZ);
+
+/**
+ * @brief Retrieves the current world extents.
+ *
+ * Any output pointer may be NULL.  If no extents have been set, all values
+ * are 0.  Check the return value: 1 = extents set, 0 = no data yet.
+ */
+BGI_API int BGI_CALL wxbgi_get_world_extents(float *minX, float *minY, float *minZ,
+                                              float *maxX, float *maxY, float *maxZ);
+
+/**
+ * @brief Expands the world extents to include the point (@p x, @p y, @p z).
+ *
+ * If no extents have been set the point becomes the initial AABB.
+ */
+BGI_API void BGI_CALL wxbgi_expand_world_extents(float x, float y, float z);
+
+/**
+ * @brief Resets the world extents to the "empty / no data" state.
+ */
+BGI_API void BGI_CALL wxbgi_reset_world_extents(void);
+
+/**
+ * @brief Adjusts a camera's projection and position to frame the world extents.
+ *
+ * **Orthographic cameras** (including 2-D cameras): the ortho extents are
+ * set so the full AABB is visible with 5 % padding on each side.  For 2-D
+ * cameras the pan is centred on the AABB and the zoom is adjusted.
+ *
+ * **Perspective cameras**: the eye is moved along the current view direction
+ * (keeping the existing target) to a distance where the AABB's bounding
+ * sphere fits within the field of view.
+ *
+ * Does nothing if no world extents have been set.
+ *
+ * @param camName Camera name, or NULL for the active camera.
+ * @return 1 on success, 0 if no extents are set, −1 if camera not found.
+ */
+BGI_API int BGI_CALL wxbgi_cam_fit_to_extents(const char *camName);
+
+// =============================================================================
+// Phase 3: UCS-to-screen projection + world-coordinate drawing wrappers
+// =============================================================================
+
+/**
+ * @brief Projects a UCS-local point through the named UCS and camera to
+ *        screen-pixel coordinates.
+ *
+ * Full pipeline: UCS-local -> world -> view -> NDC -> screen pixel.
+ *
+ * @param ucsName   UCS name, or NULL for the active UCS.
+ * @param camName   Camera name, or NULL for the active camera.
+ * @param ux,uy,uz  UCS-local input point.
+ * @param screenX   Output screen X pixel (top-left origin, Y increasing down).
+ * @param screenY   Output screen Y pixel.
+ * @return          1 if the point is visible, 0 if clipped, -1 if not found.
+ */
+BGI_API int BGI_CALL wxbgi_ucs_to_screen(const char *ucsName, const char *camName,
+                                          float ux, float uy, float uz,
+                                          float *screenX, float *screenY);
+
+// --- World-space drawing (uses the active camera) ----------------------------
+
+/** @brief Draws a single pixel at a world-space position.
+ *  @param x,y,z  World-space position.  @param color  BGI colour index. */
+BGI_API void BGI_CALL wxbgi_world_point(float x, float y, float z, int color);
+
+/** @brief Draws a line segment between two world-space points using the current colour/style. */
+BGI_API void BGI_CALL wxbgi_world_line(float x1, float y1, float z1,
+                                        float x2, float y2, float z2);
+
+/** @brief Draws a circle (world-space centre, world-unit radius) via the active camera.
+ *  The screen radius is estimated from a radial offset along world-X. */
+BGI_API void BGI_CALL wxbgi_world_circle(float cx, float cy, float cz, float radius);
+
+/** @brief Draws an ellipse arc (world-space centre, world-unit semi-axes rx/ry).
+ *  @param startAngle  Arc start in degrees (0=right, CCW).  @param endAngle  Arc end. */
+BGI_API void BGI_CALL wxbgi_world_ellipse(float cx, float cy, float cz,
+                                           float rx, float ry,
+                                           int startAngle, int endAngle);
+
+/** @brief Draws a screen-space rectangle outline from two projected world-space corners. */
+BGI_API void BGI_CALL wxbgi_world_rectangle(float x1, float y1, float z1,
+                                             float x2, float y2, float z2);
+
+/** @brief Draws an open polyline through world-space points.
+ *  @param xyzTriplets  Flat (x,y,z) array; length = pointCount*3. */
+BGI_API void BGI_CALL wxbgi_world_polyline(const float *xyzTriplets, int pointCount);
+
+/** @brief Draws and fills a closed polygon through world-space points.
+ *  Points behind the camera are dropped; needs >= 3 visible vertices. */
+BGI_API void BGI_CALL wxbgi_world_fillpoly(const float *xyzTriplets, int pointCount);
+
+/** @brief Draws text at a world-space position using current BGI font/colour settings. */
+BGI_API void BGI_CALL wxbgi_world_outtextxy(float x, float y, float z, const char *text);
+
+// --- UCS-local drawing (transform through named UCS, then project) -----------
+
+/** @brief Draws a pixel at a UCS-local position.  NULL ucsName = active UCS. */
+BGI_API void BGI_CALL wxbgi_ucs_point(const char *ucsName,
+                                       float ux, float uy, float uz, int color);
+
+/** @brief Draws a line between two UCS-local points.  NULL ucsName = active UCS. */
+BGI_API void BGI_CALL wxbgi_ucs_line(const char *ucsName,
+                                      float ux1, float uy1, float uz1,
+                                      float ux2, float uy2, float uz2);
+
+/** @brief Draws a circle at a UCS-local centre with a UCS-unit radius.  NULL ucsName = active UCS. */
+BGI_API void BGI_CALL wxbgi_ucs_circle(const char *ucsName,
+                                        float cx, float cy, float cz, float radius);
+
+/** @brief Draws an open polyline through UCS-local points.  NULL ucsName = active UCS.
+ *  @param xyzTriplets  Flat (x,y,z) array in UCS local space. */
+BGI_API void BGI_CALL wxbgi_ucs_polyline(const char *ucsName,
+                                          const float *xyzTriplets, int pointCount);
+
+/** @brief Draws text at a UCS-local anchor.  NULL ucsName = active UCS. */
+BGI_API void BGI_CALL wxbgi_ucs_outtextxy(const char *ucsName,
+                                           float ux, float uy, float uz,
+                                           const char *text);
 
 /** @} */

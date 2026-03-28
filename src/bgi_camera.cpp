@@ -15,10 +15,16 @@ namespace bgi
     {
         if (cam.vpW > 0 && cam.vpH > 0)
         {
-            x = cam.vpX;
-            y = cam.vpY;
-            w = cam.vpW;
-            h = cam.vpH;
+            // Clamp to the current window so camera viewports are always
+            // well-defined and cannot spill outside device bounds.
+            x = std::clamp(cam.vpX, 0, std::max(0, winW - 1));
+            y = std::clamp(cam.vpY, 0, std::max(0, winH - 1));
+
+            const int right  = std::clamp(cam.vpX + cam.vpW, 0, winW);
+            const int bottom = std::clamp(cam.vpY + cam.vpH, 0, winH);
+
+            w = std::max(0, right - x);
+            h = std::max(0, bottom - y);
         }
         else
         {
@@ -118,6 +124,9 @@ namespace bgi
         int vpx, vpy, vpw, vph;
         cameraEffectiveViewport(cam, winW, winH, vpx, vpy, vpw, vph);
 
+        if (vpw <= 0 || vph <= 0)
+            return false;
+
         const float aspect = (vph > 0)
                            ? static_cast<float>(vpw) / static_cast<float>(vph)
                            : 1.f;
@@ -131,15 +140,20 @@ namespace bgi
 
         const glm::vec3 ndc = glm::vec3(clip) / clip.w;
 
-        if (ndc.z < -1.f || ndc.z > 1.f)
-            return false; // outside near/far clip planes
+        // Full clip-space frustum test (X/Y/Z).
+        if (ndc.x < -1.f || ndc.x > 1.f ||
+            ndc.y < -1.f || ndc.y > 1.f ||
+            ndc.z < -1.f || ndc.z > 1.f)
+            return false;
 
-        // NDC → screen pixels.  Y is flipped so that NDC +1 maps to pixel row 0
-        // (top of the viewport), matching classic BGI and windowing conventions.
-        screenX = (ndc.x + 1.f) * 0.5f * static_cast<float>(vpw)
-                + static_cast<float>(vpx);
-        screenY = (1.f - ndc.y) * 0.5f * static_cast<float>(vph)
-                + static_cast<float>(vpy);
+        // NDC -> inclusive pixel indices in [vpx, vpx+vpw-1] and
+        // [vpy, vpy+vph-1]. This avoids a +1 pixel spill at viewport edges.
+        const float spanX = static_cast<float>(std::max(vpw - 1, 0));
+        const float spanY = static_cast<float>(std::max(vph - 1, 0));
+
+        // Y is flipped so NDC +1 maps to pixel row 0 (top), matching BGI.
+        screenX = (ndc.x + 1.f) * 0.5f * spanX + static_cast<float>(vpx);
+        screenY = (1.f - ndc.y) * 0.5f * spanY + static_cast<float>(vpy);
 
         return true;
     }
@@ -152,17 +166,23 @@ namespace bgi
         int vpx, vpy, vpw, vph;
         cameraEffectiveViewport(cam, winW, winH, vpx, vpy, vpw, vph);
 
+        if (vpw <= 0 || vph <= 0)
+            return;
+
         const float aspect = (vph > 0)
                            ? static_cast<float>(vpw) / static_cast<float>(vph)
                            : 1.f;
 
         // Screen pixel → NDC (invert the Y-flip applied in worldToScreen).
-        const float ndcX =
-            (screenX - static_cast<float>(vpx)) / static_cast<float>(vpw)
-            * 2.f - 1.f;
-        const float ndcY =
-            1.f - (screenY - static_cast<float>(vpy)) / static_cast<float>(vph)
-            * 2.f;
+        const float spanX = static_cast<float>(std::max(vpw - 1, 0));
+        const float spanY = static_cast<float>(std::max(vph - 1, 0));
+
+        const float ndcX = (spanX > 0.f)
+            ? ((screenX - static_cast<float>(vpx)) / spanX) * 2.f - 1.f
+            : 0.f;
+        const float ndcY = (spanY > 0.f)
+            ? 1.f - ((screenY - static_cast<float>(vpy)) / spanY) * 2.f
+            : 0.f;
 
         const glm::mat4 vpInv = glm::inverse(cameraVPMatrix(cam, aspect));
 

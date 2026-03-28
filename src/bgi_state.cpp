@@ -108,6 +108,14 @@ namespace bgi
         defaultCam.farPlane     =  1.f;
         gState.cameras["default"] = defaultCam;
         gState.activeCamera     = "default";
+
+        // Create the identity "world" UCS (cannot be destroyed).
+        gState.ucsSystems.clear();
+        gState.ucsSystems["world"] = CoordSystem{};
+        gState.activeUcs = "world";
+
+        // Reset world extents to "empty".
+        gState.worldExtents = WorldExtents{};
     }
 
     std::vector<std::uint8_t> &activePageBuffer()
