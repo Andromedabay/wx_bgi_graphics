@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <queue>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #if defined(_WIN32)
@@ -185,6 +186,60 @@ namespace bgi
 
     extern const ColorRGB kBgiPalette[kPaletteSize];
 
+    // -------------------------------------------------------------------------
+    // Camera system
+    // -------------------------------------------------------------------------
+
+    /** Projection mode for a Camera3D. */
+    enum class CameraProjection
+    {
+        Orthographic = 0,
+        Perspective  = 1,
+    };
+
+    /**
+     * @brief 3-D camera definition (Z-up, right-handed world coordinate system).
+     *
+     * The camera stores both full 3-D eye/target/up parameters and a 2-D
+     * convenience layer (pan/zoom/rotation) for overhead/plan-view cameras.
+     * When @c is2D is true, the 2-D fields drive the view and projection
+     * matrices; otherwise the explicit 3-D and ortho fields are used.
+     *
+     * All camera instances live in @c BgiState::cameras keyed by name.
+     * A camera named @c "default" is created automatically on @c initwindow()
+     * and replicates the classic BGI pixel-space coordinate system.
+     */
+    struct Camera3D
+    {
+        // --- Eye/target/up (Z-up, right-handed) ---
+        float eyeX{0.f},    eyeY{-10.f},  eyeZ{5.f};
+        float targetX{0.f}, targetY{0.f}, targetZ{0.f};
+        float upX{0.f},     upY{0.f},     upZ{1.f};  // Z is up
+
+        // --- Projection ---
+        CameraProjection projection{CameraProjection::Orthographic};
+
+        float fovYDeg{45.f};
+        float nearPlane{0.1f};
+        float farPlane{10000.f};
+
+        // Orthographic clip extents. All-zero triggers auto-fit via worldHeight2d.
+        float orthoLeft{0.f},   orthoRight{0.f};
+        float orthoBottom{0.f}, orthoTop{0.f};
+
+        // --- Screen-space viewport override (pixels).
+        //     All-zero means the full GLFW window. ---
+        int vpX{0}, vpY{0}, vpW{0}, vpH{0};
+
+        // --- 2-D convenience layer (active when is2D == true) ---
+        bool  is2D{false};
+        float pan2dX{0.f}, pan2dY{0.f};
+        float zoom2d{1.f};
+        float rot2dDeg{0.f};
+        /** Visible world-units height used by 2-D cameras and auto-ortho. */
+        float worldHeight2d{2.f};
+    };
+
     struct BgiState
     {
         GLFWwindow *window{nullptr};
@@ -226,6 +281,10 @@ namespace bgi
         std::array<std::uint8_t, 512> keyDown{};
         int mouseX{0};
         int mouseY{0};
+
+        // --- Camera registry ---
+        std::unordered_map<std::string, Camera3D> cameras;
+        std::string activeCamera{"default"};
     };
 
 } // namespace bgi

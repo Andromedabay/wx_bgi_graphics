@@ -49,6 +49,17 @@ FetchContent_MakeAvailable(glfw)
 
 set_target_properties(glfw PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+message(STATUS "Fetching GLM...")
+
+set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    glm
+    URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(glm)
+
 find_package(OpenGL REQUIRED)
 
 # Build a static GLEW library from fetched sources to keep the build self-contained.
@@ -83,13 +94,15 @@ set(SRCS
     src/bgi_image.cpp
     src/bgi_api.cpp
     src/bgi_modern_api.cpp
+    src/bgi_camera.cpp
+    src/bgi_camera_api.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
 
 target_include_directories(wx_bgi_opengl PUBLIC src)
 target_compile_definitions(wx_bgi_opengl PRIVATE GLEW_STATIC)
-target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL)
+target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm)
 
 if(WXBGI_ENABLE_TEST_SEAMS)
     # Expose compile-time guard to both the library and consumers of the public
@@ -123,6 +136,16 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:wxbgi_keyboard_queue_cpp>
+)
+
+add_executable(wxbgi_camera_demo_cpp examples/cpp/wxbgi_camera_demo.cpp)
+target_link_libraries(wxbgi_camera_demo_cpp PRIVATE wx_bgi_opengl glfw)
+
+add_custom_command(
+    TARGET wxbgi_camera_demo_cpp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
 )
 
 find_package(Python3 COMPONENTS Interpreter)

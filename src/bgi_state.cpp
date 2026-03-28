@@ -84,6 +84,30 @@ namespace bgi
 
         const std::size_t pixelCount = static_cast<std::size_t>(gState.width) * static_cast<std::size_t>(gState.height);
         gState.pageBuffers.assign(static_cast<std::size_t>(kPageCount), std::vector<std::uint8_t>(pixelCount, static_cast<std::uint8_t>(gState.bkColor)));
+
+        // Create the default pixel-space camera that replicates classic BGI
+        // coordinates: (0,0) = top-left, Y increases downward.
+        // The Y-flip is achieved by setting orthoBottom > orthoTop.
+        gState.cameras.clear();
+        Camera3D defaultCam;
+        defaultCam.projection   = CameraProjection::Orthographic;
+        defaultCam.eyeX         = 0.f;
+        defaultCam.eyeY         = 0.f;
+        defaultCam.eyeZ         = 1.f;
+        defaultCam.targetX      = 0.f;
+        defaultCam.targetY      = 0.f;
+        defaultCam.targetZ      = 0.f;
+        defaultCam.upX          = 0.f;
+        defaultCam.upY          = 1.f;
+        defaultCam.upZ          = 0.f;
+        defaultCam.orthoLeft    = 0.f;
+        defaultCam.orthoRight   = static_cast<float>(gState.width);
+        defaultCam.orthoBottom  = static_cast<float>(gState.height); // bottom > top → Y-flip
+        defaultCam.orthoTop     = 0.f;
+        defaultCam.nearPlane    = -1.f;
+        defaultCam.farPlane     =  1.f;
+        gState.cameras["default"] = defaultCam;
+        gState.activeCamera     = "default";
     }
 
     std::vector<std::uint8_t> &activePageBuffer()
