@@ -12,6 +12,7 @@ EXTRACT_LOCAL_CLASSES  = NO
 
 INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/DDS.md" \
+                         "@CMAKE_SOURCE_DIR@/ScreenShots.md" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_ext.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_3d.h" \

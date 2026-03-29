@@ -133,6 +133,7 @@ set(SRCS
     src/bgi_dds_render.cpp
     src/bgi_solid_api.cpp
     src/bgi_solid_render.cpp
+    src/bgi_export.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
@@ -183,6 +184,18 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
+)
+
+# Screenshot capture utility ---------------------------------------------------
+
+add_executable(capture_screenshots tools/capture_screenshots.cpp)
+target_link_libraries(capture_screenshots PRIVATE wx_bgi_opengl glfw)
+
+add_custom_command(
+    TARGET capture_screenshots POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:capture_screenshots>
 )
 
 # Phase E tests ---------------------------------------------------------------

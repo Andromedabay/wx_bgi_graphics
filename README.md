@@ -44,6 +44,14 @@ Public API declarations are available in:
 
 See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP object hierarchy, all `wxbgi_dds_*` functions, and usage examples.
 
+## Screenshots
+
+See **[ScreenShots.md](./ScreenShots.md)** for annotated screenshots of the example programs.
+
+[![3D perspective camera view](images/screenshot_cam3d_persp.png)](ScreenShots.md)
+
+*Click the image or the link above to browse all screenshots.*
+
 
 ## Turbo Pascal/Turbo C/C++ - Drop in Replacement (Well Almost...)
 

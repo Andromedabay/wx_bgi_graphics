@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "bgi_types.h"
 
@@ -232,4 +232,110 @@ BGI_API void BGI_CALL wxbgi_free_color(int idx);
  */
 BGI_API void BGI_CALL wxbgi_getrgb(int color, int *r, int *g, int *b);
 
-/** @} */
+
+
+// ---------------------------------------------------------------------------
+
+// PNG framebuffer export
+
+// ---------------------------------------------------------------------------
+
+
+
+/**
+
+ * @defgroup wxbgi_export_api PNG Export API
+
+ * @brief Save the BGI framebuffer or a DDS camera view directly to a PNG file.
+
+ *
+
+ * All three functions use a self-contained PNG encoder (CRC-32, Adler-32,
+
+ * deflate stored blocks) - no external image library is required.
+
+ * @{
+
+ */
+
+
+
+/**
+
+ * @brief Export the current visual-page pixel buffer to a PNG file.
+
+ *
+
+ * Captures exactly what is currently displayed (the visual page).
+
+ * Output dimensions match the window size passed to @c initwindow().
+
+ *
+
+ * @param filePath Destination file path (e.g. @c "screenshot.png").
+
+ * @return 0 on success, -1 if no window is open or the file cannot be written.
+
+ */
+
+BGI_API int BGI_CALL wxbgi_export_png(const char *filePath);
+
+
+
+/**
+
+ * @brief Export the full OpenGL window content to a PNG file.
+
+ *
+
+ * For pure BGI contexts equivalent to @ref wxbgi_export_png.
+
+ * Provided as a distinct entry point for callers that conceptually want
+
+ * "everything displayed in the window" regardless of page selection.
+
+ *
+
+ * @param filePath Destination file path.
+
+ * @return 0 on success, -1 on error.
+
+ */
+
+BGI_API int BGI_CALL wxbgi_export_png_window(const char *filePath);
+
+
+
+/**
+
+ * @brief Render the DDS scene through a camera and export its viewport to PNG.
+
+ *
+
+ * Calls @ref wxbgi_render_dds internally, then crops the active-page buffer to
+
+ * the named camera's viewport rectangle and writes the result as a PNG.
+
+ * Pass @c NULL as @p camName to use the active camera.
+
+ * If the camera has no explicit viewport the full window is exported.
+
+ *
+
+ * @param camName  Name of the camera to render through (or @c NULL).
+
+ * @param filePath Destination file path.
+
+ * @return 0 on success, -1 on error.
+
+ */
+
+BGI_API int BGI_CALL wxbgi_export_png_camera_view(const char *camName,
+
+                                                   const char *filePath);
+
+
+
+/** @} */  // wxbgi_export_api
+
+/** @} */  // wxbgi_ext_api
