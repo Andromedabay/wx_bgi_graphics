@@ -158,6 +158,131 @@ namespace bgi
         return true;
     }
 
+    bool cameraWorldToScreenForced(const Camera3D &cam, int winW, int winH,
+                                   float wx, float wy, float wz,
+                                   float &screenX, float &screenY)
+    {
+        int vpx, vpy, vpw, vph;
+        cameraEffectiveViewport(cam, winW, winH, vpx, vpy, vpw, vph);
+
+        if (vpw <= 0 || vph <= 0)
+            return false;
+
+        const float aspect = (vph > 0)
+                           ? static_cast<float>(vpw) / static_cast<float>(vph)
+                           : 1.f;
+
+        const glm::vec4 clip = cameraVPMatrix(cam, aspect)
+                             * glm::vec4(wx, wy, wz, 1.f);
+
+        // Reject only points strictly behind the camera (perspective divide
+        // would flip the direction, producing wildly wrong coordinates).
+        if (clip.w <= 0.f)
+            return false;
+
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+
+        // NOTE: No NDC boundary test here.  The caller relies on per-pixel
+        // clipping inside drawLineInternal / fillPolygonInternal to trim
+        // primitives at the viewport edge.  Projecting unclamped screen coords
+        // allows the scanline fill and Bresenham routines to produce correct
+        // partial coverage even when some vertices lie outside the viewport.
+        const float spanX = static_cast<float>(std::max(vpw - 1, 0));
+        const float spanY = static_cast<float>(std::max(vph - 1, 0));
+
+        screenX = (ndc.x + 1.f) * 0.5f * spanX + static_cast<float>(vpx);
+        screenY = (1.f - ndc.y) * 0.5f * spanY + static_cast<float>(vpy);
+
+        return true;
+    }
+
+    glm::vec4 cameraWorldToClip(const Camera3D &cam, int winW, int winH,
+                               float wx, float wy, float wz)
+    {
+        int vpx, vpy, vpw, vph;
+        cameraEffectiveViewport(cam, winW, winH, vpx, vpy, vpw, vph);
+        const float aspect = (vpw > 0 && vph > 0)
+                           ? static_cast<float>(vpw) / static_cast<float>(vph)
+                           : 1.f;
+        return cameraVPMatrix(cam, aspect) * glm::vec4(wx, wy, wz, 1.f);
+    }
+
+    void clipPolyByPlane(std::vector<glm::vec4> &poly, const glm::vec4 &plane)
+    {
+        const int n = static_cast<int>(poly.size());
+        if (n == 0) return;
+
+        std::vector<glm::vec4> out;
+        out.reserve(static_cast<std::size_t>(n + 1));
+
+        for (int i = 0; i < n; ++i)
+        {
+            const glm::vec4 &A = poly[static_cast<std::size_t>(i)];
+            const glm::vec4 &B = poly[static_cast<std::size_t>((i + 1) % n)];
+            const float fa = glm::dot(plane, A);
+            const float fb = glm::dot(plane, B);
+
+            if (fa > 0.f)
+                out.push_back(A);
+
+            if ((fa > 0.f) != (fb > 0.f))
+            {
+                const float t = fa / (fa - fb);
+                out.push_back(A + t * (B - A));
+            }
+        }
+        poly = std::move(out);
+    }
+
+    void clipPolyZPlanes(std::vector<glm::vec4> &poly)
+    {
+        clipPolyByPlane(poly, glm::vec4(0.f, 0.f,  1.f, 1.f));   // near: Z+W>0
+        clipPolyByPlane(poly, glm::vec4(0.f, 0.f, -1.f, 1.f));   // far: -Z+W>0
+    }
+
+    bool clipLineByPlane(glm::vec4 &A, glm::vec4 &B, const glm::vec4 &plane)
+    {
+        const float fa = glm::dot(plane, A);
+        const float fb = glm::dot(plane, B);
+        if (fa <= 0.f && fb <= 0.f) return false;   // both outside
+        if (fa > 0.f  && fb > 0.f)  return true;    // both inside
+        const float t = fa / (fa - fb);
+        if (fa <= 0.f)
+            A = A + t * (B - A);  // A was outside
+        else
+            B = A + t * (B - A);  // B was outside
+        return true;
+    }
+
+    bool clipLineZPlanes(glm::vec4 &A, glm::vec4 &B)
+    {
+        if (!clipLineByPlane(A, B, glm::vec4(0.f, 0.f,  1.f, 1.f))) return false;
+        return clipLineByPlane(A, B, glm::vec4(0.f, 0.f, -1.f, 1.f));
+    }
+
+    bool cameraClipToScreen(const Camera3D &cam, int winW, int winH,
+                            const glm::vec4 &clip,
+                            float &screenX, float &screenY)
+    {
+        if (clip.w <= 0.f)
+            return false;
+
+        int vpx, vpy, vpw, vph;
+        cameraEffectiveViewport(cam, winW, winH, vpx, vpy, vpw, vph);
+        if (vpw <= 0 || vph <= 0)
+            return false;
+
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+
+        // No NDC X/Y boundary test — per-pixel clipping handles viewport edges.
+        const float spanX = static_cast<float>(std::max(vpw - 1, 0));
+        const float spanY = static_cast<float>(std::max(vph - 1, 0));
+
+        screenX = (ndc.x + 1.f) * 0.5f * spanX + static_cast<float>(vpx);
+        screenY = (1.f - ndc.y) * 0.5f * spanY + static_cast<float>(vpy);
+        return true;
+    }
+
     void cameraScreenToRay(const Camera3D &cam, int winW, int winH,
                            float screenX, float screenY,
                            float &rayOx, float &rayOy, float &rayOz,

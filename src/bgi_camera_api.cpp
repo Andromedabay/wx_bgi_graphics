@@ -372,8 +372,9 @@ BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name)
     dc->camera.zoom2d         = 1.f;
     dc->camera.rot2dDeg       = 0.f;
     dc->camera.worldHeight2d  = static_cast<float>(bgi::gState.height);
-    dc->camera.nearPlane      = -1.f;
-    dc->camera.farPlane       =  1.f;
+    // Wide Z range so 3-D objects above/below the XY plane remain visible.
+    dc->camera.nearPlane      = -10000.f;
+    dc->camera.farPlane       =  10000.f;
 
     bgi::gState.dds->append(dc);
     bgi::gState.cameras[name] = dc;

@@ -426,6 +426,7 @@ This code is Open Source and Free to use with no warranties or claims.
 This repository is based on Open-Source Code from 7 different source:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
+         - Techniques mentioned at URL [https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html](https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html).  
     2. CMake Template, from lszl84, MIT License  
     3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license  
     4. glew Library, from https://github.com/nigels-com/glew, Custom License  

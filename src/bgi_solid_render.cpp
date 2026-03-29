@@ -54,15 +54,16 @@ struct Triangle
 // Projection helpers
 // ---------------------------------------------------------------------------
 
-/** Project a world-space point through the camera to viewport-relative pixels.
- *  Returns false if behind camera (caller may still draw edge stubs). */
-bool projectWP(const bgi::Camera3D &cam,
-               const glm::vec3 &wp,
+/** Project a 4-D clip-space point to viewport-relative pixels.
+ *  No NDC X/Y test — relies on per-pixel clipping at the viewport boundary.
+ *  Returns false only when w <= 0 (guaranteed not to occur after near-plane clip). */
+bool projectCP(const bgi::Camera3D &cam,
+               const glm::vec4 &cp,
                int &px, int &py)
 {
     float sx = 0.f, sy = 0.f;
-    if (!bgi::cameraWorldToScreen(cam, bgi::gState.width, bgi::gState.height,
-                                  wp.x, wp.y, wp.z, sx, sy))
+    if (!bgi::cameraClipToScreen(cam, bgi::gState.width, bgi::gState.height,
+                                 cp, sx, sy))
         return false;
     px = static_cast<int>(sx) - bgi::gState.viewport.left;
     py = static_cast<int>(sy) - bgi::gState.viewport.top;
@@ -81,7 +82,15 @@ void renderTriangles(const bgi::Camera3D &cam,
         return;
 
     // Camera eye position for front-face determination.
-    glm::vec3 eye{cam.eyeX, cam.eyeY, cam.eyeZ};
+    // For 2-D cameras the stored eyeX/Y/Z are the 3-D camera defaults and are
+    // meaningless; derive the effective eye from the 2-D camera parameters
+    // (pan centre plus a large positive Z so it "looks down" from above in
+    // the Z-up world convention).
+    glm::vec3 eye;
+    if (cam.is2D)
+        eye = glm::vec3(cam.pan2dX, cam.pan2dY, 10000.f);
+    else
+        eye = glm::vec3(cam.eyeX, cam.eyeY, cam.eyeZ);
 
     // Build view matrix for depth sorting.
     glm::mat4 view = bgi::cameraViewMatrix(cam);
@@ -118,35 +127,45 @@ void renderTriangles(const bgi::Camera3D &cam,
         glm::vec3 viewDir  = eye - centroid;
         bool frontFace = glm::dot(normal, viewDir) > 0.f;
 
-        // Project all three vertices.
-        int px[3], py[3];
-        bool allVisible = true;
-        for (int k = 0; k < 3; ++k)
-            if (!projectWP(cam, tri.v[k], px[k], py[k]))
-                allVisible = false;
-
-        // Skip triangles where no vertex is visible.
-        if (!allVisible)
+        // Sutherland-Hodgman: clip the triangle against near + far Z planes
+        // in 4-D clip space, then project and rasterize each resulting sub-triangle.
+        std::vector<glm::vec4> clip4 = {
+            bgi::cameraWorldToClip(cam, bgi::gState.width, bgi::gState.height,
+                                   tri.v[0].x, tri.v[0].y, tri.v[0].z),
+            bgi::cameraWorldToClip(cam, bgi::gState.width, bgi::gState.height,
+                                   tri.v[1].x, tri.v[1].y, tri.v[1].z),
+            bgi::cameraWorldToClip(cam, bgi::gState.width, bgi::gState.height,
+                                   tri.v[2].x, tri.v[2].y, tri.v[2].z)
+        };
+        bgi::clipPolyZPlanes(clip4);
+        if (clip4.size() < 3)
             continue;
 
-        std::vector<std::pair<int,int>> pts = {
-            {px[0], py[0]}, {px[1], py[1]}, {px[2], py[2]}
-        };
-
-        if (mode == bgi::SolidDrawMode::Solid && frontFace)
+        // Triangle fan from vertex 0 of the clipped polygon
+        for (std::size_t fi = 1; fi + 1 < clip4.size(); ++fi)
         {
-            // Save and temporarily override fill state.
-            int savedFillPat  = bgi::gState.fillPattern;
-            int savedFillCol  = bgi::gState.fillColor;
-            bgi::gState.fillPattern = bgi::SOLID_FILL;
-            bgi::gState.fillColor   = tri.faceColor;
-            bgi::fillPolygonInternal(pts, tri.faceColor);
-            bgi::gState.fillPattern = savedFillPat;
-            bgi::gState.fillColor   = savedFillCol;
-        }
+            int px0 = 0, py0 = 0, px1 = 0, py1 = 0, px2 = 0, py2 = 0;
+            if (!projectCP(cam, clip4[0], px0, py0)) continue;
+            if (!projectCP(cam, clip4[fi], px1, py1)) continue;
+            if (!projectCP(cam, clip4[fi + 1], px2, py2)) continue;
 
-        // Always draw edges (wireframe or solid).
-        bgi::drawPolygonInternal(pts, tri.edgeColor);
+            std::vector<std::pair<int,int>> pts = {
+                {px0, py0}, {px1, py1}, {px2, py2}
+            };
+
+            if (mode == bgi::SolidDrawMode::Solid && frontFace)
+            {
+                int savedFillPat  = bgi::gState.fillPattern;
+                int savedFillCol  = bgi::gState.fillColor;
+                bgi::gState.fillPattern = bgi::SOLID_FILL;
+                bgi::gState.fillColor   = tri.faceColor;
+                bgi::fillPolygonInternal(pts, tri.faceColor);
+                bgi::gState.fillPattern = savedFillPat;
+                bgi::gState.fillColor   = savedFillCol;
+            }
+
+            bgi::drawPolygonInternal(pts, tri.edgeColor);
+        }
     }
 }
 

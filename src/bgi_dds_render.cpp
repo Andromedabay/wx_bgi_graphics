@@ -127,6 +127,9 @@ bool resolveWorld(bgi::CoordSpace cs, const std::string &ucsName,
  * Project a world point through the camera and return viewport-relative pixel
  * coordinates (same convention as bgi_world_api.cpp — viewport.left/top are
  * subtracted so internal draw functions add them back correctly).
+ *
+ * Returns false if the point is outside the view frustum (NDC boundary test).
+ * Use projectToVpRelForced when partial edge clipping is needed.
  */
 bool projectToVpRel(const bgi::Camera3D &cam,
                     float wx, float wy, float wz,
@@ -138,6 +141,51 @@ bool projectToVpRel(const bgi::Camera3D &cam,
         return false;
     vpX = static_cast<int>(sx) - bgi::gState.viewport.left;
     vpY = static_cast<int>(sy) - bgi::gState.viewport.top;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Sutherland-Hodgman pipeline helpers
+// ---------------------------------------------------------------------------
+
+/** Convert a world point to 4-D clip space via the camera's VP matrix. */
+glm::vec4 worldToClip4(const bgi::Camera3D &cam,
+                        float wx, float wy, float wz)
+{
+    return bgi::cameraWorldToClip(cam,
+                                  bgi::gState.width, bgi::gState.height,
+                                  wx, wy, wz);
+}
+
+/**
+ * Project a clip-space point to viewport-relative pixel coords.
+ * No NDC X/Y test — relies on per-pixel viewport clipping.
+ * Returns false only when w <= 0.
+ */
+bool clipToVpRel(const bgi::Camera3D &cam, const glm::vec4 &clip,
+                 int &vpX, int &vpY)
+{
+    float sx = 0.f, sy = 0.f;
+    if (!bgi::cameraClipToScreen(cam,
+                                 bgi::gState.width, bgi::gState.height,
+                                 clip, sx, sy))
+        return false;
+    vpX = static_cast<int>(sx) - bgi::gState.viewport.left;
+    vpY = static_cast<int>(sy) - bgi::gState.viewport.top;
+    return true;
+}
+
+/**
+ * Helper: clip a line edge A→B against near+far, then project both endpoints
+ * to viewport-relative pixels.  Returns false if the entire segment is clipped.
+ */
+bool clipAndProjectLine(const bgi::Camera3D &cam,
+                        glm::vec4 A, glm::vec4 B,
+                        int &ax, int &ay, int &bx, int &by)
+{
+    if (!bgi::clipLineZPlanes(A, B)) return false;
+    if (!clipToVpRel(cam, A, ax, ay)) return false;
+    if (!clipToVpRel(cam, B, bx, by)) return false;
     return true;
 }
 
@@ -277,12 +325,12 @@ void renderLine(const bgi::Camera3D &cam, const bgi::DdsLine &obj)
     if (!resolveWorld(obj.coordSpace, obj.ucsName,
                       obj.p2.x, obj.p2.y, obj.p2.z, wx2, wy2, wz2))
         return;
+
+    glm::vec4 A = worldToClip4(cam, wx1, wy1, wz1);
+    glm::vec4 B = worldToClip4(cam, wx2, wy2, wz2);
     int vx1 = 0, vy1 = 0, vx2 = 0, vy2 = 0;
-    const bool v1 = projectToVpRel(cam, wx1, wy1, wz1, vx1, vy1);
-    const bool v2 = projectToVpRel(cam, wx2, wy2, wz2, vx2, vy2);
-    if (!v1 && !v2)
-        return;
-    bgi::drawLineInternal(vx1, vy1, vx2, vy2, bgi::gState.currentColor);
+    if (clipAndProjectLine(cam, A, B, vx1, vy1, vx2, vy2))
+        bgi::drawLineInternal(vx1, vy1, vx2, vy2, bgi::gState.currentColor);
 }
 
 void renderCircle(const bgi::Camera3D &cam, const bgi::DdsCircle &obj)
@@ -459,16 +507,19 @@ void renderRectangle(const bgi::Camera3D &cam, const bgi::DdsRectangle &obj)
     if (!resolveWorld(obj.coordSpace, obj.ucsName,
                       obj.p2.x, obj.p2.y, obj.p2.z, wx2, wy2, wz2))
         return;
-    int vx1 = 0, vy1 = 0, vx2 = 0, vy2 = 0;
-    const bool v1 = projectToVpRel(cam, wx1, wy1, wz1, vx1, vy1);
-    const bool v2 = projectToVpRel(cam, wx2, wy2, wz2, vx2, vy2);
-    if (!v1 && !v2)
-        return;
+
+    // Build the four corners in clip space.
+    const glm::vec4 TL = worldToClip4(cam, wx1, wy1, wz1);
+    const glm::vec4 TR = worldToClip4(cam, wx2, wy1, wz1);
+    const glm::vec4 BR = worldToClip4(cam, wx2, wy2, wz2);
+    const glm::vec4 BL = worldToClip4(cam, wx1, wy2, wz2);
+
     const int c = bgi::gState.currentColor;
-    bgi::drawLineInternal(vx1, vy1, vx2, vy1, c);
-    bgi::drawLineInternal(vx2, vy1, vx2, vy2, c);
-    bgi::drawLineInternal(vx2, vy2, vx1, vy2, c);
-    bgi::drawLineInternal(vx1, vy2, vx1, vy1, c);
+    int ax, ay, bx, by;
+    if (clipAndProjectLine(cam, TL, TR, ax, ay, bx, by)) bgi::drawLineInternal(ax, ay, bx, by, c);
+    if (clipAndProjectLine(cam, TR, BR, ax, ay, bx, by)) bgi::drawLineInternal(ax, ay, bx, by, c);
+    if (clipAndProjectLine(cam, BR, BL, ax, ay, bx, by)) bgi::drawLineInternal(ax, ay, bx, by, c);
+    if (clipAndProjectLine(cam, BL, TL, ax, ay, bx, by)) bgi::drawLineInternal(ax, ay, bx, by, c);
 }
 
 void renderBar(const bgi::Camera3D &cam, const bgi::DdsBar &obj)
@@ -481,11 +532,19 @@ void renderBar(const bgi::Camera3D &cam, const bgi::DdsBar &obj)
     if (!resolveWorld(obj.coordSpace, obj.ucsName,
                       obj.p2.x, obj.p2.y, obj.p2.z, wx2, wy2, wz2))
         return;
+    // Use cameraWorldToScreenForced for fill-rect corners (filled bar doesn't
+    // need SH triangle decomposition; per-pixel clipping handles boundaries).
     int vx1 = 0, vy1 = 0, vx2 = 0, vy2 = 0;
-    const bool v1 = projectToVpRel(cam, wx1, wy1, wz1, vx1, vy1);
-    const bool v2 = projectToVpRel(cam, wx2, wy2, wz2, vx2, vy2);
-    if (!v1 && !v2)
-        return;
+    float sx = 0.f, sy = 0.f;
+    bgi::cameraWorldToScreenForced(cam, bgi::gState.width, bgi::gState.height,
+                                   wx1, wy1, wz1, sx, sy);
+    vx1 = static_cast<int>(sx) - bgi::gState.viewport.left;
+    vy1 = static_cast<int>(sy) - bgi::gState.viewport.top;
+    bgi::cameraWorldToScreenForced(cam, bgi::gState.width, bgi::gState.height,
+                                   wx2, wy2, wz2, sx, sy);
+    vx2 = static_cast<int>(sx) - bgi::gState.viewport.left;
+    vy2 = static_cast<int>(sy) - bgi::gState.viewport.top;
+
     const int l = std::min(vx1, vx2), r = std::max(vx1, vx2);
     const int t = std::min(vy1, vy2), b = std::max(vy1, vy2);
     bgi::fillRectInternal(l, t, r, b, bgi::gState.fillColor);
@@ -493,9 +552,6 @@ void renderBar(const bgi::Camera3D &cam, const bgi::DdsBar &obj)
 
 void renderBar3D(const bgi::Camera3D &cam, const bgi::DdsBar3D &obj)
 {
-    // Compute the 7 key world-space corner points.
-    // p1 = (left, top), p2 = (right, bottom) in local space.
-    // depth is an offset applied to X and -Y (the classic bar3d 2D extrusion).
     const float left   = obj.p1.x, top    = obj.p1.y, lz = obj.p1.z;
     const float right  = obj.p2.x, bottom = obj.p2.y;
     const float d      = obj.depth;
@@ -512,51 +568,66 @@ void renderBar3D(const bgi::Camera3D &cam, const bgi::DdsBar3D &obj)
     rw(right+d, bottom-d, wF);
     rw(left+d,  top-d,  wG);
 
-    int vA[2], vB[2], vC[2], vD[2], vE[2], vF[2], vG[2];
-    auto proj = [&](const float *wpt, int *vpt) {
-        projectToVpRel(cam, wpt[0], wpt[1], wpt[2], vpt[0], vpt[1]);
-    };
-    proj(wA, vA); proj(wB, vB); proj(wC, vC); proj(wD, vD);
-    proj(wE, vE); proj(wF, vF); proj(wG, vG);
-
-    // Front face fill (axis-aligned bounding box of projected corners)
-    const int fl = std::min(vA[0], vD[0]);
-    const int ft = std::min(vA[1], vB[1]);
-    const int fr = std::max(vB[0], vC[0]);
-    const int fb = std::max(vC[1], vD[1]);
-    bgi::fillRectInternal(fl, ft, fr, fb, bgi::gState.fillColor);
-
-    const int c = bgi::gState.currentColor;
-    // Front face outline
-    bgi::drawLineInternal(vA[0], vA[1], vB[0], vB[1], c);
-    bgi::drawLineInternal(vB[0], vB[1], vC[0], vC[1], c);
-    bgi::drawLineInternal(vC[0], vC[1], vD[0], vD[1], c);
-    bgi::drawLineInternal(vD[0], vD[1], vA[0], vA[1], c);
-    // Right extrusion lines
-    bgi::drawLineInternal(vB[0], vB[1], vE[0], vE[1], c);
-    bgi::drawLineInternal(vC[0], vC[1], vF[0], vF[1], c);
-    bgi::drawLineInternal(vE[0], vE[1], vF[0], vF[1], c);
-    // Top face (optional)
-    if (obj.topFlag)
+    // Front face fill (projected bounding rect of front corners using forced proj)
     {
-        bgi::drawLineInternal(vA[0], vA[1], vG[0], vG[1], c);
-        bgi::drawLineInternal(vG[0], vG[1], vE[0], vE[1], c);
+        int vA[2], vD[2], vB[2], vC[2];
+        float sx = 0.f, sy = 0.f;
+        auto fp = [&](const float *w, int *v) {
+            bgi::cameraWorldToScreenForced(cam, bgi::gState.width, bgi::gState.height,
+                                           w[0], w[1], w[2], sx, sy);
+            v[0] = (int)sx - bgi::gState.viewport.left;
+            v[1] = (int)sy - bgi::gState.viewport.top;
+        };
+        fp(wA,vA); fp(wB,vB); fp(wC,vC); fp(wD,vD);
+        const int fl = std::min(vA[0], vD[0]);
+        const int ft = std::min(vA[1], vB[1]);
+        const int fr = std::max(vB[0], vC[0]);
+        const int fb = std::max(vC[1], vD[1]);
+        bgi::fillRectInternal(fl, ft, fr, fb, bgi::gState.fillColor);
     }
+
+    // All outline edges clipped with SH
+    const int c = bgi::gState.currentColor;
+    auto edge = [&](const float *p, const float *q) {
+        glm::vec4 A = worldToClip4(cam, p[0], p[1], p[2]);
+        glm::vec4 B = worldToClip4(cam, q[0], q[1], q[2]);
+        int ax, ay, bx, by;
+        if (clipAndProjectLine(cam, A, B, ax, ay, bx, by))
+            bgi::drawLineInternal(ax, ay, bx, by, c);
+    };
+    edge(wA, wB); edge(wB, wC); edge(wC, wD); edge(wD, wA);
+    edge(wB, wE); edge(wC, wF); edge(wE, wF);
+    if (obj.topFlag) { edge(wA, wG); edge(wG, wE); }
 }
 
 void renderPolygon(const bgi::Camera3D &cam, const bgi::DdsPolygon &obj)
 {
     if (obj.pts.size() < 2)
         return;
-    std::vector<std::pair<int, int>> projected;
-    projected.reserve(obj.pts.size());
+
+    // Collect clip-space vertices
+    std::vector<glm::vec4> clip4;
+    clip4.reserve(obj.pts.size());
     for (const auto &p : obj.pts)
     {
         float wx = 0.f, wy = 0.f, wz = 0.f;
         if (!resolveWorld(obj.coordSpace, obj.ucsName, p.x, p.y, p.z, wx, wy, wz))
-            continue;
+            return;
+        clip4.push_back(worldToClip4(cam, wx, wy, wz));
+    }
+
+    // Sutherland-Hodgman: clip against near + far Z planes
+    bgi::clipPolyZPlanes(clip4);
+    if (clip4.size() < 2)
+        return;
+
+    // Project to viewport-relative pixels
+    std::vector<std::pair<int, int>> projected;
+    projected.reserve(clip4.size());
+    for (const auto &c4 : clip4)
+    {
         int vpX = 0, vpY = 0;
-        if (projectToVpRel(cam, wx, wy, wz, vpX, vpY))
+        if (clipToVpRel(cam, c4, vpX, vpY))
             projected.emplace_back(vpX, vpY);
     }
     if (projected.size() < 2)
@@ -568,15 +639,31 @@ void renderFillPoly(const bgi::Camera3D &cam, const bgi::DdsFillPoly &obj)
 {
     if (obj.pts.size() < 3)
         return;
-    std::vector<std::pair<int, int>> projected;
-    projected.reserve(obj.pts.size());
+
+    // Collect clip-space vertices
+    std::vector<glm::vec4> clip4;
+    clip4.reserve(obj.pts.size());
     for (const auto &p : obj.pts)
     {
         float wx = 0.f, wy = 0.f, wz = 0.f;
         if (!resolveWorld(obj.coordSpace, obj.ucsName, p.x, p.y, p.z, wx, wy, wz))
-            continue;
+            return;
+        clip4.push_back(worldToClip4(cam, wx, wy, wz));
+    }
+
+    // Sutherland-Hodgman: clip against near + far Z planes
+    bgi::clipPolyZPlanes(clip4);
+    if (clip4.size() < 3)
+        return;
+
+    // Project to viewport-relative pixels (no NDC X/Y test; per-pixel clipping
+    // inside fillPolygonInternal handles viewport boundaries)
+    std::vector<std::pair<int, int>> projected;
+    projected.reserve(clip4.size());
+    for (const auto &c4 : clip4)
+    {
         int vpX = 0, vpY = 0;
-        if (projectToVpRel(cam, wx, wy, wz, vpX, vpY))
+        if (clipToVpRel(cam, c4, vpX, vpY))
             projected.emplace_back(vpX, vpY);
     }
     if (projected.size() < 3)

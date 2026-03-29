@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
 
 /**
  * @file bgi_camera.h
@@ -87,6 +88,66 @@ namespace bgi
     bool cameraWorldToScreen(const Camera3D &cam, int winW, int winH,
                              float wx, float wy, float wz,
                              float &screenX, float &screenY);
+
+    /**
+     * Like @ref cameraWorldToScreen but skips the NDC frustum boundary test.
+     *
+     * The returned screen coordinates may be outside the viewport rectangle
+     * (negative or beyond winW/winH).  The only hard rejection is a point that
+     * is truly behind the camera (clip.w ≤ 0 for perspective cameras).  This
+     * variant is used by polygon and line renderers that rely on per-pixel
+     * viewport clipping inside @c drawLineInternal / @c fillPolygonInternal,
+     * enabling correct partial clipping when primitives straddle viewport edges.
+     */
+    bool cameraWorldToScreenForced(const Camera3D &cam, int winW, int winH,
+                                   float wx, float wy, float wz,
+                                   float &screenX, float &screenY);
+
+    /**
+     * Transform a world-space point to 4-D clip space via the camera's VP matrix.
+     * Use this to prepare vertices for Sutherland-Hodgman clipping.
+     */
+    glm::vec4 cameraWorldToClip(const Camera3D &cam, int winW, int winH,
+                                float wx, float wy, float wz);
+
+    /**
+     * Sutherland-Hodgman clip step: clip a convex polygon (in 4-D clip space)
+     * against one half-space.  "Inside" is dot(plane, P) > 0.
+     *
+     * @param poly  Polygon vertices (clip-space 4-D homogeneous), modified in place.
+     * @param plane Clip-plane coefficients (A,B,C,D): A·X+B·Y+C·Z+D·W > 0.
+     */
+    void clipPolyByPlane(std::vector<glm::vec4> &poly, const glm::vec4 &plane);
+
+    /**
+     * Clip a convex polygon in clip space against the near plane (Z+W>0) and
+     * far plane (-Z+W>0).  Together these ensure W>0 (safe for perspective divide)
+     * and Z within the camera depth range.
+     */
+    void clipPolyZPlanes(std::vector<glm::vec4> &poly);
+
+    /**
+     * Clip a LINE SEGMENT in clip space against one half-space in place.
+     * Returns false (and leaves A/B undefined) when both endpoints are outside.
+     */
+    bool clipLineByPlane(glm::vec4 &A, glm::vec4 &B, const glm::vec4 &plane);
+
+    /**
+     * Clip a line segment against near and far Z planes.
+     * Returns false when the segment is fully clipped away.
+     */
+    bool clipLineZPlanes(glm::vec4 &A, glm::vec4 &B);
+
+    /**
+     * Project a 4-D clip-space point (after SH clipping) to a screen pixel.
+     *
+     * No NDC X/Y boundary test — the caller relies on per-pixel viewport
+     * clipping inside drawLineInternal / fillPolygonInternal.
+     * Returns false only when clip.w <= 0 (should not occur after near clipping).
+     */
+    bool cameraClipToScreen(const Camera3D &cam, int winW, int winH,
+                            const glm::vec4 &clip,
+                            float &screenX, float &screenY);
 
     /**
      * Unprojects a screen pixel to a world-space ray.
