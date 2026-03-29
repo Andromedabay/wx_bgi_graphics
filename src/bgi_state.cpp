@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "bgi_dds.h"
 #include "bgi_draw.h"
 
 namespace bgi
@@ -28,6 +29,12 @@ namespace bgi
 
     std::mutex gMutex;
     BgiState gState;
+
+    // BgiState constructor / destructor are defined here (not inline in the
+    // header) so the compiler can generate the unique_ptr<DdsScene> destructor
+    // in a translation unit where DdsScene is fully defined (bgi_dds.h above).
+    BgiState::BgiState() : dds(std::make_unique<DdsScene>()) {}
+    BgiState::~BgiState() = default;
 
     void resetPaletteState()
     {
@@ -85,33 +92,48 @@ namespace bgi
         const std::size_t pixelCount = static_cast<std::size_t>(gState.width) * static_cast<std::size_t>(gState.height);
         gState.pageBuffers.assign(static_cast<std::size_t>(kPageCount), std::vector<std::uint8_t>(pixelCount, static_cast<std::uint8_t>(gState.bkColor)));
 
+        // Clear the DDS and reinitialise camera / UCS registries.
+        // Cameras and UCS are DDS-first: their data lives inside DdsCamera /
+        // DdsUcs objects; BgiState::cameras and ucsSystems are just name→ptr indexes.
+        gState.dds->clearAll();
+        gState.cameras.clear();
+        gState.ucsSystems.clear();
+
         // Create the default pixel-space camera that replicates classic BGI
         // coordinates: (0,0) = top-left, Y increases downward.
         // The Y-flip is achieved by setting orthoBottom > orthoTop.
-        gState.cameras.clear();
-        Camera3D defaultCam;
-        defaultCam.projection   = CameraProjection::Orthographic;
-        defaultCam.eyeX         = 0.f;
-        defaultCam.eyeY         = 0.f;
-        defaultCam.eyeZ         = 1.f;
-        defaultCam.targetX      = 0.f;
-        defaultCam.targetY      = 0.f;
-        defaultCam.targetZ      = 0.f;
-        defaultCam.upX          = 0.f;
-        defaultCam.upY          = 1.f;
-        defaultCam.upZ          = 0.f;
-        defaultCam.orthoLeft    = 0.f;
-        defaultCam.orthoRight   = static_cast<float>(gState.width);
-        defaultCam.orthoBottom  = static_cast<float>(gState.height); // bottom > top → Y-flip
-        defaultCam.orthoTop     = 0.f;
-        defaultCam.nearPlane    = -1.f;
-        defaultCam.farPlane     =  1.f;
-        gState.cameras["default"] = defaultCam;
-        gState.activeCamera     = "default";
+        {
+            auto dc = std::make_shared<DdsCamera>();
+            dc->name                   = "default";
+            dc->camera.projection      = CameraProjection::Orthographic;
+            dc->camera.eyeX            = 0.f;
+            dc->camera.eyeY            = 0.f;
+            dc->camera.eyeZ            = 1.f;
+            dc->camera.targetX         = 0.f;
+            dc->camera.targetY         = 0.f;
+            dc->camera.targetZ         = 0.f;
+            dc->camera.upX             = 0.f;
+            dc->camera.upY             = 1.f;
+            dc->camera.upZ             = 0.f;
+            dc->camera.orthoLeft       = 0.f;
+            dc->camera.orthoRight      = static_cast<float>(gState.width);
+            dc->camera.orthoBottom     = static_cast<float>(gState.height); // Y-flip
+            dc->camera.orthoTop        = 0.f;
+            dc->camera.nearPlane       = -1.f;
+            dc->camera.farPlane        =  1.f;
+            gState.dds->append(dc);
+            gState.cameras["default"]  = dc;
+        }
+        gState.activeCamera = "default";
 
         // Create the identity "world" UCS (cannot be destroyed).
-        gState.ucsSystems.clear();
-        gState.ucsSystems["world"] = CoordSystem{};
+        {
+            auto du = std::make_shared<DdsUcs>();
+            du->name           = "world";
+            du->ucs            = CoordSystem{};
+            gState.dds->append(du);
+            gState.ucsSystems["world"] = du;
+        }
         gState.activeUcs = "world";
 
         // Reset world extents to "empty".

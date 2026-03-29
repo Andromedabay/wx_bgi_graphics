@@ -8,6 +8,7 @@
 #include "bgi_font.h"
 #include "bgi_image.h"
 #include "bgi_state.h"
+#include "bgi_dds.h"
 
 #include <algorithm>
 #include <chrono>
@@ -300,6 +301,34 @@ namespace
         }
         bgi::drawEllipseInternal(x, y, stangle, endangle, xradius, yradius, bgi::gState.currentColor);
     }
+
+    // -------------------------------------------------------------------------
+    // DDS helpers — called while gMutex is already held by the caller.
+    // -------------------------------------------------------------------------
+
+    bgi::DdsStyle captureStyle()
+    {
+        bgi::DdsStyle s;
+        s.color             = bgi::gState.currentColor;
+        s.lineStyle         = bgi::gState.lineSettings;
+        s.fillStyle.pattern = bgi::gState.fillPattern;
+        s.fillStyle.color   = bgi::gState.fillColor;
+        s.textStyle         = bgi::gState.textSettings;
+        s.writeMode         = bgi::gState.writeMode;
+        s.bkColor           = bgi::gState.bkColor;
+        return s;
+    }
+
+    // Convert int-pair polygon vertices (from polygonFromArray) to glm::vec3
+    // with Z=0 for storage in DDS as BgiPixel-space coords.
+    std::vector<glm::vec3> pairsToVec3(const std::vector<std::pair<int, int>> &pts)
+    {
+        std::vector<glm::vec3> out;
+        out.reserve(pts.size());
+        for (const auto &[px, py] : pts)
+            out.push_back({float(px), float(py), 0.f});
+        return out;
+    }
 } // namespace
 
 BGI_API void BGI_CALL arc(int x, int y, int stangle, int endangle, int radius)
@@ -313,6 +342,15 @@ BGI_API void BGI_CALL arc(int x, int y, int stangle, int endangle, int radius)
 
     const auto points = bgi::buildArcPoints(x, y, stangle, endangle, radius, radius);
     updateArcState(x, y, points);
+    {
+        auto obj        = std::make_shared<bgi::DdsArc>();
+        obj->style      = captureStyle();
+        obj->centre     = {float(x), float(y), 0.f};
+        obj->radius     = float(radius);
+        obj->startAngle = float(stangle);
+        obj->endAngle   = float(endangle);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawEllipseInternal(x, y, stangle, endangle, radius, radius, bgi::gState.currentColor);
     flushIfVisible();
 }
@@ -323,6 +361,13 @@ BGI_API void BGI_CALL bar(int left, int top, int right, int bottom)
     if (!requireReady())
     {
         return;
+    }
+    {
+        auto obj   = std::make_shared<bgi::DdsBar>();
+        obj->style = captureStyle();
+        obj->p1    = {float(left), float(top), 0.f};
+        obj->p2    = {float(right), float(bottom), 0.f};
+        bgi::gState.dds->append(std::move(obj));
     }
     bgi::fillRectInternal(left, top, right, bottom, bgi::gState.fillColor);
     flushIfVisible();
@@ -335,7 +380,15 @@ BGI_API void BGI_CALL bar3d(int left, int top, int right, int bottom, int depth,
     {
         return;
     }
-
+    {
+        auto obj     = std::make_shared<bgi::DdsBar3D>();
+        obj->style   = captureStyle();
+        obj->p1      = {float(left), float(top), 0.f};
+        obj->p2      = {float(right), float(bottom), 0.f};
+        obj->depth   = float(depth);
+        obj->topFlag = (topflag != 0);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::fillRectInternal(left, top, right, bottom, bgi::gState.fillColor);
     bgi::drawLineInternal(left, top, right, top, bgi::gState.currentColor);
     bgi::drawLineInternal(right, top, right, bottom, bgi::gState.currentColor);
@@ -361,6 +414,13 @@ BGI_API void BGI_CALL circle(int x, int y, int radius)
         return;
     }
 
+    {
+        auto obj    = std::make_shared<bgi::DdsCircle>();
+        obj->style  = captureStyle();
+        obj->centre = {float(x), float(y), 0.f};
+        obj->radius = float(radius);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawCircleInternal(x, y, radius, bgi::gState.currentColor);
     flushIfVisible();
 }
@@ -443,7 +503,12 @@ BGI_API void BGI_CALL drawpoly(int numpoints, const int *polypoints)
         bgi::gState.lastResult = bgi::grInvalidInput;
         return;
     }
-
+    {
+        auto obj      = std::make_shared<bgi::DdsPolygon>();
+        obj->style    = captureStyle();
+        obj->pts      = pairsToVec3(points);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawPolygonInternal(points, bgi::gState.currentColor);
     flushIfVisible();
 }
@@ -459,6 +524,16 @@ BGI_API void BGI_CALL ellipse(int x, int y, int stangle, int endangle, int xradi
 
     const auto points = bgi::buildArcPoints(x, y, stangle, endangle, xradius, yradius);
     updateArcState(x, y, points);
+    {
+        auto obj        = std::make_shared<bgi::DdsEllipse>();
+        obj->style      = captureStyle();
+        obj->centre     = {float(x), float(y), 0.f};
+        obj->rx         = float(xradius);
+        obj->ry         = float(yradius);
+        obj->startAngle = float(stangle);
+        obj->endAngle   = float(endangle);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawEllipseInternal(x, y, stangle, endangle, xradius, yradius, bgi::gState.currentColor);
     flushIfVisible();
 }
@@ -472,6 +547,14 @@ BGI_API void BGI_CALL fillellipse(int x, int y, int xradius, int yradius)
         return;
     }
 
+    {
+        auto obj    = std::make_shared<bgi::DdsFillEllipse>();
+        obj->style  = captureStyle();
+        obj->centre = {float(x), float(y), 0.f};
+        obj->rx     = float(xradius);
+        obj->ry     = float(yradius);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::fillEllipseInternal(x, y, xradius, yradius, bgi::gState.fillColor);
     bgi::drawEllipseInternal(x, y, 0, 360, xradius, yradius, bgi::gState.currentColor);
     flushIfVisible();
@@ -491,7 +574,12 @@ BGI_API void BGI_CALL fillpoly(int numpoints, const int *polypoints)
         bgi::gState.lastResult = bgi::grInvalidInput;
         return;
     }
-
+    {
+        auto obj   = std::make_shared<bgi::DdsFillPoly>();
+        obj->style = captureStyle();
+        obj->pts   = pairsToVec3(points);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::fillPolygonInternal(points, bgi::gState.fillColor);
     bgi::drawPolygonInternal(points, bgi::gState.currentColor);
     flushIfVisible();
@@ -847,6 +935,13 @@ BGI_API void BGI_CALL line(int x1, int y1, int x2, int y2)
     {
         return;
     }
+    {
+        auto obj   = std::make_shared<bgi::DdsLine>();
+        obj->style = captureStyle();
+        obj->p1    = {float(x1), float(y1), 0.f};
+        obj->p2    = {float(x2), float(y2), 0.f};
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawLineInternal(x1, y1, x2, y2, bgi::gState.currentColor);
     flushIfVisible();
 }
@@ -860,6 +955,13 @@ BGI_API void BGI_CALL linerel(int dx, int dy)
     }
     const int targetX = bgi::gState.currentX + dx;
     const int targetY = bgi::gState.currentY + dy;
+    {
+        auto obj   = std::make_shared<bgi::DdsLine>();
+        obj->style = captureStyle();
+        obj->p1    = {float(bgi::gState.currentX), float(bgi::gState.currentY), 0.f};
+        obj->p2    = {float(targetX), float(targetY), 0.f};
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawLineInternal(bgi::gState.currentX, bgi::gState.currentY, targetX, targetY, bgi::gState.currentColor);
     bgi::gState.currentX = targetX;
     bgi::gState.currentY = targetY;
@@ -872,6 +974,13 @@ BGI_API void BGI_CALL lineto(int x, int y)
     if (!requireReady())
     {
         return;
+    }
+    {
+        auto obj   = std::make_shared<bgi::DdsLine>();
+        obj->style = captureStyle();
+        obj->p1    = {float(bgi::gState.currentX), float(bgi::gState.currentY), 0.f};
+        obj->p2    = {float(x), float(y), 0.f};
+        bgi::gState.dds->append(std::move(obj));
     }
     bgi::drawLineInternal(bgi::gState.currentX, bgi::gState.currentY, x, y, bgi::gState.currentColor);
     bgi::gState.currentX = x;
@@ -905,6 +1014,13 @@ BGI_API void BGI_CALL outtext(char *textstring)
     }
 
     const std::string text = safeText(textstring);
+    {
+        auto obj   = std::make_shared<bgi::DdsText>();
+        obj->style = captureStyle();
+        obj->pos   = {float(bgi::gState.currentX), float(bgi::gState.currentY), 0.f};
+        obj->text  = text;
+        bgi::gState.dds->append(std::move(obj));
+    }
     drawTextAnchored(bgi::gState.currentX, bgi::gState.currentY, text);
     const auto [width, height] = bgi::measureText(text);
     if (bgi::gState.textSettings.direction == bgi::VERT_DIR)
@@ -927,7 +1043,15 @@ BGI_API void BGI_CALL outtextxy(int x, int y, char *textstring)
         return;
     }
 
-    drawTextAnchored(x, y, safeText(textstring));
+    const std::string safeStr = safeText(textstring);
+    {
+        auto obj   = std::make_shared<bgi::DdsText>();
+        obj->style = captureStyle();
+        obj->pos   = {float(x), float(y), 0.f};
+        obj->text  = safeStr;
+        bgi::gState.dds->append(std::move(obj));
+    }
+    drawTextAnchored(x, y, safeStr);
     flushIfVisible();
 }
 
@@ -939,6 +1063,15 @@ BGI_API void BGI_CALL pieslice(int x, int y, int stangle, int endangle, int radi
         bgi::gState.lastResult = bgi::grInvalidInput;
         return;
     }
+    {
+        auto obj        = std::make_shared<bgi::DdsPieSlice>();
+        obj->style      = captureStyle();
+        obj->centre     = {float(x), float(y), 0.f};
+        obj->radius     = float(radius);
+        obj->startAngle = float(stangle);
+        obj->endAngle   = float(endangle);
+        bgi::gState.dds->append(std::move(obj));
+    }
     fillSectorShape(x, y, stangle, endangle, radius, radius, true);
     flushIfVisible();
 }
@@ -946,7 +1079,25 @@ BGI_API void BGI_CALL pieslice(int x, int y, int stangle, int endangle, int radi
 BGI_API void BGI_CALL putimage(int left, int top, void *bitmap, int op)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    if (!requireReady() || !bgi::drawImage(left, top, bitmap, op))
+    if (!requireReady() || bitmap == nullptr)
+    {
+        bgi::gState.lastResult = bgi::grInvalidInput;
+        return;
+    }
+    {
+        const auto *hdr = static_cast<const bgi::ImageHeader *>(bitmap);
+        auto obj        = std::make_shared<bgi::DdsImage>();
+        obj->style      = captureStyle();
+        obj->pos        = {float(left), float(top), 0.f};
+        obj->width      = static_cast<int>(hdr->width);
+        obj->height     = static_cast<int>(hdr->height);
+        const auto *px  = reinterpret_cast<const uint8_t *>(hdr + 1);
+        const std::size_t n = static_cast<std::size_t>(hdr->width) *
+                              static_cast<std::size_t>(hdr->height);
+        obj->pixels.assign(px, px + n);
+        bgi::gState.dds->append(std::move(obj));
+    }
+    if (!bgi::drawImage(left, top, bitmap, op))
     {
         bgi::gState.lastResult = bgi::grInvalidInput;
         return;
@@ -961,6 +1112,13 @@ BGI_API void BGI_CALL putpixel(int x, int y, int color)
     {
         return;
     }
+    {
+        auto obj   = std::make_shared<bgi::DdsPoint>();
+        obj->style = captureStyle();
+        obj->pos   = {float(x), float(y), 0.f};
+        obj->color = color;
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::setPixelWithMode(x, y, color, bgi::gState.writeMode);
     flushIfVisible();
 }
@@ -972,7 +1130,13 @@ BGI_API void BGI_CALL rectangle(int left, int top, int right, int bottom)
     {
         return;
     }
-
+    {
+        auto obj   = std::make_shared<bgi::DdsRectangle>();
+        obj->style = captureStyle();
+        obj->p1    = {float(left), float(top), 0.f};
+        obj->p2    = {float(right), float(bottom), 0.f};
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawLineInternal(left, top, right, top, bgi::gState.currentColor);
     bgi::drawLineInternal(right, top, right, bottom, bgi::gState.currentColor);
     bgi::drawLineInternal(right, bottom, left, bottom, bgi::gState.currentColor);
@@ -1004,6 +1168,16 @@ BGI_API void BGI_CALL sector(int x, int y, int stangle, int endangle, int xradiu
     {
         bgi::gState.lastResult = bgi::grInvalidInput;
         return;
+    }
+    {
+        auto obj        = std::make_shared<bgi::DdsSector>();
+        obj->style      = captureStyle();
+        obj->centre     = {float(x), float(y), 0.f};
+        obj->rx         = float(xradius);
+        obj->ry         = float(yradius);
+        obj->startAngle = float(stangle);
+        obj->endAngle   = float(endangle);
+        bgi::gState.dds->append(std::move(obj));
     }
     fillSectorShape(x, y, stangle, endangle, xradius, yradius, true);
     flushIfVisible();

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "bgi_camera.h"
+#include "bgi_dds.h"
 #include "bgi_state.h"
 #include "bgi_ucs.h"
 
@@ -29,7 +30,7 @@ namespace
     static bgi::CoordSystem *findUcs(const std::string &name)
     {
         auto it = bgi::gState.ucsSystems.find(name);
-        return (it != bgi::gState.ucsSystems.end()) ? &it->second : nullptr;
+        return (it != bgi::gState.ucsSystems.end()) ? &it->second->ucs : nullptr;
     }
 
     // Camera name resolver (duplicated from bgi_camera_api to avoid cross-TU
@@ -47,7 +48,7 @@ namespace
     static bgi::Camera3D *findCamera(const std::string &name)
     {
         auto it = bgi::gState.cameras.find(name);
-        return (it != bgi::gState.cameras.end()) ? &it->second : nullptr;
+        return (it != bgi::gState.cameras.end()) ? &it->second->camera : nullptr;
     }
 
 } // anonymous namespace
@@ -66,7 +67,12 @@ BGI_API int BGI_CALL wxbgi_ucs_create(const char *name)
     if (bgi::gState.window == nullptr)
         return -1;
 
-    bgi::gState.ucsSystems[name] = bgi::CoordSystem{};
+    auto du = std::make_shared<bgi::DdsUcs>();
+    du->name = name;
+    du->ucs  = bgi::CoordSystem{};
+
+    bgi::gState.dds->append(du);
+    bgi::gState.ucsSystems[name] = du;
     return 1;
 }
 
@@ -78,7 +84,13 @@ BGI_API void BGI_CALL wxbgi_ucs_destroy(const char *name)
         return; // "world" UCS is protected
 
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::gState.ucsSystems.erase(name);
+
+    auto it = bgi::gState.ucsSystems.find(name);
+    if (it != bgi::gState.ucsSystems.end())
+    {
+        it->second->deleted = true;
+        bgi::gState.ucsSystems.erase(it);
+    }
 }
 
 BGI_API void BGI_CALL wxbgi_ucs_set_active(const char *name)

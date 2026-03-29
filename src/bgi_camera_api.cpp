@@ -5,6 +5,7 @@
 #include <string>
 
 #include "bgi_camera.h"
+#include "bgi_dds.h"
 #include "bgi_state.h"
 
 // ---------------------------------------------------------------------------
@@ -26,13 +27,14 @@ namespace
     }
 
     /**
-     * Looks up a camera by name (already resolved).  Returns nullptr if the
-     * camera does not exist.  Caller must hold gMutex.
+     * Looks up a camera by name (already resolved).  Returns a raw pointer to
+     * the Camera3D data inside the DdsCamera, or nullptr if not found.
+     * Caller must hold gMutex.
      */
     static bgi::Camera3D *findCamera(const std::string &name)
     {
         auto it = bgi::gState.cameras.find(name);
-        return (it != bgi::gState.cameras.end()) ? &it->second : nullptr;
+        return (it != bgi::gState.cameras.end()) ? &it->second->camera : nullptr;
     }
 
 } // anonymous namespace
@@ -51,12 +53,14 @@ BGI_API int BGI_CALL wxbgi_cam_create(const char *name, int type)
     if (bgi::gState.window == nullptr)
         return -1;
 
-    bgi::Camera3D cam;
-    cam.projection = (type == WXBGI_CAM_PERSPECTIVE)
-                   ? bgi::CameraProjection::Perspective
-                   : bgi::CameraProjection::Orthographic;
+    auto dc = std::make_shared<bgi::DdsCamera>();
+    dc->name            = name;
+    dc->camera.projection = (type == WXBGI_CAM_PERSPECTIVE)
+                           ? bgi::CameraProjection::Perspective
+                           : bgi::CameraProjection::Orthographic;
 
-    bgi::gState.cameras[name] = cam;
+    bgi::gState.dds->append(dc);
+    bgi::gState.cameras[name] = dc;
     return 1;
 }
 
@@ -69,7 +73,14 @@ BGI_API void BGI_CALL wxbgi_cam_destroy(const char *name)
         return;
 
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::gState.cameras.erase(name);
+
+    // Remove from DDS (soft-delete by marking the DdsCamera object deleted).
+    auto it = bgi::gState.cameras.find(name);
+    if (it != bgi::gState.cameras.end())
+    {
+        it->second->deleted = true;
+        bgi::gState.cameras.erase(it);
+    }
 }
 
 BGI_API void BGI_CALL wxbgi_cam_set_active(const char *name)
@@ -352,18 +363,20 @@ BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name)
     if (bgi::gState.window == nullptr)
         return -1;
 
-    bgi::Camera3D cam;
-    cam.is2D           = true;
-    cam.projection     = bgi::CameraProjection::Orthographic;
-    cam.pan2dX         = 0.f;
-    cam.pan2dY         = 0.f;
-    cam.zoom2d         = 1.f;
-    cam.rot2dDeg       = 0.f;
-    cam.worldHeight2d  = static_cast<float>(bgi::gState.height);
-    cam.nearPlane      = -1.f;
-    cam.farPlane       =  1.f;
+    auto dc = std::make_shared<bgi::DdsCamera>();
+    dc->name                  = name;
+    dc->camera.is2D           = true;
+    dc->camera.projection     = bgi::CameraProjection::Orthographic;
+    dc->camera.pan2dX         = 0.f;
+    dc->camera.pan2dY         = 0.f;
+    dc->camera.zoom2d         = 1.f;
+    dc->camera.rot2dDeg       = 0.f;
+    dc->camera.worldHeight2d  = static_cast<float>(bgi::gState.height);
+    dc->camera.nearPlane      = -1.f;
+    dc->camera.farPlane       =  1.f;
 
-    bgi::gState.cameras[name] = cam;
+    bgi::gState.dds->append(dc);
+    bgi::gState.cameras[name] = dc;
     return 1;
 }
 

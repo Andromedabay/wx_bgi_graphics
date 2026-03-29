@@ -62,6 +62,34 @@ FetchContent_MakeAvailable(glm)
 
 find_package(OpenGL REQUIRED)
 
+message(STATUS "Fetching nlohmann/json...")
+
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install    OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+message(STATUS "Fetching yaml-cpp...")
+
+# yaml-cpp 0.8.0 uses cmake_minimum_required(VERSION 2.8.12) which CMake 4.0+
+# rejects unless this policy variable is set.
+set(CMAKE_POLICY_VERSION_MINIMUM "3.5" CACHE INTERNAL "")
+
+set(YAML_CPP_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS   OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_INSTALL       OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    yaml-cpp
+    URL https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
 # Build a static GLEW library from fetched sources to keep the build self-contained.
 add_library(glew_static STATIC ${glew_SOURCE_DIR}/src/glew.c)
 add_library(GLEW::GLEW ALIAS glew_static)
@@ -99,13 +127,17 @@ set(SRCS
     src/bgi_ucs.cpp
     src/bgi_ucs_api.cpp
     src/bgi_world_api.cpp
+    src/bgi_dds.cpp
+    src/bgi_dds_api.cpp
+    src/bgi_dds_serial.cpp
+    src/bgi_dds_render.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
 
 target_include_directories(wx_bgi_opengl PUBLIC src)
 target_compile_definitions(wx_bgi_opengl PRIVATE GLEW_STATIC)
-target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm)
+target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp)
 
 if(WXBGI_ENABLE_TEST_SEAMS)
     # Expose compile-time guard to both the library and consumers of the public
@@ -149,6 +181,53 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
+)
+
+# Phase E tests ---------------------------------------------------------------
+
+add_executable(test_dds_serialize examples/cpp/test_dds_serialize.cpp)
+target_link_libraries(test_dds_serialize PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_serialize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_serialize>
+)
+
+add_executable(test_dds_deserialize examples/cpp/test_dds_deserialize.cpp)
+target_link_libraries(test_dds_deserialize PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_deserialize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_deserialize>
+)
+
+add_executable(test_dds_clear examples/cpp/test_dds_clear.cpp)
+target_link_libraries(test_dds_clear PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_clear POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_clear>
+)
+
+add_executable(test_dds_cam2d_yz examples/cpp/test_dds_cam2d_yz.cpp)
+target_link_libraries(test_dds_cam2d_yz PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_cam2d_yz POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_cam2d_yz>
+)
+
+add_executable(test_dds_cam3d_persp examples/cpp/test_dds_cam3d_persp.cpp)
+target_link_libraries(test_dds_cam3d_persp PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_cam3d_persp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_cam3d_persp>
 )
 
 find_package(Python3 COMPONENTS Interpreter)
@@ -293,6 +372,21 @@ if(BUILD_TESTING)
 
     add_test(NAME wxbgi_camera_demo_cpp COMMAND $<TARGET_FILE:wxbgi_camera_demo_cpp> --test)
     set_tests_properties(wxbgi_camera_demo_cpp PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_serialize     COMMAND $<TARGET_FILE:test_dds_serialize>)
+    set_tests_properties(test_dds_serialize     PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_deserialize   COMMAND $<TARGET_FILE:test_dds_deserialize>)
+    set_tests_properties(test_dds_deserialize   PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_clear         COMMAND $<TARGET_FILE:test_dds_clear>)
+    set_tests_properties(test_dds_clear         PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_cam2d_yz      COMMAND $<TARGET_FILE:test_dds_cam2d_yz>)
+    set_tests_properties(test_dds_cam2d_yz      PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_cam3d_persp   COMMAND $<TARGET_FILE:test_dds_cam3d_persp>)
+    set_tests_properties(test_dds_cam3d_persp   PROPERTIES TIMEOUT 20)
 
     if(Python3_Interpreter_FOUND)
         add_test(

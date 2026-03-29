@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -285,6 +286,15 @@ namespace bgi
         bool  hasData{false};
     };
 
+    // -------------------------------------------------------------------------
+    // Forward declarations for DDS types (full definitions in bgi_dds.h).
+    // These let BgiState hold shared_ptr<DdsCamera> and unique_ptr<DdsScene>
+    // without creating a circular include between bgi_types.h and bgi_dds.h.
+    // -------------------------------------------------------------------------
+    class DdsCamera;
+    class DdsUcs;
+    class DdsScene;
+
     struct BgiState
     {
         GLFWwindow *window{nullptr};
@@ -327,16 +337,33 @@ namespace bgi
         int mouseX{0};
         int mouseY{0};
 
-        // --- Camera registry ---
-        std::unordered_map<std::string, Camera3D> cameras;
+        // --- Camera registry (DdsCamera is the source of truth) ---
+        // shared_ptr<DdsCamera> maps are indexes into the DDS; Camera3D data
+        // lives inside each DdsCamera object.  Forward declaration keeps this
+        // header free of the full bgi_dds.h include.
+        std::unordered_map<std::string, std::shared_ptr<DdsCamera>> cameras;
         std::string activeCamera{"default"};
 
-        // --- UCS registry ---
-        std::unordered_map<std::string, CoordSystem> ucsSystems;
+        // --- UCS registry (DdsUcs is the source of truth) ---
+        std::unordered_map<std::string, std::shared_ptr<DdsUcs>> ucsSystems;
         std::string activeUcs{"world"};
 
         // --- World drawing extents (AABB in world space) ---
         WorldExtents worldExtents;
+
+        // --- Drawing Description Data Structure (DDS) scene graph ---
+        // unique_ptr so BgiState can be defined in this header without the
+        // full DdsScene definition.  Initialized in BgiState::BgiState() and
+        // reset in resetStateForWindow() (both defined in bgi_state.cpp where
+        // bgi_dds.h is included).
+        std::unique_ptr<DdsScene> dds;
+
+        // Explicitly declared (defined in bgi_state.cpp) so that the compiler
+        // generates the destructor only where DdsScene is fully defined.
+        BgiState();
+        ~BgiState();
+        BgiState(const BgiState &) = delete;
+        BgiState &operator=(const BgiState &) = delete;
     };
 
 } // namespace bgi

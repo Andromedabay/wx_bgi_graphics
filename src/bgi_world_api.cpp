@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "bgi_camera.h"
+#include "bgi_dds.h"
 #include "bgi_draw.h"
 #include "bgi_font.h"
 #include "bgi_state.h"
@@ -62,13 +63,13 @@ namespace
     const bgi::Camera3D *findCam(const std::string &key)
     {
         auto it = bgi::gState.cameras.find(key);
-        return (it != bgi::gState.cameras.end()) ? &it->second : nullptr;
+        return (it != bgi::gState.cameras.end()) ? &it->second->camera : nullptr;
     }
 
     const bgi::CoordSystem *findUcs(const std::string &key)
     {
         auto it = bgi::gState.ucsSystems.find(key);
-        return (it != bgi::gState.ucsSystems.end()) ? &it->second : nullptr;
+        return (it != bgi::gState.ucsSystems.end()) ? &it->second->ucs : nullptr;
     }
 
     // -------------------------------------------------------------------------
@@ -94,6 +95,23 @@ namespace
         vpX = static_cast<int>(sx) - bgi::gState.viewport.left;
         vpY = static_cast<int>(sy) - bgi::gState.viewport.top;
         return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // DDS helpers — called while gMutex is already held by the caller.
+    // -------------------------------------------------------------------------
+
+    bgi::DdsStyle captureStyle()
+    {
+        bgi::DdsStyle s;
+        s.color             = bgi::gState.currentColor;
+        s.lineStyle         = bgi::gState.lineSettings;
+        s.fillStyle.pattern = bgi::gState.fillPattern;
+        s.fillStyle.color   = bgi::gState.fillColor;
+        s.textStyle         = bgi::gState.textSettings;
+        s.writeMode         = bgi::gState.writeMode;
+        s.bkColor           = bgi::gState.bkColor;
+        return s;
     }
 
     // Screen-space distance between two device-pixel projections.
@@ -166,6 +184,14 @@ BGI_API void BGI_CALL wxbgi_world_point(float x, float y, float z, int color)
     if (!projectToVpRel(*cam, x, y, z, vpX, vpY))
         return;
 
+    {
+        auto obj   = std::make_shared<bgi::DdsPoint>();
+        obj->style = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->pos   = {x, y, z};
+        obj->color = bgi::normalizeColor(color);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::setPixelWithMode(vpX, vpY, bgi::normalizeColor(color), bgi::gState.writeMode);
     bgi::flushToScreen();
 }
@@ -189,6 +215,14 @@ BGI_API void BGI_CALL wxbgi_world_line(float x1, float y1, float z1,
     if (!v1 && !v2)
         return;
 
+    {
+        auto obj   = std::make_shared<bgi::DdsLine>();
+        obj->style = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->p1    = {x1, y1, z1};
+        obj->p2    = {x2, y2, z2};
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawLineInternal(vx1, vy1, vx2, vy2, bgi::gState.currentColor);
     bgi::flushToScreen();
 }
@@ -230,6 +264,14 @@ BGI_API void BGI_CALL wxbgi_world_circle(float cx, float cy, float cz, float rad
     const int vpX = static_cast<int>(sx0) - bgi::gState.viewport.left;
     const int vpY = static_cast<int>(sy0) - bgi::gState.viewport.top;
 
+    {
+        auto obj   = std::make_shared<bgi::DdsCircle>();
+        obj->style = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->centre = {cx, cy, cz};
+        obj->radius = radius;
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawCircleInternal(vpX, vpY, screenRadius, bgi::gState.currentColor);
     bgi::flushToScreen();
 }
@@ -265,6 +307,17 @@ BGI_API void BGI_CALL wxbgi_world_ellipse(float cx, float cy, float cz,
     const int vpX = static_cast<int>(sx0) - bgi::gState.viewport.left;
     const int vpY = static_cast<int>(sy0) - bgi::gState.viewport.top;
 
+    {
+        auto obj        = std::make_shared<bgi::DdsEllipse>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->centre     = {cx, cy, cz};
+        obj->rx         = rx;
+        obj->ry         = ry;
+        obj->startAngle = float(startAngle);
+        obj->endAngle   = float(endAngle);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::drawEllipseInternal(vpX, vpY, startAngle, endAngle,
                              screenRx, screenRy, bgi::gState.currentColor);
     bgi::flushToScreen();
@@ -290,6 +343,15 @@ BGI_API void BGI_CALL wxbgi_world_rectangle(float x1, float y1, float z1,
                                              x2, y2, z2, sx2, sy2);
     if (!v1 && !v2)
         return;
+
+    {
+        auto obj        = std::make_shared<bgi::DdsRectangle>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->p1         = {x1, y1, z1};
+        obj->p2         = {x2, y2, z2};
+        bgi::gState.dds->append(std::move(obj));
+    }
 
     // Screen-space bounding box of the two projected corners
     const int left   = std::min(static_cast<int>(sx1), static_cast<int>(sx2));
@@ -325,6 +387,16 @@ BGI_API void BGI_CALL wxbgi_world_polyline(const float *xyzTriplets, int pointCo
     const auto *cam = findCam(resolveActiveCam());
     if (cam == nullptr)
         return;
+
+    {
+        auto obj        = std::make_shared<bgi::DdsPolygon>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->pts.reserve(static_cast<std::size_t>(pointCount));
+        for (int i = 0; i < pointCount; ++i)
+            obj->pts.push_back({xyzTriplets[i * 3], xyzTriplets[i * 3 + 1], xyzTriplets[i * 3 + 2]});
+        bgi::gState.dds->append(std::move(obj));
+    }
 
     const int color = bgi::gState.currentColor;
     bool prevVisible = false;
@@ -367,6 +439,16 @@ BGI_API void BGI_CALL wxbgi_world_fillpoly(const float *xyzTriplets, int pointCo
     if (cam == nullptr)
         return;
 
+    {
+        auto obj        = std::make_shared<bgi::DdsFillPoly>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->pts.reserve(static_cast<std::size_t>(pointCount));
+        for (int i = 0; i < pointCount; ++i)
+            obj->pts.push_back({xyzTriplets[i * 3], xyzTriplets[i * 3 + 1], xyzTriplets[i * 3 + 2]});
+        bgi::gState.dds->append(std::move(obj));
+    }
+
     std::vector<std::pair<int, int>> pts;
     pts.reserve(static_cast<std::size_t>(pointCount));
 
@@ -408,6 +490,15 @@ BGI_API void BGI_CALL wxbgi_world_outtextxy(float x, float y, float z, const cha
     int vpX = 0, vpY = 0;
     if (!projectToVpRel(*cam, x, y, z, vpX, vpY))
         return;
+
+    {
+        auto obj        = std::make_shared<bgi::DdsText>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::World3D;
+        obj->pos        = {x, y, z};
+        obj->text       = std::string(text);
+        bgi::gState.dds->append(std::move(obj));
+    }
 
     // Apply text justification (mirrors drawTextAnchored in bgi_api.cpp)
     const auto [tw, th] = bgi::measureText(std::string(text));
@@ -490,6 +581,15 @@ BGI_API void BGI_CALL wxbgi_ucs_point(const char *ucsName,
     int vpX = 0, vpY = 0;
     if (!projectToVpRel(*cam, wx, wy, wz, vpX, vpY)) return;
 
+    {
+        auto obj        = std::make_shared<bgi::DdsPoint>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::UcsLocal;
+        obj->ucsName    = resolveUcsName(ucsName);
+        obj->pos        = {ux, uy, uz};
+        obj->color      = bgi::normalizeColor(color);
+        bgi::gState.dds->append(std::move(obj));
+    }
     bgi::setPixelWithMode(vpX, vpY, bgi::normalizeColor(color), bgi::gState.writeMode);
     bgi::flushToScreen();
 }
@@ -514,6 +614,15 @@ BGI_API void BGI_CALL wxbgi_ucs_line(const char *ucsName,
     bgi::ucsLocalToWorld(*ucs, ux1, uy1, uz1, wx1, wy1, wz1);
     bgi::ucsLocalToWorld(*ucs, ux2, uy2, uz2, wx2, wy2, wz2);
 
+    {
+        auto obj        = std::make_shared<bgi::DdsLine>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::UcsLocal;
+        obj->ucsName    = resolveUcsName(ucsName);
+        obj->p1         = {ux1, uy1, uz1};
+        obj->p2         = {ux2, uy2, uz2};
+        bgi::gState.dds->append(std::move(obj));
+    }
     worldLineNoLock(*cam, wx1, wy1, wz1, wx2, wy2, wz2);
     bgi::flushToScreen();
 }
@@ -543,6 +652,15 @@ BGI_API void BGI_CALL wxbgi_ucs_circle(const char *ucsName,
                                         (ey - wy) * (ey - wy) +
                                         (ez - wz) * (ez - wz));
 
+    {
+        auto obj        = std::make_shared<bgi::DdsCircle>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::UcsLocal;
+        obj->ucsName    = resolveUcsName(ucsName);
+        obj->centre     = {cx, cy, cz};
+        obj->radius     = radius;
+        bgi::gState.dds->append(std::move(obj));
+    }
     worldCircleNoLock(*cam, wx, wy, wz, worldRadius);
     bgi::flushToScreen();
 }
@@ -563,6 +681,17 @@ BGI_API void BGI_CALL wxbgi_ucs_polyline(const char *ucsName,
     if (ucs == nullptr) return;
     const auto *cam = findCam(resolveActiveCam());
     if (cam == nullptr) return;
+
+    {
+        auto obj        = std::make_shared<bgi::DdsPolygon>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::UcsLocal;
+        obj->ucsName    = resolveUcsName(ucsName);
+        obj->pts.reserve(static_cast<std::size_t>(pointCount));
+        for (int i = 0; i < pointCount; ++i)
+            obj->pts.push_back({xyzTriplets[i * 3], xyzTriplets[i * 3 + 1], xyzTriplets[i * 3 + 2]});
+        bgi::gState.dds->append(std::move(obj));
+    }
 
     const int color = bgi::gState.currentColor;
     bool prevVisible = false;
@@ -615,6 +744,16 @@ BGI_API void BGI_CALL wxbgi_ucs_outtextxy(const char *ucsName,
 
     int vpX = 0, vpY = 0;
     if (!projectToVpRel(*cam, wx, wy, wz, vpX, vpY)) return;
+
+    {
+        auto obj        = std::make_shared<bgi::DdsText>();
+        obj->style      = captureStyle();
+        obj->coordSpace = bgi::CoordSpace::UcsLocal;
+        obj->ucsName    = resolveUcsName(ucsName);
+        obj->pos        = {ux, uy, uz};
+        obj->text       = std::string(text);
+        bgi::gState.dds->append(std::move(obj));
+    }
 
     const auto [tw, th] = bgi::measureText(std::string(text));
     switch (bgi::gState.textSettings.horiz)
