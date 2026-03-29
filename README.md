@@ -245,6 +245,9 @@ python examples\python\bgi_api_coverage.py build\Debug\wx_bgi_opengl.dll
 #### Linux / macOS
 
 ```bash
+# Export LD Path for the Shared_LIB_Library file.
+export LD_LIBRARY_PATH="$HOME/source/wx_bgi_graphics/build/bgidemo_pascal:$LD_LIBRARY_PATH"
+
 # C++ API coverage
 ./build/bgi_api_coverage_cpp
 
