@@ -1,25 +1,31 @@
 /**
  * wxbgi_camera_demo.cpp
  *
- * Demonstrates the Phase 1 camera viewport API on top of classic BGI drawing.
+ * Demonstrates true RGB colour support (wxbgi_alloc_color), 3D solid rendering,
+ * DDS retained-mode scene graph, and per-panel viewport clipping.
  *
- * The demo shows three panels in a split-screen layout:
- *  - Left:   default pixel-space camera (classic BGI coordinates, unchanged)
- *  - Centre: 2-D world camera with pan and zoom driven by GLFW keyboard input
- *  - Right:  3-D perspective camera orbiting a set of world-space points
+ * Scene:
+ *  - Rectangle in the world XY plane, diagonally bisected BL→TR.
+ *    The left/top triangle is filled with a smooth Red→Orange→Yellow gradient
+ *    using wxbgi_alloc_color (no palette remapping needed).
+ *  - A wxbgi_solid_cylinder positioned so its right side extends beyond the
+ *    boundary of the left and centre panels — viewport clipping is clearly visible.
+ *  - World-space XYZ axes and a reference grid.
  *
- * Controls (keyboard):
- *   W / S       – 2-D pan up / down
- *   A / D       – 2-D pan left / right
- *   + / -       – 2-D zoom in / out
- *   Q / E       – rotate 2-D view
- *   Arrow keys  – orbit the perspective camera (azimuth / elevation)
- *   Escape      – close
+ * The same DDS scene is shown through THREE cameras, each clipped to its panel
+ * via  setviewport( …, clip=1 ) :
+ *
+ *   Left   "cam_left"  fixed 2D top-down ortho
+ *   Centre "cam2d"     interactive 2D pan / zoom / rotate   WASD  +/-  Q/E
+ *   Right  "cam3d"     interactive 3D perspective orbit      Arrow keys
+ *
+ * Escape to quit.
  */
 
 #include "wx_bgi.h"
 #include "wx_bgi_3d.h"
 #include "wx_bgi_ext.h"
+#include "wx_bgi_solid.h"
 
 #include <GLFW/glfw3.h>
 
@@ -27,271 +33,272 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <string>
 
 // ---------------------------------------------------------------------------
-// Geometry: a simple grid of points in world space (Z-up, XY ground plane)
+// World-space scene constants
 // ---------------------------------------------------------------------------
 
-struct WorldPoint { float x, y, z; int color; };
+// Rectangle in the XY plane (Z = 0)
+static constexpr float kRx1 = -80.f, kRy1 = -60.f;   // BL world corner
+static constexpr float kRx2 =  80.f, kRy2 =  60.f;   // TR world corner
 
-static const std::array<WorldPoint, 9> kWorldPoints = {{
-    {   0.f,   0.f,  0.f, 15 }, // origin – WHITE
-    { 100.f,   0.f,  0.f,  4 }, // +X axis end – RED
-    {   0.f, 100.f,  0.f,  2 }, // +Y axis end – GREEN
-    {   0.f,   0.f,100.f,  1 }, // +Z axis end – BLUE
-    {  50.f,  50.f, 20.f, 14 }, // YELLOW
-    { -50.f,  50.f,  0.f, 11 }, // LIGHTCYAN
-    {  50.f, -50.f,  0.f, 12 }, // LIGHTRED
-    { -50.f, -50.f, 30.f, 13 }, // LIGHTMAGENTA
-    {   0.f,   0.f, 60.f,  3 }, // CYAN – high point
-}};
+// Cylinder: centre chosen so right edge (x=90+30=120) equals the cam_left
+// world boundary of ±120  →  the rightmost slice is clipped in the left panel.
+static constexpr float kCylX = 90.f, kCylY = 0.f, kCylZ = 0.f;
+static constexpr float kCylR = 30.f, kCylH = 80.f;
+
+// Number of horizontal gradient strips in the left/top triangle
+static constexpr int kGradSteps = 14;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-static void drawCross(int screenX, int screenY, int color, int sz = 5)
-{
-    setcolor(color);
-    line(screenX - sz, screenY, screenX + sz, screenY);
-    line(screenX, screenY - sz, screenX, screenY + sz);
-}
-
-// Draw a label at a screen position (clipped to window bounds).
 static void drawLabel(int x, int y, const char *text, int color)
 {
     setcolor(color);
     outtextxy(x, y, const_cast<char *>(text));
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
+// Set clipping viewport, render DDS, restore full-window viewport.
+static void renderPanel(const char *cam, int x1, int y1, int x2, int y2,
+                        int winW, int winH)
+{
+    setviewport(x1, y1, x2, y2, 1);              // clip = ON
+    wxbgi_render_dds(cam);
+    setviewport(0, 0, winW - 1, winH - 1, 0);    // full window, no clip
+}
 
+// ---------------------------------------------------------------------------
+// buildDdsScene – populate the retained-mode scene (called once before loop)
+// ---------------------------------------------------------------------------
+static void buildDdsScene(std::array<int, kGradSteps> &gradColors)
+{
+    // --- Allocate kGradSteps true-RGB gradient colours (Red → Orange → Yellow) ---
+    for (int i = 0; i < kGradSteps; ++i)
+    {
+        float t = (float)i / (float)(kGradSteps - 1);
+        gradColors[i] = wxbgi_alloc_color(255, (int)(255.f * t), 0);
+    }
+
+    // --- World XYZ axes ---
+    setcolor(4); wxbgi_world_line(0,0,0, 120,0,0);
+    setcolor(2); wxbgi_world_line(0,0,0,   0,120,0);
+    setcolor(1); wxbgi_world_line(0,0,0,   0,  0,120);
+    setcolor(4); wxbgi_world_outtextxy(125.f,   0.f,   0.f, "X");
+    setcolor(2); wxbgi_world_outtextxy(  0.f, 125.f,   0.f, "Y");
+    setcolor(1); wxbgi_world_outtextxy(  0.f,   0.f, 125.f, "Z");
+
+    // --- Reference grid in the XY plane ---
+    for (int g = -100; g <= 100; g += 25)
+    {
+        setcolor(g == 0 ? 2 : 7);
+        wxbgi_world_line((float)g, -100.f, 0.f, (float)g, 100.f, 0.f);
+    }
+    for (int g = -100; g <= 100; g += 25)
+    {
+        setcolor(g == 0 ? 4 : 7);
+        wxbgi_world_line(-100.f, (float)g, 0.f, 100.f, (float)g, 0.f);
+    }
+
+    // --- Gradient-filled left/top triangle of the diagonal bisection ---
+    //
+    // Rectangle corners (world XY): BL(-80,-60)  BR(80,-60)  TR(80,60)  TL(-80,60)
+    // Diagonal: BL(-80,-60) → TR(80,60)
+    // Left/top triangle:  BL, TL, TR
+    //
+    // At world Y = y the strip spans x ∈ [kRx1 , x_diag(y)]
+    //   where  x_diag(y) = kRx1 + (kRx2-kRx1)*(y-kRy1)/(kRy2-kRy1)
+    //
+    // Strips run bottom (kRy1=-60, RED) → top (kRy2=+60, YELLOW).
+    for (int i = 0; i < kGradSteps; ++i)
+    {
+        float y0 = kRy1 + (kRy2 - kRy1) * (float)i         / (float)kGradSteps;
+        float y1 = kRy1 + (kRy2 - kRy1) * (float)(i + 1)   / (float)kGradSteps;
+        float xd0 = kRx1 + (kRx2 - kRx1) * (y0 - kRy1) / (kRy2 - kRy1);
+        float xd1 = kRx1 + (kRx2 - kRx1) * (y1 - kRy1) / (kRy2 - kRy1);
+
+        int c = gradColors[i];
+        setcolor(c);
+        setfillstyle(bgi::SOLID_FILL, c);
+
+        // Trapezoid vertices (world XY, Z=0): BL → BR → TR → TL
+        float pts[12] = {
+            kRx1, y0, 0.f,
+            xd0,  y0, 0.f,
+            xd1,  y1, 0.f,
+            kRx1, y1, 0.f
+        };
+        wxbgi_world_fillpoly(pts, 4);
+    }
+
+    // Rectangle outline (WHITE) + diagonal guide line (LIGHTGRAY)
+    setcolor(15);
+    wxbgi_world_rectangle(kRx1, kRy1, 0.f, kRx2, kRy2, 0.f);
+    setcolor(7);
+    wxbgi_world_line(kRx1, kRy1, 0.f, kRx2, kRy2, 0.f);
+
+    // --- Cylinder ---
+    // True-RGB face colour: vivid orange-red from extended palette
+    int cylFace = wxbgi_alloc_color(255, 100, 20);
+    wxbgi_solid_set_draw_mode(WXBGI_SOLID_SOLID);
+    wxbgi_solid_set_edge_color(15);           // WHITE edges
+    wxbgi_solid_set_face_color(cylFace);
+    wxbgi_solid_cylinder(kCylX, kCylY, kCylZ, kCylR, kCylH, 20, 1);
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
 int main(int argc, char *argv[])
 {
-    // When invoked with --test, draw one frame then exit (for ctest).
     const bool testMode = (argc >= 2 && std::strcmp(argv[1], "--test") == 0);
 
     constexpr int kW = 1440, kH = 480;
-    initwindow(kW, kH, "Camera Demo", 50, 50, 0, 0);
-
+    initwindow(kW, kH, "RGB Gradient + Cylinder — 3-View Clipping Demo", 50, 50, 0, 0);
     if (graphresult() != 0)
         return 1;
 
-    const int panelW = kW / 3; // ~480 px each
+    const int panelW = kW / 3;   // 480 px each
 
     // ------------------------------------------------------------------
-    // Set up 2-D overhead camera (centre panel)
+    // Camera setup
     // ------------------------------------------------------------------
+
+    // Left panel — fixed 2D top-down ortho.
+    // World height 240 → visible X range ±120.
+    // Cylinder right edge is at x = 90+30 = 120 → clips exactly at panel edge.
+    wxbgi_cam2d_create("cam_left");
+    wxbgi_cam2d_set_world_height("cam_left", 240.f);
+    wxbgi_cam2d_set_pan("cam_left", 0.f, 0.f);
+    wxbgi_cam_set_screen_viewport("cam_left", 0, 0, panelW, kH);
+
+    // Centre panel — interactive 2D pan/zoom.
     wxbgi_cam2d_create("cam2d");
-    wxbgi_cam2d_set_world_height("cam2d", 300.f); // 300 world-units visible
+    wxbgi_cam2d_set_world_height("cam2d", 280.f);
     wxbgi_cam2d_set_pan("cam2d", 0.f, 0.f);
     wxbgi_cam_set_screen_viewport("cam2d", panelW, 0, panelW, kH);
 
-    // ------------------------------------------------------------------
-    // Set up 3-D perspective camera (right panel)
-    // ------------------------------------------------------------------
+    // Right panel — 3D perspective orbit.
     wxbgi_cam_create("cam3d", WXBGI_CAM_PERSPECTIVE);
     wxbgi_cam_set_perspective("cam3d", 60.f, 0.5f, 5000.f);
     wxbgi_cam_set_screen_viewport("cam3d", panelW * 2, 0, panelW, kH);
 
-    float azimuth   = 45.f;  // degrees around Z axis
-    float elevation = 30.f;  // degrees above XY plane
-    float orbitR    = 250.f; // orbit radius
+    float azimuth   = 45.f;
+    float elevation = 30.f;
+    const float orbitR = 300.f;
 
-    auto updateOrbitCamera = [&]()
+    auto updateOrbit = [&]()
     {
-        const float azR = azimuth   * 3.14159265f / 180.f;
-        const float elR = elevation * 3.14159265f / 180.f;
-        const float ex  = orbitR * std::cos(elR) * std::cos(azR);
-        const float ey  = orbitR * std::cos(elR) * std::sin(azR);
-        const float ez  = orbitR * std::sin(elR);
-        wxbgi_cam_set_eye("cam3d", ex, ey, ez);
-        wxbgi_cam_set_target("cam3d", 0.f, 0.f, 30.f); // look at scene centre
-        wxbgi_cam_set_up("cam3d", 0.f, 0.f, 1.f);      // Z-up
+        const float az = azimuth   * 3.14159265f / 180.f;
+        const float el = elevation * 3.14159265f / 180.f;
+        wxbgi_cam_set_eye("cam3d",
+            orbitR * std::cos(el) * std::cos(az),
+            orbitR * std::cos(el) * std::sin(az),
+            orbitR * std::sin(el));
+        wxbgi_cam_set_target("cam3d", 0.f, 0.f, 0.f);
+        wxbgi_cam_set_up("cam3d", 0.f, 0.f, 1.f);
     };
-    updateOrbitCamera();
+    updateOrbit();
 
     // ------------------------------------------------------------------
-    // Main loop  (runs once in --test mode, interactively otherwise)
+    // Build the DDS scene (once — all objects are stored for re-render)
     // ------------------------------------------------------------------
-    bool redrawRequested = true; // draw initial frame once
+    wxbgi_cam_set_active("cam_left");   // immediate renders go to left panel
+    cleardevice();
+
+    std::array<int, kGradSteps> gradColors{};
+    buildDdsScene(gradColors);
+
+    cleardevice();   // wipe the immediate-render residue from DDS building
+
+    // ------------------------------------------------------------------
+    // Main render loop
+    // ------------------------------------------------------------------
+    bool redrawRequested = true;
+
     do
     {
         if (!testMode)
         {
             wxbgi_poll_events();
 
-            const auto keyDown = [](int key) -> bool
-            {
-                return wxbgi_is_key_down(key) == 1;
-            };
-
-            if (keyDown(GLFW_KEY_ESCAPE))
+            if (wxbgi_is_key_down(GLFW_KEY_ESCAPE))
                 break;
 
-            bool cameraChanged = false;
+            bool changed = false;
 
-            // 2-D camera pan / zoom / rotate
-            if (keyDown(GLFW_KEY_W)) { wxbgi_cam2d_pan_by("cam2d",  0.f,  4.f); cameraChanged = true; }
-            if (keyDown(GLFW_KEY_S)) { wxbgi_cam2d_pan_by("cam2d",  0.f, -4.f); cameraChanged = true; }
-            if (keyDown(GLFW_KEY_A)) { wxbgi_cam2d_pan_by("cam2d", -4.f,  0.f); cameraChanged = true; }
-            if (keyDown(GLFW_KEY_D)) { wxbgi_cam2d_pan_by("cam2d",  4.f,  0.f); cameraChanged = true; }
-
-            // Support both main keyboard and numpad +/- for zoom controls.
-            if (keyDown(GLFW_KEY_EQUAL) || keyDown(GLFW_KEY_KP_ADD))
+            // Centre 2D camera: pan / zoom / rotate
+            if (wxbgi_is_key_down(GLFW_KEY_W)) { wxbgi_cam2d_pan_by("cam2d",  0.f,  4.f); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_S)) { wxbgi_cam2d_pan_by("cam2d",  0.f, -4.f); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_A)) { wxbgi_cam2d_pan_by("cam2d", -4.f,  0.f); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_D)) { wxbgi_cam2d_pan_by("cam2d",  4.f,  0.f); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_EQUAL) || wxbgi_is_key_down(GLFW_KEY_KP_ADD))
+            { wxbgi_cam2d_zoom_at("cam2d", 1.02f, 0.f, 0.f); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_MINUS) || wxbgi_is_key_down(GLFW_KEY_KP_SUBTRACT))
+            { wxbgi_cam2d_zoom_at("cam2d", 0.98f, 0.f, 0.f); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_Q))
             {
-                wxbgi_cam2d_zoom_at("cam2d", 1.02f, 0.f, 0.f);
-                cameraChanged = true;
+                float r = 0.f;
+                wxbgi_cam2d_get_rotation("cam2d", &r);
+                wxbgi_cam2d_set_rotation("cam2d", r + 1.f);
+                changed = true;
             }
-            if (keyDown(GLFW_KEY_MINUS) || keyDown(GLFW_KEY_KP_SUBTRACT))
+            if (wxbgi_is_key_down(GLFW_KEY_E))
             {
-                wxbgi_cam2d_zoom_at("cam2d", 0.98f, 0.f, 0.f);
-                cameraChanged = true;
-            }
-
-            if (keyDown(GLFW_KEY_Q))
-            {
-                wxbgi_cam2d_set_rotation("cam2d",
-                    [&]{ float r = 0.f; wxbgi_cam2d_get_rotation("cam2d", &r); return r + 1.f; }());
-                cameraChanged = true;
-            }
-            if (keyDown(GLFW_KEY_E))
-            {
-                wxbgi_cam2d_set_rotation("cam2d",
-                    [&]{ float r = 0.f; wxbgi_cam2d_get_rotation("cam2d", &r); return r - 1.f; }());
-                cameraChanged = true;
+                float r = 0.f;
+                wxbgi_cam2d_get_rotation("cam2d", &r);
+                wxbgi_cam2d_set_rotation("cam2d", r - 1.f);
+                changed = true;
             }
 
-            // 3-D camera orbit
-            bool orbitChanged = false;
-            if (keyDown(GLFW_KEY_LEFT))  { azimuth   -= 1.f; orbitChanged = true; }
-            if (keyDown(GLFW_KEY_RIGHT)) { azimuth   += 1.f; orbitChanged = true; }
-            if (keyDown(GLFW_KEY_UP))    { elevation  = std::min(89.f, elevation + 1.f); orbitChanged = true; }
-            if (keyDown(GLFW_KEY_DOWN))  { elevation  = std::max(-89.f, elevation - 1.f); orbitChanged = true; }
-            if (orbitChanged)
-            {
-                updateOrbitCamera();
-                cameraChanged = true;
-            }
+            // Right 3D camera: orbit
+            if (wxbgi_is_key_down(GLFW_KEY_LEFT))
+            { azimuth -= 1.f; updateOrbit(); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_RIGHT))
+            { azimuth += 1.f; updateOrbit(); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_UP))
+            { elevation = std::min(89.f, elevation + 1.f); updateOrbit(); changed = true; }
+            if (wxbgi_is_key_down(GLFW_KEY_DOWN))
+            { elevation = std::max(-89.f, elevation - 1.f); updateOrbit(); changed = true; }
 
-            // Render only when the camera state changes due to keyboard input.
-            redrawRequested = redrawRequested || cameraChanged;
-            if (!redrawRequested)
-            {
-                delay(8);
-                continue;
-            }
+            redrawRequested = redrawRequested || changed;
+            if (!redrawRequested) { delay(8); continue; }
         }
 
-        // --- Draw --------------------------------------------------------
+        // ---- Render -------------------------------------------------
         cleardevice();
 
-        // ---- Left panel: classic BGI pixel-space (no camera transform) ----
-        // Draw dividing lines
-        setcolor(7); // LIGHTGRAY
+        // Panel dividers (full window, no clip)
+        setcolor(7);
         line(panelW - 1, 0, panelW - 1, kH - 1);
-        line(panelW * 2 - 1, 0, panelW * 2 - 1, kH - 1);
+        line(2 * panelW - 1, 0, 2 * panelW - 1, kH - 1);
 
-        // Classic BGI drawing in the left panel (viewport-clipped)
-        setviewport(0, 0, panelW - 1, kH - 1, 1);
-        setcolor(15); circle(panelW / 2, kH / 2, 80);
-        setcolor(14); rectangle(50, 50, panelW - 50, kH - 50);
-        setcolor(10); line(0, 0, panelW - 1, kH - 1);
-        setcolor(11); line(panelW - 1, 0, 0, kH - 1);
-        drawLabel(10, 10, "Classic BGI (left panel)", 15);
-        drawLabel(10, 25, "No camera transform", 7);
-        setviewport(0, 0, kW - 1, kH - 1, 0); // reset to full window
+        // Three panels — each with clipping viewport
+        renderPanel("cam_left", 0,          0, panelW - 1,     kH - 1, kW, kH);
+        renderPanel("cam2d",    panelW,     0, 2*panelW - 1,   kH - 1, kW, kH);
+        renderPanel("cam3d",    2*panelW,   0, kW - 1,         kH - 1, kW, kH);
 
-        // ---- Centre panel: 2-D world camera (Phase 3 wxbgi_world_* API) ----
+        // Panel labels (pixel-space, drawn after render so they appear on top)
+        drawLabel(6, 6,  "cam_left: 2D fixed ortho (clip ON)", 15);
+        drawLabel(6, 20, "Cylinder right edge clips here ->",  7);
+
         {
-            // Activate the 2-D camera so wxbgi_world_* functions project
-            // through it automatically.
-            wxbgi_cam_set_active("cam2d");
-
-            // World-space grid drawn with wxbgi_world_line (no manual project)
-            for (int gx = -200; gx <= 200; gx += 50)
-            {
-                setcolor(gx == 0 ? 10 : 8); // GREEN for Y-axis, DARKGRAY otherwise
-                wxbgi_world_line(static_cast<float>(gx), -200.f, 0.f,
-                                 static_cast<float>(gx),  200.f, 0.f);
-            }
-            for (int gy = -200; gy <= 200; gy += 50)
-            {
-                setcolor(gy == 0 ? 4 : 8); // RED for X-axis, DARKGRAY otherwise
-                wxbgi_world_line(-200.f, static_cast<float>(gy), 0.f,
-                                  200.f, static_cast<float>(gy), 0.f);
-            }
-
-            // A circle and rectangle in world units
-            setcolor(14); // YELLOW
-            wxbgi_world_circle(0.f, 0.f, 0.f, 80.f);
-
-            setcolor(11); // LIGHTCYAN
-            wxbgi_world_rectangle(-60.f, -60.f, 0.f, 60.f, 60.f, 0.f);
-
-            // World points drawn with wxbgi_world_point
-            for (const auto &wp : kWorldPoints)
-                wxbgi_world_point(wp.x, wp.y, 0.f, wp.color);
-
-            // Axis labels using wxbgi_world_outtextxy
-            setcolor(4); wxbgi_world_outtextxy( 110.f,    0.f, 0.f, "+X");
-            setcolor(2); wxbgi_world_outtextxy(   0.f,  110.f, 0.f, "+Y");
-
-            // Status label (screen-space, classic BGI)
             float panX = 0.f, panY = 0.f, zoom = 1.f;
             wxbgi_cam2d_get_pan("cam2d", &panX, &panY);
             wxbgi_cam2d_get_zoom("cam2d", &zoom);
             char buf[80];
-            std::snprintf(buf, sizeof(buf), "pan=(%.0f,%.0f) zoom=%.2f", panX, panY, zoom);
-            drawLabel(panelW + 10, 10, "2-D World Camera (WASD/+/-/Q/E)", 15);
-            drawLabel(panelW + 10, 25, buf, 7);
-            drawLabel(panelW + 10, 40, "Grid/circle/rect via wxbgi_world_*", 7);
-
-            // Restore default camera for the next panel's classic BGI ops
-            wxbgi_cam_set_active("default");
+            std::snprintf(buf, sizeof(buf), "pan=(%.0f,%.0f)  zoom=%.2f", panX, panY, zoom);
+            drawLabel(panelW + 6, 6,  "cam2d: 2D pan/zoom  WASD/+/-/Q/E", 15);
+            drawLabel(panelW + 6, 20, buf, 7);
         }
-
-        // ---- Right panel: 3-D perspective camera (Phase 3 world draw) -----
         {
-            wxbgi_cam_set_active("cam3d");
-
-            // World-space axes via wxbgi_world_line
-            setcolor(4);  wxbgi_world_line(0,0,0, 100,0,0);    // X – RED
-            setcolor(2);  wxbgi_world_line(0,0,0, 0,100,0);    // Y – GREEN
-            setcolor(1);  wxbgi_world_line(0,0,0, 0,0,100);    // Z – BLUE
-
-            // Axis tip labels via wxbgi_world_outtextxy
-            setcolor(4);  wxbgi_world_outtextxy(105.f,   0.f,   0.f, "X");
-            setcolor(2);  wxbgi_world_outtextxy(  0.f, 105.f,   0.f, "Y");
-            setcolor(1);  wxbgi_world_outtextxy(  0.f,   0.f, 105.f, "Z");
-
-            // A circle in the XY plane and one in the XZ plane
-            setcolor(14); wxbgi_world_circle(0.f, 0.f,  0.f, 60.f); // XY ground
-            setcolor(11); wxbgi_world_circle(0.f, 0.f, 30.f, 40.f); // elevated
-
-            // World points with coloured crosses (manual projection still works)
-            for (const auto &wp : kWorldPoints)
-            {
-                float sx, sy;
-                if (wxbgi_cam_world_to_screen("cam3d", wp.x, wp.y, wp.z, &sx, &sy) == 1)
-                    drawCross(static_cast<int>(sx), static_cast<int>(sy), wp.color, 8);
-            }
-
-            // Label
-            char buf[80];
+            char buf[64];
             std::snprintf(buf, sizeof(buf),
-                          "az=%.0f el=%.0f (Arrow keys)", azimuth, elevation);
-            drawLabel(panelW * 2 + 10, 10, "3-D Perspective Camera", 15);
-            drawLabel(panelW * 2 + 10, 25, buf, 7);
-            drawLabel(panelW * 2 + 10, 40, "Axes/circles via wxbgi_world_*", 7);
-
-            wxbgi_cam_set_active("default");
+                          "az=%.0f  el=%.0f  (arrow keys)", azimuth, elevation);
+            drawLabel(2*panelW + 6, 6,  "cam3d: 3D perspective orbit", 15);
+            drawLabel(2*panelW + 6, 20, buf, 7);
         }
 
-        // Present
         wxbgi_swap_window_buffers();
 
         if (testMode)

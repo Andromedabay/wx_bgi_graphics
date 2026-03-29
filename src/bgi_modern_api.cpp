@@ -4,6 +4,7 @@
 
 #include "wx_bgi_ext.h"
 
+#include "bgi_draw.h"
 #include "bgi_state.h"
 
 #include <algorithm>
@@ -435,4 +436,56 @@ BGI_API int BGI_CALL wxbgi_write_pixels_rgba8(int x, int y, int width, int heigh
 
     bgi::gState.lastResult = bgi::grOk;
     return byteCount;
+}
+
+// =============================================================================
+// Extended RGB palette API  (wxbgi_define_color / wxbgi_alloc_color / ...)
+// =============================================================================
+
+BGI_API int BGI_CALL wxbgi_define_color(int idx, int r, int g, int b)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (idx < bgi::kExtColorBase || idx >= bgi::kExtColorBase + bgi::kExtPaletteSize)
+        return -1;
+    const std::size_t slot = static_cast<std::size_t>(idx - bgi::kExtColorBase);
+    bgi::gState.extPalette[slot] = {bgi::normalizeColorByte(r),
+                                    bgi::normalizeColorByte(g),
+                                    bgi::normalizeColorByte(b)};
+    return idx;
+}
+
+BGI_API int BGI_CALL wxbgi_alloc_color(int r, int g, int b)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (bgi::gState.extColorNext >= bgi::kExtColorBase + bgi::kExtPaletteSize)
+        return -1;
+    const int idx = bgi::gState.extColorNext++;
+    const std::size_t slot = static_cast<std::size_t>(idx - bgi::kExtColorBase);
+    bgi::gState.extPalette[slot] = {bgi::normalizeColorByte(r),
+                                    bgi::normalizeColorByte(g),
+                                    bgi::normalizeColorByte(b)};
+    return idx;
+}
+
+BGI_API void BGI_CALL wxbgi_free_color(int idx)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (idx < bgi::kExtColorBase || idx >= bgi::kExtColorBase + bgi::kExtPaletteSize)
+        return;
+    const std::size_t slot = static_cast<std::size_t>(idx - bgi::kExtColorBase);
+    bgi::gState.extPalette[slot] = {0, 0, 0};
+    // Step the alloc pointer back if this was the most recently allocated slot.
+    if (idx + 1 == bgi::gState.extColorNext)
+        --bgi::gState.extColorNext;
+}
+
+BGI_API void BGI_CALL wxbgi_getrgb(int color, int *r, int *g, int *b)
+{
+    if (!r || !g || !b)
+        return;
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    const bgi::ColorRGB rgb = bgi::colorToRGB(color);
+    *r = rgb.r;
+    *g = rgb.g;
+    *b = rgb.b;
 }
