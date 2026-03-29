@@ -42,6 +42,10 @@ namespace bgi
         std::uint8_t applyWriteMode(std::uint8_t destination, int color, int mode)
         {
             const std::uint8_t source = static_cast<std::uint8_t>(normalizeColor(color));
+            // Bitwise write modes (XOR/OR/AND/NOT) are 4-bit palette operations.
+            // Extended colours (>= kExtColorBase) are always written as COPY_PUT.
+            if (source >= static_cast<std::uint8_t>(kExtColorBase))
+                return source;
             switch (mode)
             {
             case XOR_PUT:
@@ -135,12 +139,21 @@ namespace bgi
 
     int normalizeColor(int color)
     {
+        // Extended colours (16-255) pass through unchanged so they address extPalette.
+        if (color >= kExtColorBase && color < kExtColorBase + kExtPaletteSize)
+            return color;
+        // Classic BGI palette (0-15): wrap negatives and out-of-range positives.
         int wrapped = color % kPaletteSize;
         if (wrapped < 0)
-        {
             wrapped += kPaletteSize;
-        }
         return wrapped;
+    }
+
+    ColorRGB colorToRGB(int c)
+    {
+        if (c >= kExtColorBase && c < kExtColorBase + kExtPaletteSize)
+            return gState.extPalette[static_cast<std::size_t>(c - kExtColorBase)];
+        return gState.palette[static_cast<std::size_t>(normalizeColor(c))];
     }
 
     std::uint8_t normalizeColorByte(int value)
@@ -286,7 +299,7 @@ namespace bgi
         glfwMakeContextCurrent(gState.window);
         glfwPollEvents();
 
-        const ColorRGB background = gState.palette[static_cast<std::size_t>(normalizeColor(gState.bkColor))];
+        const ColorRGB background = colorToRGB(gState.bkColor);
 
         glViewport(0, 0, gState.width, gState.height);
         glClearColor(background.r / 255.0f, background.g / 255.0f, background.b / 255.0f, 1.0f);
@@ -316,7 +329,7 @@ namespace bgi
                     continue;
                 }
 
-                const ColorRGB color = gState.palette[static_cast<std::size_t>(colorIndex)];
+                const ColorRGB color = colorToRGB(colorIndex);
                 glColor3ub(color.r, color.g, color.b);
                 glVertex2i(x, y);
             }

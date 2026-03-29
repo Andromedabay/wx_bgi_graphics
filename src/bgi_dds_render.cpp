@@ -35,6 +35,7 @@
 #include "bgi_draw.h"
 #include "bgi_font.h"
 #include "bgi_image.h"
+#include "bgi_solid_render.h"
 #include "bgi_state.h"
 #include "bgi_ucs.h"
 
@@ -679,6 +680,16 @@ void renderObject(const bgi::Camera3D &cam, const bgi::DdsObject &obj)
         renderText(cam, static_cast<const bgi::DdsText &>(obj));         break;
     case bgi::DdsObjectType::Image:
         renderImage(cam, static_cast<const bgi::DdsImage &>(obj));       break;
+    case bgi::DdsObjectType::Box:
+    case bgi::DdsObjectType::Sphere:
+    case bgi::DdsObjectType::Cylinder:
+    case bgi::DdsObjectType::Cone:
+    case bgi::DdsObjectType::Torus:
+    case bgi::DdsObjectType::HeightMap:
+    case bgi::DdsObjectType::ParamSurface:
+    case bgi::DdsObjectType::Extrusion:
+        bgi::renderSolid3D(cam, obj);
+        break;
     default: break;
     }
 }

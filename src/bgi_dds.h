@@ -101,6 +101,20 @@ enum class DdsObjectType
     FillPoly,
     Text,
     Image,
+
+    // Phase 4 — 3D Solid Primitives ──────────────────────────────────────────
+    Box,
+    Sphere,
+    Cylinder,
+    Cone,
+    Torus,
+
+    // Phase 5 — 3D Surfaces ──────────────────────────────────────────────────
+    HeightMap,
+    ParamSurface,
+
+    // Phase 6 — 2D→3D Extrusion ──────────────────────────────────────────────
+    Extrusion,
 };
 
 // =============================================================================
@@ -330,6 +344,85 @@ struct DdsImage : public DdsObject
     std::vector<uint8_t> pixels; ///< Raw BGI palette-indexed pixels (width × height bytes).
 
     DdsImage() { type = DdsObjectType::Image; }
+};
+
+// =============================================================================
+// Phase 4/5/6 — 3D Solid, Surface and Extrusion objects
+// =============================================================================
+
+enum class SolidDrawMode { Wireframe = 0, Solid = 1 };
+enum class ParamSurfaceFormula { Sphere = 0, Cylinder = 1, Torus = 2, Saddle = 3, Mobius = 4 };
+
+/** Base for all Phase 4/5/6 solid/surface/extrusion objects. */
+struct DdsSolid3D : public DdsObject
+{
+    CoordSpace      coordSpace{CoordSpace::World3D};
+    std::string     ucsName;
+    glm::vec3       origin{0.f, 0.f, 0.f};
+    SolidDrawMode   drawMode{SolidDrawMode::Wireframe};
+    int             edgeColor{15};  ///< Color for wireframe edges (BGI palette index).
+    int             faceColor{7};   ///< Color for filled faces  (BGI palette index).
+    int             slices{16};     ///< Tessellation: segments around circular axis.
+    int             stacks{8};      ///< Tessellation: segments along height/depth axis.
+};
+
+struct DdsBox : public DdsSolid3D {
+    float width{1.f};   ///< Extent along world X axis.
+    float depth{1.f};   ///< Extent along world Y axis.
+    float height{1.f};  ///< Extent along world Z axis.
+    DdsBox() { type = DdsObjectType::Box; }
+};
+
+struct DdsSphere : public DdsSolid3D {
+    float radius{1.f};
+    DdsSphere() { type = DdsObjectType::Sphere; }
+};
+
+struct DdsCylinder : public DdsSolid3D {
+    float radius{1.f};
+    float height{1.f};
+    int   caps{1};   ///< Non-zero = draw top and bottom disc caps.
+    DdsCylinder() { type = DdsObjectType::Cylinder; }
+};
+
+struct DdsCone : public DdsSolid3D {
+    float radius{1.f};
+    float height{1.f};
+    int   cap{1};    ///< Non-zero = draw the base disc cap.
+    DdsCone() { type = DdsObjectType::Cone; }
+};
+
+struct DdsTorus : public DdsSolid3D {
+    float majorRadius{2.f};  ///< Distance from torus centre to tube centre.
+    float minorRadius{0.5f}; ///< Radius of the tube.
+    // slices = segments around the main axis; stacks = segments of tube cross-section.
+    DdsTorus() { type = DdsObjectType::Torus; }
+};
+
+struct DdsHeightMap : public DdsSolid3D {
+    int   rows{0};
+    int   cols{0};
+    float cellWidth{1.f};   ///< World-unit spacing between columns (X direction).
+    float cellHeight{1.f};  ///< World-unit spacing between rows    (Y direction).
+    std::vector<float> heights; ///< row-major flat array of rows*cols Z values.
+    DdsHeightMap() { type = DdsObjectType::HeightMap; }
+};
+
+struct DdsParamSurface : public DdsSolid3D {
+    ParamSurfaceFormula formula{ParamSurfaceFormula::Sphere};
+    float param1{1.f};  ///< Primary parameter (e.g. radius for sphere).
+    float param2{0.5f}; ///< Secondary parameter (e.g. minor radius for torus).
+    int   uSteps{20};
+    int   vSteps{20};
+    DdsParamSurface() { type = DdsObjectType::ParamSurface; }
+};
+
+struct DdsExtrusion : public DdsSolid3D {
+    std::vector<glm::vec3> baseProfile; ///< 2-D profile vertices (Z may be non-zero for UCS support).
+    glm::vec3 extrudeDir{0.f, 0.f, 1.f}; ///< Direction vector; its magnitude is the extrusion length.
+    int       capStart{1}; ///< Non-zero = fill the base polygon.
+    int       capEnd{1};   ///< Non-zero = fill the top polygon.
+    DdsExtrusion() { type = DdsObjectType::Extrusion; }
 };
 
 // =============================================================================

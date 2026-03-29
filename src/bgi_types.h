@@ -28,7 +28,9 @@ namespace bgi
     constexpr int DETECT = 0;
     constexpr int kDefaultWidth = 960;
     constexpr int kDefaultHeight = 720;
-    constexpr int kPaletteSize = 16;
+    constexpr int kPaletteSize    = 16;   ///< classic BGI palette slots (0-15)
+    constexpr int kExtColorBase   = 16;   ///< first user-assignable extended colour index
+    constexpr int kExtPaletteSize = 240;  ///< extended slots 16-255 (fits uint8_t pixel buffer)
     constexpr int kPageCount = 2;
     constexpr int kPatternRows = 8;
     constexpr int kPatternCols = 8;
@@ -325,7 +327,9 @@ namespace bgi
         arccoordstype lastArc{0, 0, 0, 0, 0, 0};
         palettetype defaultPalette{};
         palettetype activePalette{};
-        std::array<ColorRGB, kPaletteSize> palette{};
+        std::array<ColorRGB, kPaletteSize>    palette{};
+        std::array<ColorRGB, kExtPaletteSize> extPalette{};  ///< user-assigned RGB slots 16-255
+        int extColorNext{kExtColorBase};                      ///< next auto-alloc slot
         unsigned graphBufSize{0U};
         int activePage{0};
         int visualPage{0};
@@ -357,6 +361,11 @@ namespace bgi
         // reset in resetStateForWindow() (both defined in bgi_state.cpp where
         // bgi_dds.h is included).
         std::unique_ptr<DdsScene> dds;
+
+        // --- 3D Solid / Surface / Extrusion defaults ---
+        int solidDrawMode{0};   ///< 0 = Wireframe, 1 = Solid (painter's algorithm).
+        int solidEdgeColor{15}; ///< Default edge colour (WHITE).
+        int solidFaceColor{7};  ///< Default face colour (LIGHTGRAY).
 
         // Explicitly declared (defined in bgi_state.cpp) so that the compiler
         // generates the destructor only where DdsScene is fully defined.

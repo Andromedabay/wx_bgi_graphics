@@ -188,4 +188,48 @@ BGI_API int BGI_CALL wxbgi_read_pixels_rgba8(int x, int y, int width, int height
  */
 BGI_API int BGI_CALL wxbgi_write_pixels_rgba8(int x, int y, int width, int height, const unsigned char *inBuffer, int inBufferSize);
 
+/**
+ * @brief Assigns an RGB colour to a specific extended palette slot (index 16-255).
+ *
+ * The classic 16-colour BGI palette (indices 0-15) is unaffected; use the
+ * standard @ref setrgbpalette for those entries.
+ *
+ * @param idx   Extended palette slot to define, must be in the range [16, 255].
+ * @param r,g,b Colour components (0-255 each).
+ * @return @p idx on success, or -1 if @p idx is outside [16, 255].
+ */
+BGI_API int  BGI_CALL wxbgi_define_color(int idx, int r, int g, int b);
+
+/**
+ * @brief Allocates the next free extended palette slot and assigns it an RGB colour.
+ *
+ * Slots are assigned sequentially starting at index 16.  Use @ref wxbgi_free_color
+ * to release slots for reuse.
+ *
+ * @param r,g,b Colour components (0-255 each).
+ * @return Allocated palette index (16-255), or -1 if all 240 extended slots are exhausted.
+ */
+BGI_API int  BGI_CALL wxbgi_alloc_color(int r, int g, int b);
+
+/**
+ * @brief Releases an extended palette slot so it may be reused by wxbgi_alloc_color.
+ *
+ * The slot is reset to black (0,0,0).  Has no effect on classic palette indices 0-15.
+ * @param idx Extended palette slot to release (16-255).
+ */
+BGI_API void BGI_CALL wxbgi_free_color(int idx);
+
+/**
+ * @brief Retrieves the RGB components of any colour index (0-255).
+ *
+ * Works for both classic BGI palette entries (0-15, including any setrgbpalette
+ * overrides) and user-defined extended entries (16-255).
+ *
+ * @param color Palette index 0-255.
+ * @param r     Receives the red component (0-255).
+ * @param g     Receives the green component (0-255).
+ * @param b     Receives the blue component (0-255).
+ */
+BGI_API void BGI_CALL wxbgi_getrgb(int color, int *r, int *g, int *b);
+
 /** @} */

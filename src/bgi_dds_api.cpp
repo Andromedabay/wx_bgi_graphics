@@ -45,6 +45,14 @@ static int typeToInt(bgi::DdsObjectType t)
         case bgi::DdsObjectType::FillPoly:        return WXBGI_DDS_FILL_POLY;
         case bgi::DdsObjectType::Text:            return WXBGI_DDS_TEXT;
         case bgi::DdsObjectType::Image:           return WXBGI_DDS_IMAGE;
+        case bgi::DdsObjectType::Box:             return WXBGI_DDS_BOX;
+        case bgi::DdsObjectType::Sphere:          return WXBGI_DDS_SPHERE;
+        case bgi::DdsObjectType::Cylinder:        return WXBGI_DDS_CYLINDER;
+        case bgi::DdsObjectType::Cone:            return WXBGI_DDS_CONE;
+        case bgi::DdsObjectType::Torus:           return WXBGI_DDS_TORUS;
+        case bgi::DdsObjectType::HeightMap:       return WXBGI_DDS_HEIGHTMAP;
+        case bgi::DdsObjectType::ParamSurface:    return WXBGI_DDS_PARAM_SURFACE;
+        case bgi::DdsObjectType::Extrusion:       return WXBGI_DDS_EXTRUSION;
         default:                                  return WXBGI_DDS_UNKNOWN;
     }
 }
@@ -79,6 +87,16 @@ static int coordSpaceToInt(const bgi::DdsObject &obj)
             case bgi::DdsObjectType::FillPoly:   return static_cast<const bgi::DdsFillPoly&>(obj).coordSpace;
             case bgi::DdsObjectType::Text:       return static_cast<const bgi::DdsText&>(obj).coordSpace;
             case bgi::DdsObjectType::Image:      return bgi::CoordSpace::BgiPixel; // images always pixel-space
+            // Phase 4/5/6 solid types — coordSpace is in DdsSolid3D base
+            case bgi::DdsObjectType::Box:
+            case bgi::DdsObjectType::Sphere:
+            case bgi::DdsObjectType::Cylinder:
+            case bgi::DdsObjectType::Cone:
+            case bgi::DdsObjectType::Torus:
+            case bgi::DdsObjectType::HeightMap:
+            case bgi::DdsObjectType::ParamSurface:
+            case bgi::DdsObjectType::Extrusion:
+                return static_cast<const bgi::DdsSolid3D&>(obj).coordSpace;
             default:                             return bgi::CoordSpace::BgiPixel;
         }
     };

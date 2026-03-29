@@ -423,13 +423,16 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 
 This code is Open Source and Free to use with no warranties or claims.
   
-This repository is based on Open-Source Code from 5 different source:  
+This repository is based on Open-Source Code from 7 different source:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
     2. CMake Template, from lszl84, MIT License  
     3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license  
     4. glew Library, from https://github.com/nigels-com/glew, Custom License  
-    5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
+    5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)
+    6. JSON Library, from citation.APA="Lohmann, N. (2025). JSON for Modern C++ (Version 3.12.0) [Computer software]. https://github.com/nlohmann", MIT License
+    7. YAML Library, from https://github.com/jbeder/yaml-cpp , MIT License
+
   
 Depends on C/C++ Template created by Luke of devmindscapetutorilas:
  - [www.onlyfastcode.com](https://www.onlyfastcode.com)

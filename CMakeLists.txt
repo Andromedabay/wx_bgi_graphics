@@ -131,6 +131,8 @@ set(SRCS
     src/bgi_dds_api.cpp
     src/bgi_dds_serial.cpp
     src/bgi_dds_render.cpp
+    src/bgi_solid_api.cpp
+    src/bgi_solid_render.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
@@ -228,6 +230,15 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:test_dds_cam3d_persp>
+)
+
+add_executable(test_solids examples/cpp/test_solids.cpp)
+target_link_libraries(test_solids PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_solids POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_solids>
 )
 
 find_package(Python3 COMPONENTS Interpreter)
@@ -387,6 +398,9 @@ if(BUILD_TESTING)
 
     add_test(NAME test_dds_cam3d_persp   COMMAND $<TARGET_FILE:test_dds_cam3d_persp>)
     set_tests_properties(test_dds_cam3d_persp   PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_solids            COMMAND $<TARGET_FILE:test_solids>)
+    set_tests_properties(test_solids            PROPERTIES TIMEOUT 30)
 
     if(Python3_Interpreter_FOUND)
         add_test(

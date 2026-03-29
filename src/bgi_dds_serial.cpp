@@ -90,6 +90,14 @@ const char *typeStr(bgi::DdsObjectType t)
         case bgi::DdsObjectType::FillPoly:        return "FillPoly";
         case bgi::DdsObjectType::Text:            return "Text";
         case bgi::DdsObjectType::Image:           return "Image";
+        case bgi::DdsObjectType::Box:             return "Box";
+        case bgi::DdsObjectType::Sphere:          return "Sphere";
+        case bgi::DdsObjectType::Cylinder:        return "Cylinder";
+        case bgi::DdsObjectType::Cone:            return "Cone";
+        case bgi::DdsObjectType::Torus:           return "Torus";
+        case bgi::DdsObjectType::HeightMap:       return "HeightMap";
+        case bgi::DdsObjectType::ParamSurface:    return "ParamSurface";
+        case bgi::DdsObjectType::Extrusion:       return "Extrusion";
         default:                                  return "Unknown";
     }
 }
@@ -495,6 +503,129 @@ json objectToJ(const bgi::DdsObject &obj)
         j["pixels"]     = json::binary(o.pixels);
         break;
     }
+    // Phase 4/5/6 — shared solid base fields
+    case bgi::DdsObjectType::Box: {
+        const auto &o = static_cast<const bgi::DdsBox&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]    = vec3ToJ(o.origin);
+        j["drawMode"]  = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["slices"]    = o.slices;
+        j["stacks"]    = o.stacks;
+        j["width"]     = o.width;
+        j["depth"]     = o.depth;
+        j["height"]    = o.height;
+        break;
+    }
+    case bgi::DdsObjectType::Sphere: {
+        const auto &o = static_cast<const bgi::DdsSphere&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]    = vec3ToJ(o.origin);
+        j["drawMode"]  = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["slices"]    = o.slices;
+        j["stacks"]    = o.stacks;
+        j["radius"]    = o.radius;
+        break;
+    }
+    case bgi::DdsObjectType::Cylinder: {
+        const auto &o = static_cast<const bgi::DdsCylinder&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]    = vec3ToJ(o.origin);
+        j["drawMode"]  = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["slices"]    = o.slices;
+        j["stacks"]    = o.stacks;
+        j["radius"]    = o.radius;
+        j["height"]    = o.height;
+        j["caps"]      = o.caps;
+        break;
+    }
+    case bgi::DdsObjectType::Cone: {
+        const auto &o = static_cast<const bgi::DdsCone&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]    = vec3ToJ(o.origin);
+        j["drawMode"]  = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["slices"]    = o.slices;
+        j["stacks"]    = o.stacks;
+        j["radius"]    = o.radius;
+        j["height"]    = o.height;
+        j["cap"]       = o.cap;
+        break;
+    }
+    case bgi::DdsObjectType::Torus: {
+        const auto &o = static_cast<const bgi::DdsTorus&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]      = vec3ToJ(o.origin);
+        j["drawMode"]    = static_cast<int>(o.drawMode);
+        j["edgeColor"]   = o.edgeColor;
+        j["faceColor"]   = o.faceColor;
+        j["slices"]      = o.slices;
+        j["stacks"]      = o.stacks;
+        j["majorRadius"] = o.majorRadius;
+        j["minorRadius"] = o.minorRadius;
+        break;
+    }
+    case bgi::DdsObjectType::HeightMap: {
+        const auto &o = static_cast<const bgi::DdsHeightMap&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]     = vec3ToJ(o.origin);
+        j["drawMode"]   = static_cast<int>(o.drawMode);
+        j["edgeColor"]  = o.edgeColor;
+        j["faceColor"]  = o.faceColor;
+        j["slices"]     = o.slices;
+        j["stacks"]     = o.stacks;
+        j["rows"]       = o.rows;
+        j["cols"]       = o.cols;
+        j["cellWidth"]  = o.cellWidth;
+        j["cellHeight"] = o.cellHeight;
+        {
+            auto ha = json::array();
+            for (float h : o.heights) ha.push_back(h);
+            j["heights"] = ha;
+        }
+        break;
+    }
+    case bgi::DdsObjectType::ParamSurface: {
+        const auto &o = static_cast<const bgi::DdsParamSurface&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]    = vec3ToJ(o.origin);
+        j["drawMode"]  = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["slices"]    = o.slices;
+        j["stacks"]    = o.stacks;
+        j["formula"]   = static_cast<int>(o.formula);
+        j["param1"]    = o.param1;
+        j["param2"]    = o.param2;
+        j["uSteps"]    = o.uSteps;
+        j["vSteps"]    = o.vSteps;
+        break;
+    }
+    case bgi::DdsObjectType::Extrusion: {
+        const auto &o = static_cast<const bgi::DdsExtrusion&>(obj);
+        drawHeaderToJ(j, o.coordSpace, o.ucsName, o.style);
+        j["origin"]     = vec3ToJ(o.origin);
+        j["drawMode"]   = static_cast<int>(o.drawMode);
+        j["edgeColor"]  = o.edgeColor;
+        j["faceColor"]  = o.faceColor;
+        j["slices"]     = o.slices;
+        j["stacks"]     = o.stacks;
+        j["extrudeDir"] = vec3ToJ(o.extrudeDir);
+        j["capStart"]   = o.capStart;
+        j["capEnd"]     = o.capEnd;
+        {
+            auto pts = json::array();
+            for (const auto &p : o.baseProfile) pts.push_back(vec3ToJ(p));
+            j["pts"] = pts;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -635,6 +766,86 @@ std::shared_ptr<bgi::DdsObject> objectFromJ(const json &j)
         o->height = j.value("height", 0);
         if (j.contains("pixels") && j["pixels"].is_binary())
             o->pixels = j["pixels"].get_binary();
+        return o;
+    }
+
+    // Phase 4/5/6 — solid base field loader (lambda)
+    auto loadSolidBase = [&](bgi::DdsSolid3D &s) {
+        s.coordSpace = getCS(); s.ucsName = getUcs(); s.style = getSty();
+        if (j.contains("origin")) s.origin = vec3FromJ(j["origin"]);
+        s.drawMode  = static_cast<bgi::SolidDrawMode>(j.value("drawMode",  0));
+        s.edgeColor = j.value("edgeColor", 15);
+        s.faceColor = j.value("faceColor",  7);
+        s.slices    = j.value("slices",    16);
+        s.stacks    = j.value("stacks",     8);
+    };
+
+    if (typeStr == "Box") {
+        auto o = std::make_shared<bgi::DdsBox>();
+        loadSolidBase(*o);
+        o->width  = j.value("width",  1.f);
+        o->depth  = j.value("depth",  1.f);
+        o->height = j.value("height", 1.f);
+        return o;
+    }
+    if (typeStr == "Sphere") {
+        auto o = std::make_shared<bgi::DdsSphere>();
+        loadSolidBase(*o);
+        o->radius = j.value("radius", 1.f);
+        return o;
+    }
+    if (typeStr == "Cylinder") {
+        auto o = std::make_shared<bgi::DdsCylinder>();
+        loadSolidBase(*o);
+        o->radius = j.value("radius", 1.f);
+        o->height = j.value("height", 1.f);
+        o->caps   = j.value("caps",   1);
+        return o;
+    }
+    if (typeStr == "Cone") {
+        auto o = std::make_shared<bgi::DdsCone>();
+        loadSolidBase(*o);
+        o->radius = j.value("radius", 1.f);
+        o->height = j.value("height", 1.f);
+        o->cap    = j.value("cap",    1);
+        return o;
+    }
+    if (typeStr == "Torus") {
+        auto o = std::make_shared<bgi::DdsTorus>();
+        loadSolidBase(*o);
+        o->majorRadius = j.value("majorRadius", 2.f);
+        o->minorRadius = j.value("minorRadius", 0.5f);
+        return o;
+    }
+    if (typeStr == "HeightMap") {
+        auto o = std::make_shared<bgi::DdsHeightMap>();
+        loadSolidBase(*o);
+        o->rows       = j.value("rows",       0);
+        o->cols       = j.value("cols",       0);
+        o->cellWidth  = j.value("cellWidth",  1.f);
+        o->cellHeight = j.value("cellHeight", 1.f);
+        if (j.contains("heights"))
+            for (const auto &h : j["heights"]) o->heights.push_back(h.get<float>());
+        return o;
+    }
+    if (typeStr == "ParamSurface") {
+        auto o = std::make_shared<bgi::DdsParamSurface>();
+        loadSolidBase(*o);
+        o->formula = static_cast<bgi::ParamSurfaceFormula>(j.value("formula", 0));
+        o->param1  = j.value("param1",  1.f);
+        o->param2  = j.value("param2",  0.5f);
+        o->uSteps  = j.value("uSteps",  20);
+        o->vSteps  = j.value("vSteps",  20);
+        return o;
+    }
+    if (typeStr == "Extrusion") {
+        auto o = std::make_shared<bgi::DdsExtrusion>();
+        loadSolidBase(*o);
+        if (j.contains("extrudeDir")) o->extrudeDir = vec3FromJ(j["extrudeDir"]);
+        o->capStart = j.value("capStart", 1);
+        o->capEnd   = j.value("capEnd",   1);
+        if (j.contains("pts"))
+            for (const auto &p : j["pts"]) o->baseProfile.push_back(vec3FromJ(p));
         return o;
     }
     return nullptr;
@@ -1033,6 +1244,145 @@ YAML::Node objectToY(const bgi::DdsObject &obj)
         // Omit pixel data in YAML (large binary blob); width/height preserved.
         break;
     }
+    // Phase 4/5/6 — solid base fields helper (lambda defined inline)
+    case bgi::DdsObjectType::Box: {
+        const auto &o = static_cast<const bgi::DdsBox&>(obj);
+        n["coordSpace"] = coordSpaceStr(o.coordSpace);
+        n["ucsName"]    = o.ucsName;
+        n["style"]      = styleToY(o.style);
+        n["origin"]     = vec3ToY(o.origin);
+        n["drawMode"]   = static_cast<int>(o.drawMode);
+        n["edgeColor"]  = o.edgeColor;
+        n["faceColor"]  = o.faceColor;
+        n["slices"]     = o.slices;
+        n["stacks"]     = o.stacks;
+        n["width"]      = o.width;
+        n["depth"]      = o.depth;
+        n["height"]     = o.height;
+        break;
+    }
+    case bgi::DdsObjectType::Sphere: {
+        const auto &o = static_cast<const bgi::DdsSphere&>(obj);
+        n["coordSpace"] = coordSpaceStr(o.coordSpace);
+        n["ucsName"]    = o.ucsName;
+        n["style"]      = styleToY(o.style);
+        n["origin"]     = vec3ToY(o.origin);
+        n["drawMode"]   = static_cast<int>(o.drawMode);
+        n["edgeColor"]  = o.edgeColor;
+        n["faceColor"]  = o.faceColor;
+        n["slices"]     = o.slices;
+        n["stacks"]     = o.stacks;
+        n["radius"]     = o.radius;
+        break;
+    }
+    case bgi::DdsObjectType::Cylinder: {
+        const auto &o = static_cast<const bgi::DdsCylinder&>(obj);
+        n["coordSpace"] = coordSpaceStr(o.coordSpace);
+        n["ucsName"]    = o.ucsName;
+        n["style"]      = styleToY(o.style);
+        n["origin"]     = vec3ToY(o.origin);
+        n["drawMode"]   = static_cast<int>(o.drawMode);
+        n["edgeColor"]  = o.edgeColor;
+        n["faceColor"]  = o.faceColor;
+        n["slices"]     = o.slices;
+        n["stacks"]     = o.stacks;
+        n["radius"]     = o.radius;
+        n["height"]     = o.height;
+        n["caps"]       = o.caps;
+        break;
+    }
+    case bgi::DdsObjectType::Cone: {
+        const auto &o = static_cast<const bgi::DdsCone&>(obj);
+        n["coordSpace"] = coordSpaceStr(o.coordSpace);
+        n["ucsName"]    = o.ucsName;
+        n["style"]      = styleToY(o.style);
+        n["origin"]     = vec3ToY(o.origin);
+        n["drawMode"]   = static_cast<int>(o.drawMode);
+        n["edgeColor"]  = o.edgeColor;
+        n["faceColor"]  = o.faceColor;
+        n["slices"]     = o.slices;
+        n["stacks"]     = o.stacks;
+        n["radius"]     = o.radius;
+        n["height"]     = o.height;
+        n["cap"]        = o.cap;
+        break;
+    }
+    case bgi::DdsObjectType::Torus: {
+        const auto &o = static_cast<const bgi::DdsTorus&>(obj);
+        n["coordSpace"]  = coordSpaceStr(o.coordSpace);
+        n["ucsName"]     = o.ucsName;
+        n["style"]       = styleToY(o.style);
+        n["origin"]      = vec3ToY(o.origin);
+        n["drawMode"]    = static_cast<int>(o.drawMode);
+        n["edgeColor"]   = o.edgeColor;
+        n["faceColor"]   = o.faceColor;
+        n["slices"]      = o.slices;
+        n["stacks"]      = o.stacks;
+        n["majorRadius"] = o.majorRadius;
+        n["minorRadius"] = o.minorRadius;
+        break;
+    }
+    case bgi::DdsObjectType::HeightMap: {
+        const auto &o = static_cast<const bgi::DdsHeightMap&>(obj);
+        n["coordSpace"]  = coordSpaceStr(o.coordSpace);
+        n["ucsName"]     = o.ucsName;
+        n["style"]       = styleToY(o.style);
+        n["origin"]      = vec3ToY(o.origin);
+        n["drawMode"]    = static_cast<int>(o.drawMode);
+        n["edgeColor"]   = o.edgeColor;
+        n["faceColor"]   = o.faceColor;
+        n["slices"]      = o.slices;
+        n["stacks"]      = o.stacks;
+        n["rows"]        = o.rows;
+        n["cols"]        = o.cols;
+        n["cellWidth"]   = o.cellWidth;
+        n["cellHeight"]  = o.cellHeight;
+        {
+            YAML::Node ha(YAML::NodeType::Sequence);
+            for (float h : o.heights) ha.push_back(h);
+            n["heights"] = ha;
+        }
+        break;
+    }
+    case bgi::DdsObjectType::ParamSurface: {
+        const auto &o = static_cast<const bgi::DdsParamSurface&>(obj);
+        n["coordSpace"] = coordSpaceStr(o.coordSpace);
+        n["ucsName"]    = o.ucsName;
+        n["style"]      = styleToY(o.style);
+        n["origin"]     = vec3ToY(o.origin);
+        n["drawMode"]   = static_cast<int>(o.drawMode);
+        n["edgeColor"]  = o.edgeColor;
+        n["faceColor"]  = o.faceColor;
+        n["slices"]     = o.slices;
+        n["stacks"]     = o.stacks;
+        n["formula"]    = static_cast<int>(o.formula);
+        n["param1"]     = o.param1;
+        n["param2"]     = o.param2;
+        n["uSteps"]     = o.uSteps;
+        n["vSteps"]     = o.vSteps;
+        break;
+    }
+    case bgi::DdsObjectType::Extrusion: {
+        const auto &o = static_cast<const bgi::DdsExtrusion&>(obj);
+        n["coordSpace"]  = coordSpaceStr(o.coordSpace);
+        n["ucsName"]     = o.ucsName;
+        n["style"]       = styleToY(o.style);
+        n["origin"]      = vec3ToY(o.origin);
+        n["drawMode"]    = static_cast<int>(o.drawMode);
+        n["edgeColor"]   = o.edgeColor;
+        n["faceColor"]   = o.faceColor;
+        n["slices"]      = o.slices;
+        n["stacks"]      = o.stacks;
+        n["extrudeDir"]  = vec3ToY(o.extrudeDir);
+        n["capStart"]    = o.capStart;
+        n["capEnd"]      = o.capEnd;
+        {
+            YAML::Node pts(YAML::NodeType::Sequence);
+            for (const auto &p : o.baseProfile) pts.push_back(vec3ToY(p));
+            n["pts"] = pts;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -1242,6 +1592,87 @@ std::shared_ptr<bgi::DdsObject> objectFromY(const YAML::Node &n)
             o->width  = n["width"]  ? n["width"].as<int>(0)  : 0;
             o->height = n["height"] ? n["height"].as<int>(0) : 0;
             // Pixel data not restored from YAML (was not serialized).
+            return o;
+        }
+
+        // Phase 4/5/6 — solid base field loader (lambda)
+        auto loadSolidBase = [&](bgi::DdsSolid3D &s) {
+            s.coordSpace = getCS(); s.ucsName = getUcsName(); s.style = getStyle();
+            if (n["origin"]) { auto v = vec3FromY(n["origin"]); s.origin = {v.x, v.y, v.z}; }
+            s.drawMode  = static_cast<bgi::SolidDrawMode>(n["drawMode"]  ? n["drawMode"].as<int>(0)  : 0);
+            s.edgeColor = n["edgeColor"] ? n["edgeColor"].as<int>(15) : 15;
+            s.faceColor = n["faceColor"] ? n["faceColor"].as<int>(7)  :  7;
+            s.slices    = n["slices"]    ? n["slices"].as<int>(16)    : 16;
+            s.stacks    = n["stacks"]    ? n["stacks"].as<int>(8)     :  8;
+        };
+
+        if (type == "Box") {
+            auto o = std::make_shared<bgi::DdsBox>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->width  = getFloat("width",  1.f);
+            o->depth  = getFloat("depth",  1.f);
+            o->height = getFloat("height", 1.f);
+            return o;
+        }
+        if (type == "Sphere") {
+            auto o = std::make_shared<bgi::DdsSphere>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->radius = getFloat("radius", 1.f);
+            return o;
+        }
+        if (type == "Cylinder") {
+            auto o = std::make_shared<bgi::DdsCylinder>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->radius = getFloat("radius", 1.f);
+            o->height = getFloat("height", 1.f);
+            o->caps   = n["caps"] ? n["caps"].as<int>(1) : 1;
+            return o;
+        }
+        if (type == "Cone") {
+            auto o = std::make_shared<bgi::DdsCone>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->radius = getFloat("radius", 1.f);
+            o->height = getFloat("height", 1.f);
+            o->cap    = n["cap"] ? n["cap"].as<int>(1) : 1;
+            return o;
+        }
+        if (type == "Torus") {
+            auto o = std::make_shared<bgi::DdsTorus>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->majorRadius = getFloat("majorRadius", 2.f);
+            o->minorRadius = getFloat("minorRadius", 0.5f);
+            return o;
+        }
+        if (type == "HeightMap") {
+            auto o = std::make_shared<bgi::DdsHeightMap>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->rows       = n["rows"]  ? n["rows"].as<int>(0)    : 0;
+            o->cols       = n["cols"]  ? n["cols"].as<int>(0)    : 0;
+            o->cellWidth  = getFloat("cellWidth",  1.f);
+            o->cellHeight = getFloat("cellHeight", 1.f);
+            if (n["heights"] && n["heights"].IsSequence())
+                for (const auto &h : n["heights"])
+                    o->heights.push_back(h.as<float>(0.f));
+            return o;
+        }
+        if (type == "ParamSurface") {
+            auto o = std::make_shared<bgi::DdsParamSurface>();
+            baseLoad(*o); loadSolidBase(*o);
+            o->formula = static_cast<bgi::ParamSurfaceFormula>(n["formula"] ? n["formula"].as<int>(0) : 0);
+            o->param1  = getFloat("param1", 1.f);
+            o->param2  = getFloat("param2", 0.5f);
+            o->uSteps  = n["uSteps"] ? n["uSteps"].as<int>(20) : 20;
+            o->vSteps  = n["vSteps"] ? n["vSteps"].as<int>(20) : 20;
+            return o;
+        }
+        if (type == "Extrusion") {
+            auto o = std::make_shared<bgi::DdsExtrusion>();
+            baseLoad(*o); loadSolidBase(*o);
+            if (n["extrudeDir"]) { auto v = vec3FromY(n["extrudeDir"]); o->extrudeDir = {v.x, v.y, v.z}; }
+            o->capStart = n["capStart"] ? n["capStart"].as<int>(1) : 1;
+            o->capEnd   = n["capEnd"]   ? n["capEnd"].as<int>(1)   : 1;
+            if (n["pts"] && n["pts"].IsSequence())
+                for (const auto &p : n["pts"]) o->baseProfile.push_back(vec3FromY(p));
             return o;
         }
     }

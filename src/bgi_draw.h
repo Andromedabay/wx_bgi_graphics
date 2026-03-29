@@ -11,6 +11,7 @@ namespace bgi
 
     int normalizeColor(int color);
     std::uint8_t normalizeColorByte(int value);
+    ColorRGB colorToRGB(int c);  ///< resolves any colour index (0-255) to an RGB triple
     std::array<std::uint8_t, kPatternRows> makeFillPatternMask(int pattern);
 
     bool isReady();

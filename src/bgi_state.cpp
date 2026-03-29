@@ -46,6 +46,9 @@ namespace bgi
             gState.activePalette.colors[static_cast<std::size_t>(index)] = index;
             gState.palette[static_cast<std::size_t>(index)] = kBgiPalette[index];
         }
+        // Reset extended palette: clear all user-assigned slots back to BLACK.
+        gState.extPalette.fill({0, 0, 0});
+        gState.extColorNext = kExtColorBase;
     }
 
     void resetDrawingState()

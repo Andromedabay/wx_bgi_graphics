@@ -53,7 +53,29 @@
 #define WXBGI_DDS_FILL_POLY      15
 #define WXBGI_DDS_TEXT           16
 #define WXBGI_DDS_IMAGE          17
+// Phase 4 — 3D Solid Primitives
+#define WXBGI_DDS_BOX            18
+#define WXBGI_DDS_SPHERE         19
+#define WXBGI_DDS_CYLINDER       20
+#define WXBGI_DDS_CONE           21
+#define WXBGI_DDS_TORUS          22
+// Phase 5 — 3D Surfaces
+#define WXBGI_DDS_HEIGHTMAP      23
+#define WXBGI_DDS_PARAM_SURFACE  24
+// Phase 6 — 2D→3D Extrusion
+#define WXBGI_DDS_EXTRUSION      25
 #define WXBGI_DDS_UNKNOWN        -1
+
+// Parametric surface formula constants
+#define WXBGI_PARAM_SPHERE    0
+#define WXBGI_PARAM_CYLINDER  1
+#define WXBGI_PARAM_TORUS     2
+#define WXBGI_PARAM_SADDLE    3
+#define WXBGI_PARAM_MOBIUS    4
+
+// Solid draw mode constants
+#define WXBGI_SOLID_WIREFRAME  0
+#define WXBGI_SOLID_SOLID      1
 
 // CoordSpace constants (returned by wxbgi_dds_get_coord_space).
 #define WXBGI_COORD_BGI_PIXEL  0  ///< Classic BGI pixel coords stored as world (x, y, 0).
