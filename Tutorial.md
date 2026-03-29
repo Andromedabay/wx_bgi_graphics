@@ -1,202 +1,272 @@
 ## BGI Double Buffering Tutorial
 
-This tutorial explains how to use your enhanced BGI implementation to:
+This tutorial explains how double (and layered) buffering works in `wx_bgi_graphics` and
+how to write smooth, flicker-free animation using the real API.
 
-    - Initialize graphics
+> **Note on older references:** An earlier draft of this document used function names such as
+> `setVisualBuffer()`, `setActiveBuffer()`, `createBuffer()`, and `destroyBuffer()`.
+> **None of these functions exist in the library.**  The correct API is described below.
 
-    - Create and manage multiple off‑screen buffers
+---
 
-    - Draw into memory instead of the screen
+### 1. How Buffering Works in wx_bgi_graphics
 
-    - Flip buffers for smooth, flicker‑free rendering
+The library implements **two independent layers** of buffering:
 
-    - Use more than two buffers if desired
+#### Layer 1 -- BGI Software Page Buffers
 
-    - Understand safe sequencing for multi‑threaded rendering
+`initwindow()` / `initgraph()` automatically allocates **exactly two** software pixel
+buffers in CPU memory: **page 0** and **page 1**.  Each buffer stores one colour-index
+byte per pixel (the BGI palette index or an extended RGB slot).
 
-This document includes explanations and correct buffer usage explanation.
+| Variable | Meaning |
+|---|---|
+| `activePage` | The page all BGI drawing commands write to (0 or 1). |
+| `visualPage` | The page that is read and sent to OpenGL when a frame is presented (0 or 1). |
 
-### 1. Conceptual Steps (English Explanation)
+You control these with three BGI API calls:
 
-##### Step 1 — Initialize Graphics
+| Function | Effect |
+|---|---|
+| `setactivepage(int page)` | Redirect all drawing to page 0 or page 1. |
+| `setvisualpage(int page)` | Make page 0 or page 1 the displayed page, and immediately present it to the screen. |
+| `swapbuffers()` | Atomically exchange `activePage` and `visualPage`, then present -- the canonical double-buffer flip. |
 
-Start the graphics system and create the main window. This automatically creates the front buffer, which is the visible on‑screen surface.
+#### Layer 2 -- OpenGL / GLFW Hardware Double Buffer
 
-##### Step 2 — Create One or More Off‑Screen Buffers
+GLFW opens the window with a hardware double-buffered OpenGL context (a standard
+front and back OpenGL render buffer managed by the GPU driver).
 
-Allocate additional buffers in memory. These are your back buffers.
+Every time a BGI page is to be shown, the internal `flushToScreen()` function:
 
-##### Step 3 — Select an Off‑Screen Buffer for Drawing
+1. Clears the OpenGL back buffer.
+2. Iterates every pixel in the **visual** BGI page buffer.
+3. Converts each colour index to RGB and emits an OpenGL `glVertex2i` point.
+4. Calls `glFlush()` then `glfwSwapBuffers()` -- this atomically swaps the GPU
+   front/back buffers, displaying the new frame.
 
-Switch the active drawing target so all drawing goes into a chosen back buffer. In Double-Buffering you deliberatley avoid drawing on the visible (active) buffer.
+The programmer never calls `glfwSwapBuffers()` directly; `flushToScreen()` is an
+internal function invoked by `setvisualpage()`, `swapbuffers()`, and
+`wxbgi_swap_window_buffers()`.
 
-##### Step 4 — Draw Your Frame Into the Back Buffer
+#### Layer 3 (advanced) -- Manual OpenGL Frame Control
 
-Use normal BGI drawing commands. Nothing appears on screen yet.
+For programmers mixing raw OpenGL with BGI, the extension API exposes:
 
-##### Step 5 — Flip the Back Buffer to the Front Buffer
+| Function | Effect |
+|---|---|
+| `wxbgi_poll_events()` | Process OS/window events without swapping buffers. |
+| `wxbgi_swap_window_buffers()` | Call `glfwSwapBuffers()` directly (skips BGI pixel upload). |
+| `wxbgi_begin_advanced_frame()` | Begin a manual OpenGL draw frame. |
+| `wxbgi_end_advanced_frame(int swap)` | End a frame; optionally swap the OpenGL buffers. |
 
-Make the selected back buffer visible by swapping or copying it to the front buffer.
+---
 
-##### Step 6 — Clear the Back Buffer
+### 2. Conceptual Steps (English Explanation)
 
-Prepare it for the next frame.
+##### Step 1 -- Initialize Graphics
 
-##### Step 7 — Draw the Next Frame
+Call `initwindow()` or `initgraph()`.  Two BGI software page buffers (page 0 and
+page 1) are created automatically.  The GLFW window opens with a hardware
+double-buffered OpenGL context.
 
-Render the next frame into the same or another back buffer.
+##### Step 2 -- Direct Drawing to the Back Buffer
 
-##### Step 8 — Flip Again
+Call `setactivepage(1)` to send all drawing commands to page 1 while page 0
+remains visible.  In Double-Buffering you deliberately avoid drawing on the
+visible page.
 
-Display the new frame.
+##### Step 3 -- Draw Your Frame
 
-##### Step 9 — Loop
+Use normal BGI drawing commands (`line`, `circle`, `outtextxy`, etc.).
+Nothing appears on screen yet -- all output goes into the page 1 CPU buffer.
 
-Repeat the process for animation.
+##### Step 4 -- Flip / Present the Frame
 
-##### Step 10 — Cleanup
+Call `swapbuffers()`.  This exchanges which page is active and which is visual,
+then calls `flushToScreen()` to upload the new visual page to OpenGL and
+call `glfwSwapBuffers()` on the GPU.
 
-Destroy buffers and close graphics.
+##### Step 5 -- Clear and Repeat
+
+Call `cleardevice()` (which clears the new active page) and draw the next frame.
+
+##### Step 6 -- Cleanup
+
+Call `closegraph()`.  Both software page buffers are freed and the GLFW window is
+destroyed.
+
   
 ![Double-buffering minimum requirements](images/Minimum_Buffers_for_Double_buffering.png)
   
-### 2. Pseudo‑Code (Generic Explanation)
+---
+
+### 3. Pseudo-Code (Generic Explanation)
 
 ```
-initialize_graphics()
-create_window(W, H)  // creates FRONT BUFFER automatically
+initialize_graphics()          // allocates page 0 and page 1
 
-backBuffer = create_buffer(W, H)
+set_active_page(1)             // draw to the back buffer
 
 while running:
-    set_active_buffer(backBuffer)
-    clear_buffer(backBuffer)
+    clear_device()             // clear the active (back) page
 
-    draw_scene()
+    draw_scene()               // all drawing goes into the back page
 
-    set_visual_buffer(backBuffer)  // flip to screen
+    swap_buffers()             // atomic flip: back -> visual, then flush to GPU
 end while
 
-destroy_buffer(backBuffer)
-shutdown_graphics()
+shutdown_graphics()            // free buffers, close window
 ```
   
 ![Double buffering explained](images/DoubleBuffering.png)
-  
 
-### 3. Pseudo‑Code Using Your Actual Library Function Names
+---
 
-```C++
-initwindow(width, height, "BGI Window")  // creates FRONT BUFFER
+### 4. Real API Example in C++
 
-int backBuffer = createBuffer(width, height)
+```cpp
+#include "wx_bgi.h"
+#include "wx_bgi_ext.h"
 
-while (running) {
-    // Draw into off-screen memory
-    setActiveBuffer(backBuffer)
-    clearBuffer(backBuffer)
+int main()
+{
+    initwindow(800, 600, "Double Buffer Demo");
 
-    // Standard BGI drawing calls
-    setcolor(WHITE)
-    line(10, 10, 200, 200)
-    outtextxy(20, 220, "Frame Rendering")
+    // Direct all drawing to page 1 (the hidden back buffer).
+    setactivepage(1);
+    // Keep page 0 visible while we draw.
+    setvisualpage(0);
 
-    // Flip to screen
-    setVisualBuffer(backBuffer)
+    while (!wxbgi_should_close())
+    {
+        wxbgi_poll_events();          // process keyboard / mouse / close events
+
+        cleardevice();                // clear the active (back) page
+
+        // --- draw the frame ---
+        setcolor(WHITE);
+        line(10, 10, 400, 300);
+        outtextxy(20, 320, "Frame rendered off-screen");
+        // ----------------------
+
+        swapbuffers();                // flip: page 1 -> visual, page 0 -> active
+                                      // internally calls flushToScreen() and
+                                      // glfwSwapBuffers() to present to screen
+    }
+
+    closegraph();
+    return 0;
+}
+```
+
+#### Alternative: use swapbuffers() without explicit page management
+
+```cpp
+initwindow(800, 600, "Swap Demo");
+
+while (!wxbgi_should_close())
+{
+    wxbgi_poll_events();
+
+    cleardevice();
+    // draw...
+    circle(400, 300, 100);
+
+    swapbuffers();   // atomically flips active/visual pages and presents
 }
 
-destroyBuffer(backBuffer)
-closegraph()
+closegraph();
 ```
 
-### 4. Using Multiple Buffers (Triple Buffering or More)
+---
 
-Your library supports creating multiple buffers:
+### 5. Two Pages Only -- No Arbitrary Buffer Count
 
-```C++
-int buffers[6];
-for (int i = 0; i < 6; i++)
-    buffers[i] = createBuffer(width, height);
-```    
+The library provides **exactly two** BGI software page buffers (page 0 and page 1).
+It does **not** support creating additional buffers with a `createBuffer()` call --
+that function does not exist.
 
-You can draw into any of them:
-
-```C++
-setActiveBuffer(buffers[i]);
-draw_scene();
-```
-
-You can flip any of them to the screen:
-
-```C++
-setVisualBuffer(buffers[i]);
-```
-
-You can cycle through them:
-
-```C++
-current = (current + 1) % 6;
-setVisualBuffer(buffers[current]);
-```
-
-This allows for advanced rendering pipelines, temporal effects, or multi‑stage processing.
-
-### 5. Multi‑Threaded Rendering Considerations
-
-Multi-Threading Double-Buffers can be dangerous. Why?
-- The front buffer is a shared resource
-- If two threads call setVisualBuffer() at the same time, you get race conditions
-- You may flip mid‑draw, causing tearing or corrupted frames
-- BGI drawing functions are not thread‑safe unless you explicitly lock them
-  
-Using multiple buffers in a multi‑threaded environment is possible, but requires careful synchronization.
-
-<B>Safe Model</B>
-
-    * One thread draws into back buffers.
-
-    * Another thread (or the same one) flips buffers to the screen.
-
-    * Use mutexes or atomic flags to coordinate which buffer is ready.
-
-<B>Example Pattern</B>
+Classic triple-buffering at the BGI level is therefore not available.  However,
+the underlying GLFW/OpenGL context is always hardware double-buffered, so the
+complete system pipeline is:
 
 ```
-Thread A (renderer):
-    setActiveBuffer(buffers[next])
-    clearBuffer(buffers[next])
+BGI page 0 (CPU)  \
+                    --> flushToScreen() --> OpenGL back buffer --> OpenGL front buffer --> Display
+BGI page 1 (CPU)  /                        (GPU)                   (GPU, shown)
+```
+
+The GPU front/back buffer swap (`glfwSwapBuffers`) is triggered automatically
+inside `flushToScreen()` every time `setvisualpage()` or `swapbuffers()` is called.
+This gives tear-free presentation without any additional programmer effort.
+
+---
+
+### 6. Multi-Threaded Rendering Considerations
+
+The library protects all BGI state with a single internal mutex (`gMutex`).  Every
+public API function acquires this mutex before reading or writing state, so
+concurrent calls from multiple threads will not corrupt internal state.
+
+However, there are still design-level considerations:
+
+- `flushToScreen()` (called by `swapbuffers()`) must run on the thread that owns the
+  OpenGL context.  By default this is the thread that called `initwindow()`.
+- If you draw from a background thread using `setactivepage(1)` and present from the
+  main thread using `swapbuffers()`, the mutex serialises the two, but you must ensure
+  the background thread has finished its frame before calling `swapbuffers()`.
+
+**Safe single-producer / single-display pattern:**
+
+```
+Main thread (display loop):
+    wxbgi_poll_events()
+    swapbuffers()              // presents the last completed back buffer
+
+Worker thread (renderer):
+    setactivepage(1)
+    cleardevice()
     draw_scene()
-    mark buffers[next] as ready
-
-Thread B (display):
-    wait for ready buffer
-    setVisualBuffer(readyBuffer)
+    // signal main thread that frame is ready
 ```
 
-This avoids race conditions and ensures stable rendering.
+Use a `std::atomic<bool>` or `std::condition_variable` to coordinate; do not call
+`swapbuffers()` from both threads simultaneously.
 
-### 6. Should You Use More Than 2 Buffers?
-✔ Yes, if:
-- You want triple buffering (reduces blocking)
-- You want multi‑stage pipelines (e.g., one thread draws backgrounds, another draws sprites)
-- You want temporal effects (motion blur, history buffers)
+---
 
-✖ No, if:
-- You only need simple animation
-- You want maximum FPS
-- You don’t want to manage synchronization
-  
-For most real‑time rendering, 2 or 3 buffers is ideal. 3+ buffers is possible but requires careful design.
+### 7. Summary of Actual API Functions
 
-### 7. Summary
+| BGI Classic API | Effect |
+|---|---|
+| `initwindow(w, h, title)` | Open window; allocate page 0 and page 1. |
+| `setactivepage(page)` | Direct drawing to page 0 or page 1 (0 = default). |
+| `setvisualpage(page)` | Display page 0 or page 1; triggers `flushToScreen()`. |
+| `swapbuffers()` | Atomic flip of active/visual pages + `flushToScreen()`. |
+| `cleardevice()` | Clear the active page to the background colour. |
+| `closegraph()` | Free page buffers, destroy GLFW window. |
 
-Double buffering in your enhanced BGI library follows this loop:
+| Extension API (`wxbgi_*`) | Effect |
+|---|---|
+| `wxbgi_poll_events()` | Process OS events (no buffer swap). |
+| `wxbgi_swap_window_buffers()` | Swap the OpenGL front/back buffers directly. |
+| `wxbgi_begin_advanced_frame()` | Begin a manual OpenGL frame (clears GL buffers). |
+| `wxbgi_end_advanced_frame(swap)` | End a frame; swap GL buffers if `swap != 0`. |
+| `wxbgi_should_close()` | Returns non-zero when the user closes the window. |
 
-```C++
-setActiveBuffer(backBuffer)
-clearBuffer(backBuffer)
-draw()
-setVisualBuffer(backBuffer)
+The canonical animation loop is:
+
+```cpp
+setactivepage(1);
+setvisualpage(0);
+
+while (!wxbgi_should_close())
+{
+    wxbgi_poll_events();
+    cleardevice();
+    draw();
+    swapbuffers();
+}
+closegraph();
 ```
-
-For advanced use, you may create multiple buffers and rotate through them, provided you manage synchronization carefully when using multiple threads.
