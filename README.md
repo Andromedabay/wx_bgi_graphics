@@ -44,6 +44,13 @@ Public API declarations are available in:
 
 See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP object hierarchy, all `wxbgi_dds_*` functions, and usage examples.
 
+## Camera Reference
+
+The library provides two camera modes, both built on the `Camera3D` struct:
+
+- **[Camera3D_Map.md](./Camera3D_Map.md)** -- 3D perspective and orthographic cameras: data layout, GLM math layer, full `wxbgi_cam_*` API, serialization, and the file dependency diagram.
+- **[Camera2D_Map.md](./Camera2D_Map.md)** -- 2D overhead cameras (`is2D = true`): pan/zoom/rotation math, `wxbgi_cam2d_*` API, zoom-at pivot formula, and usage example.
+
 ## Screenshots
 
 See **[ScreenShots.md](./ScreenShots.md)** for annotated screenshots of the example programs.

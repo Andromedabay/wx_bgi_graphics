@@ -53,6 +53,19 @@ BGI_API int BGI_CALL wxbgi_cam_create(const char *name, int type)
     if (bgi::gState.window == nullptr)
         return -1;
 
+    // "default" is a system-reserved camera created by initwindow().
+    if (std::string_view(name) == "default")
+    {
+        bgi::gState.lastResult = bgi::grDuplicateName;
+        return -2;
+    }
+
+    if (bgi::gState.cameras.count(name))
+    {
+        bgi::gState.lastResult = bgi::grDuplicateName;
+        return -2;
+    }
+
     auto dc = std::make_shared<bgi::DdsCamera>();
     dc->name            = name;
     dc->camera.projection = (type == WXBGI_CAM_PERSPECTIVE)
@@ -61,6 +74,7 @@ BGI_API int BGI_CALL wxbgi_cam_create(const char *name, int type)
 
     bgi::gState.dds->append(dc);
     bgi::gState.cameras[name] = dc;
+    bgi::gState.lastResult = bgi::grOk;
     return 1;
 }
 
@@ -363,6 +377,19 @@ BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name)
     if (bgi::gState.window == nullptr)
         return -1;
 
+    // "default" is a system-reserved camera created by initwindow().
+    if (std::string_view(name) == "default")
+    {
+        bgi::gState.lastResult = bgi::grDuplicateName;
+        return -2;
+    }
+
+    if (bgi::gState.cameras.count(name))
+    {
+        bgi::gState.lastResult = bgi::grDuplicateName;
+        return -2;
+    }
+
     auto dc = std::make_shared<bgi::DdsCamera>();
     dc->name                  = name;
     dc->camera.is2D           = true;
@@ -378,6 +405,7 @@ BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name)
 
     bgi::gState.dds->append(dc);
     bgi::gState.cameras[name] = dc;
+    bgi::gState.lastResult = bgi::grOk;
     return 1;
 }
 

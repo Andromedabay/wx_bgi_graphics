@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "bgi_types.h"
 
@@ -44,15 +44,18 @@
 /**
  * @brief Creates a named camera and adds it to the registry.
  *
- * If a camera with @p name already exists it is replaced.
- * Newly created cameras have the following defaults:
+ * Returns an error if a camera with the same name already exists. The
+ * reserved name @c "default" (created automatically by initwindow()) is
+ * always rejected.  Newly created cameras have the following defaults:
  * - Orthographic projection; eye at (0,-10,5) looking at (0,0,0); Z-up.
  * - Auto-fit ortho extents (2 world-units tall).
  * - Screen viewport: full window.
  *
  * @param name Camera identifier string (UTF-8, must not be NULL).
  * @param type @ref WXBGI_CAM_ORTHO or @ref WXBGI_CAM_PERSPECTIVE.
- * @return 1 on success, 0 on invalid input, -1 if no window is open.
+ * @return 1 on success, 0 on invalid input, -1 if no window is open,
+ *         -2 if a camera with that name already exists
+ *         (sets @c graphresult() to @c grDuplicateName).
  */
 BGI_API int BGI_CALL wxbgi_cam_create(const char *name, int type);
 
@@ -259,11 +262,15 @@ BGI_API void BGI_CALL wxbgi_cam_screen_to_ray(const char *name,
 /**
  * @brief Creates a 2-D overhead camera.
  *
+ * Returns an error if a camera with the same name already exists. The
+ * reserved name @c "default" is always rejected.
  * The initial view is centred on world origin (0,0), zoom = 1, no rotation,
- * and 720 world-units visible vertically.
+ * and the window height in world-units visible vertically.
  *
  * @param name Camera identifier string (must not be NULL).
- * @return 1 on success, 0 on invalid input, -1 if no window is open.
+ * @return 1 on success, 0 on invalid input, -1 if no window is open,
+ *         -2 if a camera with that name already exists
+ *         (sets @c graphresult() to @c grDuplicateName).
  */
 BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name);
 
@@ -354,10 +361,14 @@ BGI_API void BGI_CALL wxbgi_cam2d_set_world_height(const char *name,
 /**
  * @brief Creates a named UCS initialised to the world identity frame.
  *
- * If a UCS with @p name already exists it is replaced.
+ * Returns an error if a UCS with the same name already exists. The
+ * reserved name @c "world" (created automatically by initwindow()) is
+ * always rejected.
  *
  * @param name  UCS identifier string (must not be NULL or empty).
- * @return 1 on success, 0 on invalid input, -1 if no window is open.
+ * @return 1 on success, 0 on invalid input, -1 if no window is open,
+ *         -2 if a UCS with that name already exists
+ *         (sets @c graphresult() to @c grDuplicateName).
  */
 BGI_API int BGI_CALL wxbgi_ucs_create(const char *name);
 

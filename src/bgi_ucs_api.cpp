@@ -67,12 +67,26 @@ BGI_API int BGI_CALL wxbgi_ucs_create(const char *name)
     if (bgi::gState.window == nullptr)
         return -1;
 
+    // "world" is a system-reserved UCS created by initwindow().
+    if (std::string_view(name) == "world")
+    {
+        bgi::gState.lastResult = bgi::grDuplicateName;
+        return -2;
+    }
+
+    if (bgi::gState.ucsSystems.count(name))
+    {
+        bgi::gState.lastResult = bgi::grDuplicateName;
+        return -2;
+    }
+
     auto du = std::make_shared<bgi::DdsUcs>();
     du->name = name;
     du->ucs  = bgi::CoordSystem{};
 
     bgi::gState.dds->append(du);
     bgi::gState.ucsSystems[name] = du;
+    bgi::gState.lastResult = bgi::grOk;
     return 1;
 }
 

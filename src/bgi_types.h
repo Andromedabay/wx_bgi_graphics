@@ -116,6 +116,7 @@ namespace bgi
         grInitFailed = -19,
         grWindowClosed = -20,
         grInvalidInput = -21,
+        grDuplicateName = -22, ///< A camera or UCS with that name already exists.
     };
 
     struct arccoordstype
