@@ -48,9 +48,9 @@ See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP
 
 See **[ScreenShots.md](./ScreenShots.md)** for annotated screenshots of the example programs.
 
-[![3D perspective camera view](images/screenshot_cam3d_persp.png)](ScreenShots.md)
+![3D perspective camera view](images/thumb_cam3d_persp.png)
 
-*Click the image or the link above to browse all screenshots.*
+*[View all screenshots](ScreenShots.md)*
 
 
 ## Turbo Pascal/Turbo C/C++ - Drop in Replacement (Well Almost...)
