@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file bgi_solid_render.cpp
  * @brief Phase 4/5/6 — software tessellation and painter's-algorithm renderer
  *        for 3D solid primitives, parametric surfaces, and extruded polygons.
@@ -219,11 +219,11 @@ void tessBox(const bgi::DdsBox &o, const glm::vec3 &cen, std::vector<Triangle> &
         tris.push_back({{c[a], c[cc], c[d]},  o.faceColor, o.edgeColor});
     };
 
-    addFace(0, 3, 2, 1);  // Bottom (−Z)
+    addFace(0, 3, 2, 1);  // Bottom (-Z)
     addFace(4, 5, 6, 7);  // Top    (+Z)
-    addFace(0, 1, 5, 4);  // Front  (−Y)
+    addFace(0, 1, 5, 4);  // Front  (-Y)
     addFace(2, 3, 7, 6);  // Back   (+Y)
-    addFace(0, 4, 7, 3);  // Left   (−X)
+    addFace(0, 4, 7, 3);  // Left   (-X)
     addFace(1, 2, 6, 5);  // Right  (+X)
 }
 

@@ -46,13 +46,13 @@
  *
  * If a camera with @p name already exists it is replaced.
  * Newly created cameras have the following defaults:
- * - Orthographic projection; eye at (0,−10,5) looking at (0,0,0); Z-up.
+ * - Orthographic projection; eye at (0,-10,5) looking at (0,0,0); Z-up.
  * - Auto-fit ortho extents (2 world-units tall).
  * - Screen viewport: full window.
  *
  * @param name Camera identifier string (UTF-8, must not be NULL).
  * @param type @ref WXBGI_CAM_ORTHO or @ref WXBGI_CAM_PERSPECTIVE.
- * @return 1 on success, 0 on invalid input, −1 if no window is open.
+ * @return 1 on success, 0 on invalid input, -1 if no window is open.
  */
 BGI_API int BGI_CALL wxbgi_cam_create(const char *name, int type);
 
@@ -219,7 +219,7 @@ BGI_API void BGI_CALL wxbgi_cam_get_vp_matrix(const char *name, float *out16);
  * @param screenY        Output screen Y pixel (may be NULL).
  * @return  1 if the point is visible (inside the view frustum),
  *          0 if clipped,
- *         −1 if the camera is not found or no window is open.
+ *         -1 if the camera is not found or no window is open.
  */
 BGI_API int BGI_CALL wxbgi_cam_world_to_screen(const char *name,
                                                 float wx, float wy, float wz,
@@ -263,7 +263,7 @@ BGI_API void BGI_CALL wxbgi_cam_screen_to_ray(const char *name,
  * and 720 world-units visible vertically.
  *
  * @param name Camera identifier string (must not be NULL).
- * @return 1 on success, 0 on invalid input, −1 if no window is open.
+ * @return 1 on success, 0 on invalid input, -1 if no window is open.
  */
 BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name);
 
@@ -357,7 +357,7 @@ BGI_API void BGI_CALL wxbgi_cam2d_set_world_height(const char *name,
  * If a UCS with @p name already exists it is replaced.
  *
  * @param name  UCS identifier string (must not be NULL or empty).
- * @return 1 on success, 0 on invalid input, −1 if no window is open.
+ * @return 1 on success, 0 on invalid input, -1 if no window is open.
  */
 BGI_API int BGI_CALL wxbgi_ucs_create(const char *name);
 
@@ -530,7 +530,7 @@ BGI_API void BGI_CALL wxbgi_reset_world_extents(void);
  * Does nothing if no world extents have been set.
  *
  * @param camName Camera name, or NULL for the active camera.
- * @return 1 on success, 0 if no extents are set, −1 if camera not found.
+ * @return 1 on success, 0 if no extents are set, -1 if camera not found.
  */
 BGI_API int BGI_CALL wxbgi_cam_fit_to_extents(const char *camName);
 
