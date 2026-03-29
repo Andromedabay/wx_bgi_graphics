@@ -33,12 +33,16 @@ The library now includes classic BGI-style support for:
 - image buffer helpers such as `imagesize`, `getimage`, `putimage`
 - double-buffer style page selection via `setactivepage`, `setvisualpage`, `getactivepage`, `getvisualpage`, `swapbuffers`
 - additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
+- retained-mode scene graph (DDS / DDDS) with JSON and YAML serialisation via `wxbgi_dds_*`
 
 Public API declarations are available in:
 
 - `src/wx_bgi.h` (classic BGI API)
 - `src/wx_bgi_ext.h` (modern extension helpers)
 - `src/wx_bgi_3d.h` (camera, UCS, world-coordinate extension API)
+- `src/wx_bgi_dds.h` (Drawing Description Data Structure — DDS/CHDOP/DDJ/DDY)
+
+See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP object hierarchy, all `wxbgi_dds_*` functions, and usage examples.
 
 
 ## Turbo Pascal/Turbo C/C++ - Drop in Replacement (Well Almost...)
