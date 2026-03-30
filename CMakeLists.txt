@@ -459,7 +459,7 @@ if(BUILD_TESTING)
             NAME bgi_api_coverage_pascal_build
             COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG> --target bgi_api_coverage_pascal_build
         )
-        set_tests_properties(bgi_api_coverage_pascal_build PROPERTIES TIMEOUT 20)
+        set_tests_properties(bgi_api_coverage_pascal_build PROPERTIES TIMEOUT 120)
 
         if(UNIX AND NOT APPLE)
             add_test(

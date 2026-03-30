@@ -376,7 +376,7 @@ for each camera:
     render DDS scene objects
     drawOverlaysForCamera(camName, cam)   ← grid, UCS axes, concentric circles
     flushToScreen()
-        └── drawSelectionCursorsGL()      ← selection cursor (OpenGL pass)
+        +-- drawSelectionCursorsGL()      <- selection cursor (OpenGL pass)
 ```
 
 Flash rendering for selected objects:
