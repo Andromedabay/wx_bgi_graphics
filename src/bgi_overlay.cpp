@@ -500,9 +500,15 @@ static float screenDistToObject(const Camera3D &cam, const glm::mat4 &viewMat,
         break;
     }
     case DdsObjectType::Polygon:
-    case DdsObjectType::FillPoly:
     {
         const auto &o = static_cast<const DdsPolygon &>(obj);
+        for (const auto &p : o.pts)
+            probe(tw(o.coordSpace, o.ucsName, p));
+        break;
+    }
+    case DdsObjectType::FillPoly:
+    {
+        const auto &o = static_cast<const DdsFillPoly &>(obj);
         for (const auto &p : o.pts)
             probe(tw(o.coordSpace, o.ucsName, p));
         break;
@@ -519,7 +525,93 @@ static float screenDistToObject(const Camera3D &cam, const glm::mat4 &viewMat,
         probe(tw(o.coordSpace, "", o.pos));
         break;
     }
-    default:
+    // ---- 3D Solid primitives ----------------------------------------
+    case DdsObjectType::Cylinder:
+    {
+        const auto &o = static_cast<const DdsCylinder &>(obj);
+        const glm::vec3 top = o.origin + glm::vec3(0.f, 0.f, o.height);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        probe(tw(o.coordSpace, o.ucsName, top));
+        // mid-height centre
+        probe(tw(o.coordSpace, o.ucsName, o.origin + glm::vec3(0.f, 0.f, o.height * 0.5f)));
+        for (auto dp : {glm::vec3{o.radius, 0, 0}, glm::vec3{-o.radius, 0, 0},
+                        glm::vec3{0, o.radius, 0}, glm::vec3{0, -o.radius, 0}})
+        {
+            probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+            probe(tw(o.coordSpace, o.ucsName, top + dp));
+        }
+        break;
+    }
+    case DdsObjectType::Sphere:
+    {
+        const auto &o = static_cast<const DdsSphere &>(obj);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        for (auto dp : {glm::vec3{o.radius, 0, 0}, glm::vec3{-o.radius, 0, 0},
+                        glm::vec3{0, o.radius, 0}, glm::vec3{0, -o.radius, 0},
+                        glm::vec3{0, 0, o.radius}, glm::vec3{0, 0, -o.radius}})
+            probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+        break;
+    }
+    case DdsObjectType::Box:
+    {
+        const auto &o = static_cast<const DdsBox &>(obj);
+        const float hw = o.width  * 0.5f;
+        const float hd = o.depth  * 0.5f;
+        // All 8 corners + centre
+        for (float dz : {0.f, o.height})
+            for (auto dxy : {glm::vec2{-hw,-hd}, glm::vec2{hw,-hd},
+                             glm::vec2{ hw, hd}, glm::vec2{-hw, hd}})
+                probe(tw(o.coordSpace, o.ucsName,
+                         o.origin + glm::vec3(dxy.x, dxy.y, dz)));
+        probe(tw(o.coordSpace, o.ucsName, o.origin + glm::vec3(0.f, 0.f, o.height * 0.5f)));
+        break;
+    }
+    case DdsObjectType::Cone:
+    {
+        const auto &o = static_cast<const DdsCone &>(obj);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        // Apex
+        probe(tw(o.coordSpace, o.ucsName, o.origin + glm::vec3(0.f, 0.f, o.height)));
+        // Base perimeter
+        for (auto dp : {glm::vec3{o.radius, 0, 0}, glm::vec3{-o.radius, 0, 0},
+                        glm::vec3{0, o.radius, 0}, glm::vec3{0, -o.radius, 0}})
+            probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+        break;
+    }
+    case DdsObjectType::Torus:
+    {
+        const auto &o = static_cast<const DdsTorus &>(obj);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        const float outer = o.majorRadius + o.minorRadius;
+        const float inner = o.majorRadius - o.minorRadius;
+        for (auto dp : {glm::vec3{outer, 0, 0}, glm::vec3{-outer, 0, 0},
+                        glm::vec3{0, outer, 0}, glm::vec3{0, -outer, 0},
+                        glm::vec3{inner, 0, 0}, glm::vec3{-inner, 0, 0}})
+            probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+        break;
+    }
+    case DdsObjectType::HeightMap:
+    {
+        const auto &o = static_cast<const DdsHeightMap &>(obj);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        const float w = o.cellWidth  * static_cast<float>(o.cols);
+        const float d = o.cellHeight * static_cast<float>(o.rows);
+        for (auto dp : {glm::vec3{w, 0, 0}, glm::vec3{0, d, 0}, glm::vec3{w, d, 0}})
+            probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+        break;
+    }
+    case DdsObjectType::Extrusion:
+    {
+        const auto &o = static_cast<const DdsExtrusion &>(obj);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        for (const auto &p : o.baseProfile)
+        {
+            probe(tw(o.coordSpace, o.ucsName, p));
+            probe(tw(o.coordSpace, o.ucsName, p + o.extrudeDir));
+        }
+        break;
+    }
+    default: // ParamSurface and any future solid types
     {
         const auto &o = static_cast<const DdsSolid3D &>(obj);
         probe(tw(o.coordSpace, o.ucsName, o.origin));

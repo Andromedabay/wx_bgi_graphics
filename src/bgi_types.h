@@ -431,7 +431,7 @@ namespace bgi
         // --- DDS Object Selection state (not serialised) ---
         std::vector<std::string> selectedObjectIds;   ///< IDs of currently selected DDS drawing objects.
         int selectionFlashScheme {0};                 ///< Flash colour: 0 = orange (252), 1 = purple (253).
-        int selectionPickRadiusPx{12};                ///< Screen-pixel pick threshold for object selection.
+        int selectionPickRadiusPx{16};                ///< Screen-pixel pick threshold for object selection.
 
         // Explicitly declared(defined in bgi_state.cpp) so that the compiler
         // generates the destructor only where DdsScene is fully defined.
