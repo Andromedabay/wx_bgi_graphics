@@ -611,10 +611,48 @@ static float screenDistToObject(const Camera3D &cam, const glm::mat4 &viewMat,
         }
         break;
     }
-    default: // ParamSurface and any future solid types
-    {
+    default: // Any future solid types
+{
         const auto &o = static_cast<const DdsSolid3D &>(obj);
         probe(tw(o.coordSpace, o.ucsName, o.origin));
+        break;
+    }
+    case DdsObjectType::ParamSurface:
+    {
+        const auto &o = static_cast<const DdsParamSurface &>(obj);
+        probe(tw(o.coordSpace, o.ucsName, o.origin));
+        const float r  = o.param1;
+        const float r2 = o.param2;
+        switch (o.formula)
+        {
+        case ParamSurfaceFormula::Sphere:
+        case ParamSurfaceFormula::Cylinder:
+            for (auto dp : {glm::vec3{r,0,0}, glm::vec3{-r,0,0},
+                             glm::vec3{0,r,0}, glm::vec3{0,-r,0},
+                             glm::vec3{0,0,r}, glm::vec3{0,0,-r}})
+                probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+            break;
+        case ParamSurfaceFormula::Torus:
+        {
+            const float outer = r + r2;
+            for (auto dp : {glm::vec3{outer,0,0}, glm::vec3{-outer,0,0},
+                             glm::vec3{0,outer,0}, glm::vec3{0,-outer,0}})
+                probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+            break;
+        }
+        case ParamSurfaceFormula::Saddle:
+            // Saddle: z = (x^2-y^2)/param2 over x,y in [-param1,param1]
+            for (auto dp : {glm::vec3{r, 0, 0}, glm::vec3{-r, 0, 0},
+                             glm::vec3{0, r, 0}, glm::vec3{0, -r, 0},
+                             glm::vec3{r, r, 0}, glm::vec3{-r,-r, 0}})
+                probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+            break;
+        case ParamSurfaceFormula::Mobius:
+            for (auto dp : {glm::vec3{r+r2,0,0}, glm::vec3{-(r+r2),0,0},
+                             glm::vec3{0,r+r2,0}, glm::vec3{0,-(r+r2),0}})
+                probe(tw(o.coordSpace, o.ucsName, o.origin + dp));
+            break;
+        }
         break;
     }
     }

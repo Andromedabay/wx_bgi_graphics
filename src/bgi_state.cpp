@@ -88,7 +88,8 @@ namespace bgi
         gState.mouseMoved = false;
         gState.selectedObjectIds.clear();
         gState.selectionFlashScheme  = 0;
-        gState.selectionPickRadiusPx = 12;
+        gState.selectionPickRadiusPx = 16;
+        gState.solidColorOverride    = -1;
         resetPaletteState();
     }
 

@@ -785,7 +785,9 @@ void renderObject(const bgi::Camera3D &cam, const bgi::DdsObject &obj, int color
     case bgi::DdsObjectType::HeightMap:
     case bgi::DdsObjectType::ParamSurface:
     case bgi::DdsObjectType::Extrusion:
+        bgi::gState.solidColorOverride = colorOverride;
         bgi::renderSolid3D(cam, obj);
+        bgi::gState.solidColorOverride = -1;
         break;
     default: break;
     }

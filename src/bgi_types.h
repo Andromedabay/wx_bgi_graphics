@@ -420,9 +420,10 @@ namespace bgi
         std::unique_ptr<DdsScene> dds;
 
         // --- 3D Solid / Surface / Extrusion defaults ---
-        int solidDrawMode{0};   ///< 0 = Wireframe, 1 = Solid (painter's algorithm).
-        int solidEdgeColor{15}; ///< Default edge colour (WHITE).
-        int solidFaceColor{7};  ///< Default face colour (LIGHTGRAY).
+        int solidDrawMode{0};         ///< 0 = Wireframe, 1 = Solid (painter's algorithm).
+        int solidEdgeColor{15};       ///< Default edge colour (WHITE).
+        int solidFaceColor{7};        ///< Default face colour (LIGHTGRAY).
+        int solidColorOverride{-1};   ///< When >= 0, replaces faceColor and edgeColor in renderTriangleBatch (used by selection flash).
 
         // --- Global visual overlays (not serialised) ---
         OverlayGridState    overlayGrid;

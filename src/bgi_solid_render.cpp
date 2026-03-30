@@ -155,16 +155,24 @@ void renderTriangles(const bgi::Camera3D &cam,
 
             if (mode == bgi::SolidDrawMode::Solid && frontFace)
             {
+                const int fc = (bgi::gState.solidColorOverride >= 0)
+                                   ? bgi::gState.solidColorOverride
+                                   : tri.faceColor;
                 int savedFillPat  = bgi::gState.fillPattern;
                 int savedFillCol  = bgi::gState.fillColor;
                 bgi::gState.fillPattern = bgi::SOLID_FILL;
-                bgi::gState.fillColor   = tri.faceColor;
-                bgi::fillPolygonInternal(pts, tri.faceColor);
+                bgi::gState.fillColor   = fc;
+                bgi::fillPolygonInternal(pts, fc);
                 bgi::gState.fillPattern = savedFillPat;
                 bgi::gState.fillColor   = savedFillCol;
             }
 
-            bgi::drawPolygonInternal(pts, tri.edgeColor);
+            {
+                const int ec = (bgi::gState.solidColorOverride >= 0)
+                                   ? bgi::gState.solidColorOverride
+                                   : tri.edgeColor;
+                bgi::drawPolygonInternal(pts, ec);
+            }
         }
     }
 }

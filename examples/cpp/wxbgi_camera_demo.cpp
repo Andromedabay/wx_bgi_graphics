@@ -82,7 +82,7 @@ static void renderPanel(const char *cam, int x1, int y1, int x2, int y2,
 // ---------------------------------------------------------------------------
 // buildDdsScene – populate the retained-mode scene (called once before loop)
 // ---------------------------------------------------------------------------
-static void buildDdsScene(std::array<int, kGradSteps> &gradColors)
+static void buildDdsScene(std::array<int, kGradSteps> &gradColors, bool testMode)
 {
     // --- Gradient colours: Red → Orange → Yellow ---
     for (int i = 0; i < kGradSteps; ++i)
@@ -127,18 +127,27 @@ static void buildDdsScene(std::array<int, kGradSteps> &gradColors)
     wxbgi_world_outtextxy(-10.f, -15.f, 0.f, "origin");
 
     // ----- 3D Solids -------------------------------------------------
+    // In test mode use minimal tessellation so debug builds finish quickly.
+    const int cylSl  = testMode ? 6  : 12;
+    const int sphSl  = testMode ? 6  : 12;
+    const int sphSt  = testMode ? 4  : 8;
+    const int coneSl = testMode ? 6  : 12;
+    const int torTu  = testMode ? 8  : 16;
+    const int torSi  = testMode ? 4  : 8;
+    const int sadU   = testMode ? 4  : 8;
+    const int sadV   = testMode ? 4  : 8;
 
     // Cylinder — orange-red
     int cylFace = wxbgi_alloc_color(255, 100, 20);
     wxbgi_solid_set_draw_mode(WXBGI_SOLID_SOLID);
     wxbgi_solid_set_edge_color(15);
     wxbgi_solid_set_face_color(cylFace);
-    wxbgi_solid_cylinder(kCylX, kCylY, kCylZ, kCylR, kCylH, 20, 1);
+    wxbgi_solid_cylinder(kCylX, kCylY, kCylZ, kCylR, kCylH, cylSl, 1);
 
     // Sphere — magenta
     int sphFace = wxbgi_alloc_color(200, 40, 200);
     wxbgi_solid_set_face_color(sphFace);
-    wxbgi_solid_sphere(kSphX, kSphY, kSphZ, kSphR, 20, 16);
+    wxbgi_solid_sphere(kSphX, kSphY, kSphZ, kSphR, sphSl, sphSt);
 
     // Box — cobalt blue
     int boxFace = wxbgi_alloc_color(40, 80, 220);
@@ -148,12 +157,22 @@ static void buildDdsScene(std::array<int, kGradSteps> &gradColors)
     // Cone — teal/cyan
     int coneFace = wxbgi_alloc_color(20, 180, 180);
     wxbgi_solid_set_face_color(coneFace);
-    wxbgi_solid_cone(kConeX, kConeY, kConeZ, kConeR, kConeH, 20, 1);
+    wxbgi_solid_cone(kConeX, kConeY, kConeZ, kConeR, kConeH, coneSl, 1);
 
     // Torus — lime green
     int torFace = wxbgi_alloc_color(60, 200, 60);
     wxbgi_solid_set_face_color(torFace);
-    wxbgi_solid_torus(kTorX, kTorY, kTorZ, kTorMaj, kTorMin, 24, 12);
+    wxbgi_solid_torus(kTorX, kTorY, kTorZ, kTorMaj, kTorMin, torTu, torSi);
+
+    // Saddle parametric surface — gold/yellow, placed at (-80, 80, 0)
+    int saddleFace = wxbgi_alloc_color(210, 170, 20);
+    wxbgi_solid_set_face_color(saddleFace);
+    wxbgi_solid_set_edge_color(14);   // YELLOW edges
+    wxbgi_surface_parametric(-80.f, 80.f, 20.f,
+                             WXBGI_PARAM_SADDLE,
+                             50.f,   // half-extent of x,y domain
+                             80.f,   // scale divisor for z = (x²-y²)/param2
+                             sadU, sadV);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,13 +182,16 @@ int main(int argc, char *argv[])
 {
     const bool testMode = (argc >= 2 && std::strcmp(argv[1], "--test") == 0);
 
-    constexpr int kW = 1440, kH = 960;
+    // In test mode use a small window so the software painter's-algorithm
+    // renderer finishes in well under the ctest timeout (even in Debug builds).
+    const int kW = testMode ? 480 : 1440;
+    const int kH = testMode ? 320 : 960;
     initwindow(kW, kH, "wx_bgi 4-View Demo — Click objects to select, Del to delete", 30, 30, 0, 0);
     if (graphresult() != 0)
         return 1;
 
-    const int panelW = kW / 2;   // 720 px
-    const int panelH = kH / 2;   // 480 px
+    const int panelW = kW / 2;
+    const int panelH = kH / 2;
 
     // ------------------------------------------------------------------
     // Camera setup — 2×2 grid
@@ -273,7 +295,7 @@ int main(int argc, char *argv[])
     cleardevice();
 
     std::array<int, kGradSteps> gradColors{};
-    buildDdsScene(gradColors);
+    buildDdsScene(gradColors, testMode);
 
     cleardevice();
 
@@ -365,10 +387,18 @@ int main(int argc, char *argv[])
         line(panelW - 1, 0,       panelW - 1, kH - 1);
         line(0,          panelH - 1, kW - 1,  panelH - 1);
 
-        renderPanel("cam_left", 0,       0,       panelW - 1, panelH - 1, kW, kH);
-        renderPanel("cam2d",    panelW,  0,       kW - 1,     panelH - 1, kW, kH);
-        renderPanel("cam3d",    0,       panelH,  panelW - 1, kH - 1,     kW, kH);
-        renderPanel("cam_iso",  panelW,  panelH,  kW - 1,     kH - 1,     kW, kH);
+        if (testMode)
+        {
+            // In test mode render only the fast 2D panel to keep debug builds quick.
+            renderPanel("cam_left", 0, 0, panelW - 1, panelH - 1, kW, kH);
+        }
+        else
+        {
+            renderPanel("cam_left", 0,       0,       panelW - 1, panelH - 1, kW, kH);
+            renderPanel("cam2d",    panelW,  0,       kW - 1,     panelH - 1, kW, kH);
+            renderPanel("cam3d",    0,       panelH,  panelW - 1, kH - 1,     kW, kH);
+            renderPanel("cam_iso",  panelW,  panelH,  kW - 1,     kH - 1,     kW, kH);
+        }
 
         // Panel labels
         drawLabel(6, 6,  "cam_left: fixed 2D ortho (read-only)", 15);

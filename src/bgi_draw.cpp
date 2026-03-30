@@ -357,6 +357,14 @@ namespace bgi
 
     void drawLineInternal(int x1, int y1, int x2, int y2, int color)
     {
+        // Clamp endpoints to avoid Bresenham iterating over millions of off-screen
+        // steps when geometry projects far outside the window.
+        const int guard = std::max(gState.width, gState.height) * 2;
+        x1 = std::clamp(x1, -guard, guard);
+        y1 = std::clamp(y1, -guard, guard);
+        x2 = std::clamp(x2, -guard, guard);
+        y2 = std::clamp(y2, -guard, guard);
+
         int dx = std::abs(x2 - x1);
         int sx = x1 < x2 ? 1 : -1;
         int dy = -std::abs(y2 - y1);
@@ -535,6 +543,22 @@ namespace bgi
             maxY = std::max(maxY, y);
         }
 
+        // Clamp the scan range to the viewport extent to prevent millions of
+        // empty iterations when geometry projects far outside the screen.
+        if (gState.viewport.clip)
+        {
+            const int vpH = gState.viewport.bottom - gState.viewport.top;
+            minY = std::max(minY, 0);
+            maxY = std::min(maxY, vpH);
+        }
+        else
+        {
+            minY = std::max(minY, -gState.height);
+            maxY = std::min(maxY,  gState.height * 2);
+        }
+        if (minY > maxY)
+            return;
+
         for (int y = minY; y <= maxY; ++y)
         {
             std::vector<int> intersections;
@@ -556,7 +580,21 @@ namespace bgi
             std::sort(intersections.begin(), intersections.end());
             for (std::size_t index = 1; index < intersections.size(); index += 2)
             {
-                for (int x = intersections[index - 1]; x <= intersections[index]; ++x)
+                int xStart = intersections[index - 1];
+                int xEnd   = intersections[index];
+                // Clamp X to avoid iterating over millions of off-screen columns.
+                if (gState.viewport.clip)
+                {
+                    const int vpW = gState.viewport.right - gState.viewport.left;
+                    xStart = std::max(xStart, 0);
+                    xEnd   = std::min(xEnd,   vpW);
+                }
+                else
+                {
+                    xStart = std::max(xStart, -gState.width);
+                    xEnd   = std::min(xEnd,    gState.width * 2);
+                }
+                for (int x = xStart; x <= xEnd; ++x)
                 {
                     if (useFillAt(x, y))
                     {
