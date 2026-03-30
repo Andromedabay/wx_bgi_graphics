@@ -31,6 +31,8 @@ namespace bgi
     constexpr int kPaletteSize    = 16;   ///< classic BGI palette slots (0-15)
     constexpr int kExtColorBase   = 16;   ///< first user-assignable extended colour index
     constexpr int kExtPaletteSize = 240;  ///< extended slots 16-255 (fits uint8_t pixel buffer)
+    constexpr int kSelectionOrangeColor = 252;  ///< Reserved extended-palette slot — selection flash orange.
+    constexpr int kSelectionPurpleColor = 253;  ///< Reserved extended-palette slot — selection flash purple.
     constexpr int kPageCount = 2;
     constexpr int kPatternRows = 8;
     constexpr int kPatternCols = 8;
@@ -242,6 +244,23 @@ namespace bgi
         float rot2dDeg{0.f};
         /** Visible world-units height used by 2-D cameras and auto-ortho. */
         float worldHeight2d{2.f};
+
+        // --- Per-camera visual overlay state (not serialised to DDS/DDJ) ---
+
+        /// Concentric circles + crosshair overlay.
+        struct {
+            bool  enabled     {false};
+            int   count       {3};       ///< number of circles (1..8)
+            float innerRadius {25.f};    ///< world-unit radius of innermost circle
+            float outerRadius {100.f};   ///< world-unit radius of outermost circle
+        } concentricOverlay;
+
+        /// Selection cursor square overlay (moves with the mouse in this viewport).
+        struct {
+            bool  enabled     {false};
+            int   sizePx      {8};       ///< square side length, pixels (2..16)
+            int   colorScheme {0};       ///< 0 = blue, 1 = green, 2 = red
+        } selCursorOverlay;
     };
 
     // -------------------------------------------------------------------------
@@ -268,6 +287,42 @@ namespace bgi
         float xAxisX{1.f}, xAxisY{0.f}, xAxisZ{0.f};
         float yAxisX{0.f}, yAxisY{1.f}, yAxisZ{0.f};
         float zAxisX{0.f}, zAxisY{0.f}, zAxisZ{1.f};
+    };
+
+    // -------------------------------------------------------------------------
+    // Visual overlay state
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief State for the reference grid overlay.
+     *
+     * The grid is drawn in the XY plane of the active (or specified) UCS and
+     * projected through each camera that renders the scene.  It is NOT a DDS
+     * object and cannot be selected or serialised.
+     */
+    struct OverlayGridState
+    {
+        bool        enabled    {false};
+        float       spacing    {25.f};   ///< world units between adjacent grid lines
+        int         halfExtent {4};      ///< grid spans ±(halfExtent×spacing) from UCS origin
+        int         xAxisColor {RED};    ///< colour for the line coincident with UCS local X axis
+        int         yAxisColor {GREEN};  ///< colour for the line coincident with UCS local Y axis
+        int         gridColor  {DARKGRAY}; ///< colour for all non-axis grid lines
+        std::string ucsName;             ///< which UCS to use; empty = BgiState::activeUcs
+    };
+
+    /**
+     * @brief State for the UCS axes overlay.
+     *
+     * Draws labelled X/Y/Z axis arms at the world origin (world UCS) and/or at
+     * the active UCS origin, projected through every camera viewport.
+     */
+    struct OverlayUcsAxesState
+    {
+        bool  enabled    {false};
+        bool  showWorld  {true};   ///< draw world UCS axes at (0,0,0)
+        bool  showActive {true};   ///< draw active UCS axes at its own origin
+        float axisLength {80.f};   ///< world-unit length from origin to axis tip
     };
 
     // -------------------------------------------------------------------------
@@ -341,6 +396,7 @@ namespace bgi
         std::array<std::uint8_t, 512> keyDown{};
         int mouseX{0};
         int mouseY{0};
+        bool mouseMoved{false}; ///< Set true by cursorPosCallback; cleared by wxbgi_mouse_moved().
 
         // --- Camera registry (DdsCamera is the source of truth) ---
         // shared_ptr<DdsCamera> maps are indexes into the DDS; Camera3D data
@@ -368,7 +424,16 @@ namespace bgi
         int solidEdgeColor{15}; ///< Default edge colour (WHITE).
         int solidFaceColor{7};  ///< Default face colour (LIGHTGRAY).
 
-        // Explicitly declared (defined in bgi_state.cpp) so that the compiler
+        // --- Global visual overlays (not serialised) ---
+        OverlayGridState    overlayGrid;
+        OverlayUcsAxesState overlayUcsAxes;
+
+        // --- DDS Object Selection state (not serialised) ---
+        std::vector<std::string> selectedObjectIds;   ///< IDs of currently selected DDS drawing objects.
+        int selectionFlashScheme {0};                 ///< Flash colour: 0 = orange (252), 1 = purple (253).
+        int selectionPickRadiusPx{12};                ///< Screen-pixel pick threshold for object selection.
+
+        // Explicitly declared(defined in bgi_state.cpp) so that the compiler
         // generates the destructor only where DdsScene is fully defined.
         BgiState();
         ~BgiState();

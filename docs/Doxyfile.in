@@ -12,6 +12,7 @@ EXTRACT_LOCAL_CLASSES  = NO
 
 INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/DDS.md" \
+                         "@CMAKE_SOURCE_DIR@/VisualAids.md" \
                          "@CMAKE_SOURCE_DIR@/ScreenShots.md" \
                          "@CMAKE_SOURCE_DIR@/Camera3D_Map.md" \
                          "@CMAKE_SOURCE_DIR@/Camera2D_Map.md" \

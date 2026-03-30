@@ -117,6 +117,21 @@ BGI_API int BGI_CALL wxbgi_is_key_down(int key)
     return bgi::gState.keyDown[static_cast<std::size_t>(key)] != 0U ? 1 : 0;
 }
 
+BGI_API void BGI_CALL wxbgi_get_mouse_pos(int *x, int *y)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (x) *x = bgi::gState.mouseX;
+    if (y) *y = bgi::gState.mouseY;
+}
+
+BGI_API int BGI_CALL wxbgi_mouse_moved(void)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    const bool moved = bgi::gState.mouseMoved;
+    bgi::gState.mouseMoved = false;
+    return moved ? 1 : 0;
+}
+
 #ifdef WXBGI_ENABLE_TEST_SEAMS
 BGI_API int BGI_CALL wxbgi_test_clear_key_queue(void)
 {

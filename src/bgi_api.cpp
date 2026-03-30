@@ -9,6 +9,7 @@
 #include "bgi_image.h"
 #include "bgi_state.h"
 #include "bgi_dds.h"
+#include "bgi_overlay.h"
 
 #include <algorithm>
 #include <chrono>
@@ -150,6 +151,29 @@ namespace
         queueKeyCode(static_cast<int>(codepoint));
     }
 
+    void cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
+    {
+        (void)window;
+        bgi::gState.mouseX     = static_cast<int>(xpos);
+        bgi::gState.mouseY     = static_cast<int>(ypos);
+        bgi::gState.mouseMoved = true;
+    }
+
+    void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+    {
+        (void)window;
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        {
+            const bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
+            // NOTE: Do NOT acquire gMutex here.  All GLFW callbacks fire
+            // synchronously on the thread that called glfwPollEvents(), which
+            // already holds gMutex (via flushToScreen / wxbgi_poll_events).
+            // Re-acquiring a non-recursive std::mutex on the same thread calls
+            // abort() in MSVC debug builds.
+            bgi::overlayPerformPick(bgi::gState.mouseX, bgi::gState.mouseY, ctrl);
+        }
+    }
+
     bool initializeWindow(int width, int height, const char *title, int left, int top, bool doubleBuffered)
     {
         if (!bgi::gState.glfwInitialized)
@@ -199,6 +223,8 @@ namespace
         bgi::resetStateForWindow(width, height, doubleBuffered);
         glfwSetKeyCallback(bgi::gState.window, keyCallback);
         glfwSetCharCallback(bgi::gState.window, charCallback);
+        glfwSetCursorPosCallback(bgi::gState.window, cursorPosCallback);
+        glfwSetMouseButtonCallback(bgi::gState.window, mouseButtonCallback);
         bgi::gState.lastResult = bgi::grOk;
         bgi::flushToScreen();
         return true;

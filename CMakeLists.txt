@@ -134,6 +134,8 @@ set(SRCS
     src/bgi_solid_api.cpp
     src/bgi_solid_render.cpp
     src/bgi_export.cpp
+    src/bgi_overlay.cpp
+    src/bgi_overlay_api.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})

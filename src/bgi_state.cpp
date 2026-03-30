@@ -49,6 +49,9 @@ namespace bgi
         // Reset extended palette: clear all user-assigned slots back to BLACK.
         gState.extPalette.fill({0, 0, 0});
         gState.extColorNext = kExtColorBase;
+        // Reserve internal slots for selection-flash colours.
+        gState.extPalette[252 - kExtColorBase] = {230, 120, 20};   // index 252: orange
+        gState.extPalette[253 - kExtColorBase] = {150, 30, 210};   // index 253: purple
     }
 
     void resetDrawingState()
@@ -80,8 +83,12 @@ namespace bgi
             gState.keyQueue.pop();
         }
         gState.keyDown.fill(0);
-        gState.mouseX = 0;
-        gState.mouseY = 0;
+        gState.mouseX     = 0;
+        gState.mouseY     = 0;
+        gState.mouseMoved = false;
+        gState.selectedObjectIds.clear();
+        gState.selectionFlashScheme  = 0;
+        gState.selectionPickRadiusPx = 12;
         resetPaletteState();
     }
 

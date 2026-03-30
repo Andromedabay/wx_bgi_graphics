@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "bgi_draw.h"
-
+#include "bgi_overlay.h"
 #include "bgi_state.h"
 
 #include <algorithm>
@@ -335,6 +335,11 @@ namespace bgi
             }
         }
         glEnd();
+
+        // Draw selection cursor squares for cameras that have the cursor enabled.
+        // These are GL primitives painted on top of the page-buffer pixels.
+        bgi::drawSelectionCursorsGL();
+
         glFlush();
         glfwSwapBuffers(gState.window);
 

@@ -51,6 +51,10 @@ The library provides two camera modes, both built on the `Camera3D` struct:
 - **[Camera3D_Map.md](./Camera3D_Map.md)** -- 3D perspective and orthographic cameras: data layout, GLM math layer, full `wxbgi_cam_*` API, serialization, and the file dependency diagram.
 - **[Camera2D_Map.md](./Camera2D_Map.md)** -- 2D overhead cameras (`is2D = true`): pan/zoom/rotation math, `wxbgi_cam2d_*` API, zoom-at pivot formula, and usage example.
 
+## Visual Aids Reference
+
+- **[VisualAids.md](./VisualAids.md)** -- visual overlays for camera/UCS workflows: reference grid, UCS axes, concentric circles + crosshair, and per-camera selection cursor.
+
 ## Screenshots
 
 See **[ScreenShots.md](./ScreenShots.md)** for annotated screenshots of the example programs.

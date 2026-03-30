@@ -57,6 +57,27 @@ BGI_API int BGI_CALL wxbgi_read_key(void);
 BGI_API int BGI_CALL wxbgi_is_key_down(int key);
 
 /**
+ * @brief Returns the current mouse cursor position in window pixels.
+ *
+ * Writes the current mouse X and Y coordinates (in window pixels, origin
+ * top-left) into @p x and @p y.  Either pointer may be NULL.
+ * Values are updated by GLFW's cursor-position callback; the function does
+ * not call @c glfwPollEvents() itself.
+ */
+BGI_API void BGI_CALL wxbgi_get_mouse_pos(int *x, int *y);
+
+/**
+ * @brief Returns 1 if the mouse cursor moved since the last call to this function.
+ *
+ * The movement flag is set by the GLFW cursor-position callback and cleared
+ * each time this function is called.  Use it to decide whether to redraw a
+ * frame that contains a mouse-tracking visual aid (e.g., the selection cursor).
+ *
+ * @return 1 if the mouse moved since the previous call, 0 otherwise.
+ */
+BGI_API int BGI_CALL wxbgi_mouse_moved(void);
+
+/**
  * @brief Optional internal test seam APIs.
  *
  * These APIs are compiled only when `WXBGI_ENABLE_TEST_SEAMS` is defined at

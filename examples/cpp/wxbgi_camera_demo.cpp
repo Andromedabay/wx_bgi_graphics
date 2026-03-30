@@ -25,6 +25,7 @@
 #include "wx_bgi.h"
 #include "wx_bgi_3d.h"
 #include "wx_bgi_ext.h"
+#include "wx_bgi_overlay.h"
 #include "wx_bgi_solid.h"
 
 #include <GLFW/glfw3.h>
@@ -78,26 +79,6 @@ static void buildDdsScene(std::array<int, kGradSteps> &gradColors)
     {
         float t = (float)i / (float)(kGradSteps - 1);
         gradColors[i] = wxbgi_alloc_color(255, (int)(255.f * t), 0);
-    }
-
-    // --- World XYZ axes ---
-    setcolor(4); wxbgi_world_line(0,0,0, 120,0,0);
-    setcolor(2); wxbgi_world_line(0,0,0,   0,120,0);
-    setcolor(1); wxbgi_world_line(0,0,0,   0,  0,120);
-    setcolor(4); wxbgi_world_outtextxy(125.f,   0.f,   0.f, "X");
-    setcolor(2); wxbgi_world_outtextxy(  0.f, 125.f,   0.f, "Y");
-    setcolor(1); wxbgi_world_outtextxy(  0.f,   0.f, 125.f, "Z");
-
-    // --- Reference grid in the XY plane ---
-    for (int g = -100; g <= 100; g += 25)
-    {
-        setcolor(g == 0 ? 2 : 7);
-        wxbgi_world_line((float)g, -100.f, 0.f, (float)g, 100.f, 0.f);
-    }
-    for (int g = -100; g <= 100; g += 25)
-    {
-        setcolor(g == 0 ? 4 : 7);
-        wxbgi_world_line(-100.f, (float)g, 0.f, 100.f, (float)g, 0.f);
     }
 
     // --- Gradient-filled left/top triangle of the diagonal bisection ---
@@ -201,6 +182,47 @@ int main(int argc, char *argv[])
     updateOrbit();
 
     // ------------------------------------------------------------------
+    // Visual Overlays — enabled before building the scene so they appear
+    // in all three panels on the very first frame.
+    // ------------------------------------------------------------------
+
+    // Reference grid: UCS XY plane, ±100 world units, 25-unit spacing.
+    wxbgi_overlay_grid_enable();
+    wxbgi_overlay_grid_set_spacing(25.f);
+    wxbgi_overlay_grid_set_extent(4);            // ±4 × 25 = ±100 wu
+
+    // UCS axes at the world origin (upper-case X/Y/Z labels) and at any
+    // active UCS origin (lower-case labels).
+    wxbgi_overlay_ucs_axes_enable();
+    wxbgi_overlay_ucs_axes_set_length(110.f);
+
+    // Concentric circles + crosshair in each camera panel.
+    // For the fixed 2D panel, use tighter radii.
+    wxbgi_overlay_concentric_enable("cam_left");
+    wxbgi_overlay_concentric_set_count("cam_left", 3);
+    wxbgi_overlay_concentric_set_radii("cam_left", 30.f, 90.f);
+
+    // For the interactive 2D panel, use the same default radii.
+    wxbgi_overlay_concentric_enable("cam2d");
+    wxbgi_overlay_concentric_set_count("cam2d", 3);
+    wxbgi_overlay_concentric_set_radii("cam2d", 30.f, 90.f);
+
+    // For the 3D perspective panel, use slightly larger radii.
+    wxbgi_overlay_concentric_enable("cam3d");
+    wxbgi_overlay_concentric_set_count("cam3d", 3);
+    wxbgi_overlay_concentric_set_radii("cam3d", 50.f, 150.f);
+
+    // Selection cursor square — enabled in the interactive panels only.
+    // Blue cursor in centre panel, green cursor in 3D panel.
+    wxbgi_overlay_cursor_enable("cam2d");
+    wxbgi_overlay_cursor_set_size("cam2d", 12);
+    wxbgi_overlay_cursor_set_color("cam2d", 0);    // blue
+
+    wxbgi_overlay_cursor_enable("cam3d");
+    wxbgi_overlay_cursor_set_size("cam3d", 12);
+    wxbgi_overlay_cursor_set_color("cam3d", 1);    // green
+
+    // ------------------------------------------------------------------
     // Build the DDS scene (once — all objects are stored for re-render)
     // ------------------------------------------------------------------
     wxbgi_cam_set_active("cam_left");   // immediate renders go to left panel
@@ -226,6 +248,13 @@ int main(int argc, char *argv[])
                 break;
 
             bool changed = false;
+
+            // Delete key: remove all selected DDS objects.
+            if (wxbgi_is_key_down(GLFW_KEY_DELETE))
+            {
+                wxbgi_selection_delete_selected();
+                changed = true;
+            }
 
             // Centre 2D camera: pan / zoom / rotate
             if (wxbgi_is_key_down(GLFW_KEY_W)) { wxbgi_cam2d_pan_by("cam2d",  0.f,  4.f); changed = true; }
@@ -262,6 +291,22 @@ int main(int argc, char *argv[])
             { elevation = std::max(-89.f, elevation - 1.f); updateOrbit(); changed = true; }
 
             redrawRequested = redrawRequested || changed;
+
+            // Redraw when mouse moves (selection cursor square tracks the pointer).
+            if (wxbgi_mouse_moved())
+                redrawRequested = true;
+
+            // Periodic redraw for flash animations (selection flash every ~1 s,
+            // cursor colour toggle every ~2 s).  Force a redraw at ~20 fps so
+            // these effects are visible even when no key/mouse event occurred.
+            static double lastFlashRedraw = 0.0;
+            const double now = glfwGetTime();
+            if (now - lastFlashRedraw >= 0.05)   // 50 ms ≈ 20 fps cap for idle
+            {
+                lastFlashRedraw = now;
+                redrawRequested = true;
+            }
+
             if (!redrawRequested) { delay(8); continue; }
         }
 
@@ -297,6 +342,16 @@ int main(int argc, char *argv[])
                           "az=%.0f  el=%.0f  (arrow keys)", azimuth, elevation);
             drawLabel(2*panelW + 6, 6,  "cam3d: 3D perspective orbit", 15);
             drawLabel(2*panelW + 6, 20, buf, 7);
+        }
+
+        {
+            const int selCount = wxbgi_selection_count();
+            char selBuf[64];
+            if (selCount > 0)
+                std::snprintf(selBuf, sizeof(selBuf), "Selected: %d  (Del=delete, Ctrl+click=multi)", selCount);
+            else
+                std::snprintf(selBuf, sizeof(selBuf), "Click DDS object to select");
+            drawLabel(panelW + 6, 34, selBuf, selCount > 0 ? 14 : 8);
         }
 
         wxbgi_swap_window_buffers();

@@ -22,6 +22,10 @@
 
 #include "wx_bgi_dds.h"
 
+// NOTE: glew.h must be included before any OpenGL/GLFW header.
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -35,6 +39,7 @@
 #include "bgi_draw.h"
 #include "bgi_font.h"
 #include "bgi_image.h"
+#include "bgi_overlay.h"
 #include "bgi_solid_render.h"
 #include "bgi_state.h"
 #include "bgi_ucs.h"
@@ -730,10 +735,15 @@ void renderImage(const bgi::Camera3D &cam, const bgi::DdsImage &obj)
 // Main per-object dispatch
 // ---------------------------------------------------------------------------
 
-void renderObject(const bgi::Camera3D &cam, const bgi::DdsObject &obj)
+void renderObject(const bgi::Camera3D &cam, const bgi::DdsObject &obj, int colorOverride = -1)
 {
     // Temporarily apply the baked draw state for this object.
     applyStyle(obj.style);
+    if (colorOverride >= 0)
+    {
+        bgi::gState.currentColor = colorOverride;
+        bgi::gState.fillColor    = colorOverride;
+    }
 
     switch (obj.type)
     {
@@ -806,12 +816,28 @@ BGI_API void BGI_CALL wxbgi_render_dds(const char *camName)
     const auto savedStyle = saveStyle();
 
     // Traverse DDS in insertion order; skip Camera / Ucs / WorldExtents objects.
+    // Selected objects flash between their original colour and the selection colour.
+    const double flashTime  = glfwGetTime();
+    const int    flashPhase = static_cast<int>(flashTime) & 1; // 0 or 1 per second
+    const int    flashColor = (bgi::gState.selectionFlashScheme == 0)
+                                  ? bgi::kSelectionOrangeColor
+                                  : bgi::kSelectionPurpleColor;
+    const auto  &selIds     = bgi::gState.selectedObjectIds;
+
     bgi::gState.dds->forEachDrawing([&](const bgi::DdsObject &obj) {
         if (!obj.visible)
             return;
-        renderObject(cam, obj);
+        const bool selected = !selIds.empty() &&
+            std::find(selIds.begin(), selIds.end(), obj.id) != selIds.end();
+        renderObject(cam, obj, (selected && flashPhase == 1) ? flashColor : -1);
     });
 
     restoreStyle(savedStyle);
+
+    // Draw visual aids overlays (grid, UCS axes, concentric circles).
+    // These write into the same page buffer as the DDS objects but are not
+    // DDS objects themselves — they are not serialised or selectable.
+    bgi::drawOverlaysForCamera(key, cam);
+
     bgi::flushToScreen();
 }
