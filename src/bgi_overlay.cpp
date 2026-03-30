@@ -723,15 +723,29 @@ void overlayPerformPick(int mx, int my, bool multiSelect)
 
         if (!nearestId.empty())
         {
+            // Snapshot before any mutation so a single-click on an
+            // already-selected object deselects rather than re-selects it.
+            const bool wasSelected =
+                std::find(gState.selectedObjectIds.begin(),
+                          gState.selectedObjectIds.end(), nearestId)
+                    != gState.selectedObjectIds.end();
+
             if (!multiSelect)
                 gState.selectedObjectIds.clear();
 
-            auto it = std::find(gState.selectedObjectIds.begin(),
-                                gState.selectedObjectIds.end(), nearestId);
-            if (it != gState.selectedObjectIds.end())
-                gState.selectedObjectIds.erase(it);     // toggle off
-            else
-                gState.selectedObjectIds.push_back(nearestId); // select
+            if (!wasSelected)
+            {
+                gState.selectedObjectIds.push_back(nearestId);
+            }
+            else if (multiSelect)
+            {
+                // CTRL+click on already-selected object: remove from set.
+                auto it = std::find(gState.selectedObjectIds.begin(),
+                                    gState.selectedObjectIds.end(), nearestId);
+                if (it != gState.selectedObjectIds.end())
+                    gState.selectedObjectIds.erase(it);
+            }
+            // Plain click on already-selected: clear() ran above → deselected.
         }
         else if (!multiSelect)
         {

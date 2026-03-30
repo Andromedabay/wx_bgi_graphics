@@ -134,9 +134,6 @@ static void buildDdsScene(std::array<int, kGradSteps> &gradColors, bool testMode
     const int coneSl = testMode ? 6  : 12;
     const int torTu  = testMode ? 8  : 16;
     const int torSi  = testMode ? 4  : 8;
-    const int sadU   = testMode ? 4  : 8;
-    const int sadV   = testMode ? 4  : 8;
-
     // Cylinder — orange-red
     int cylFace = wxbgi_alloc_color(255, 100, 20);
     wxbgi_solid_set_draw_mode(WXBGI_SOLID_SOLID);
@@ -164,15 +161,6 @@ static void buildDdsScene(std::array<int, kGradSteps> &gradColors, bool testMode
     wxbgi_solid_set_face_color(torFace);
     wxbgi_solid_torus(kTorX, kTorY, kTorZ, kTorMaj, kTorMin, torTu, torSi);
 
-    // Saddle parametric surface — gold/yellow, placed at (-80, 80, 0)
-    int saddleFace = wxbgi_alloc_color(210, 170, 20);
-    wxbgi_solid_set_face_color(saddleFace);
-    wxbgi_solid_set_edge_color(14);   // YELLOW edges
-    wxbgi_surface_parametric(-80.f, 80.f, 20.f,
-                             WXBGI_PARAM_SADDLE,
-                             50.f,   // half-extent of x,y domain
-                             80.f,   // scale divisor for z = (x²-y²)/param2
-                             sadU, sadV);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +214,7 @@ int main(int argc, char *argv[])
             orbitR * std::cos(el) * std::cos(az),
             orbitR * std::cos(el) * std::sin(az),
             orbitR * std::sin(el));
-        wxbgi_cam_set_target("cam3d", 0.f, 0.f, 20.f);
+        wxbgi_cam_set_target("cam3d", 0.f, 0.f, 0.f);
         wxbgi_cam_set_up("cam3d", 0.f, 0.f, 1.f);
     };
     updateOrbit3d();
@@ -247,7 +235,7 @@ int main(int argc, char *argv[])
             orbitR * std::cos(el) * std::cos(az),
             orbitR * std::cos(el) * std::sin(az),
             orbitR * std::sin(el));
-        wxbgi_cam_set_target("cam_iso", 0.f, 0.f, 20.f);
+        wxbgi_cam_set_target("cam_iso", 0.f, 0.f, 0.f);
         wxbgi_cam_set_up("cam_iso", 0.f, 0.f, 1.f);
     };
     updateOrbitIso();
