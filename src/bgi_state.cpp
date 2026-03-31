@@ -86,6 +86,9 @@ namespace bgi
         gState.mouseX     = 0;
         gState.mouseY     = 0;
         gState.mouseMoved = false;
+        gState.scrollDeltaX = 0.0;
+        gState.scrollDeltaY = 0.0;
+        gState.inputDefaultFlags = WXBGI_DEFAULT_ALL;
         gState.selectedObjectIds.clear();
         gState.selectionFlashScheme  = 0;
         gState.selectionPickRadiusPx = 16;

@@ -22,6 +22,88 @@
 
 struct GLFWwindow;
 
+/**
+ * @defgroup wxbgi_input_hooks User Input Hook Callbacks
+ * @brief Optional user-supplied callbacks invoked after the library's own
+ *        internal event processing.
+ *
+ * Register hooks with `wxbgi_set_key_hook()`, `wxbgi_set_char_hook()`,
+ * `wxbgi_set_cursor_pos_hook()`, and `wxbgi_set_mouse_button_hook()`.
+ * Pass `NULL` to any registration function to remove the hook.
+ *
+ * @warning Hooks fire while the library's internal mutex is held.  They
+ *          must **not** call any `wxbgi_*` function — doing so will deadlock.
+ *          Safe operations: update your own variables, set flags, call
+ *          non-wxbgi code.
+ * @{
+ */
+
+/**
+ * @brief User hook fired after each key press, repeat, or release event.
+ *
+ * Parameters mirror the GLFW key callback: @p key is the GLFW key constant
+ * (e.g. `GLFW_KEY_ESCAPE`), @p scancode is the raw OS scancode, @p action is
+ * one of `WXBGI_KEY_PRESS` / `WXBGI_KEY_RELEASE` / `WXBGI_KEY_REPEAT`, and
+ * @p mods is a bitfield of `WXBGI_MOD_SHIFT`, `WXBGI_MOD_CTRL`, `WXBGI_MOD_ALT`.
+ */
+typedef void (BGI_CALL *WxbgiKeyHook)(int key, int scancode, int action, int mods);
+
+/**
+ * @brief User hook fired after each printable Unicode character input event.
+ *
+ * @p codepoint is the Unicode code point (1–255 used by this library; values
+ * outside that range are silently dropped before the hook is invoked).
+ */
+typedef void (BGI_CALL *WxbgiCharHook)(unsigned int codepoint);
+
+/**
+ * @brief User hook fired after every mouse cursor movement.
+ *
+ * @p x and @p y are the new cursor position in window pixels, origin at
+ * the top-left corner of the client area.
+ */
+typedef void (BGI_CALL *WxbgiCursorPosHook)(int x, int y);
+
+/**
+ * @brief User hook fired after each mouse button press or release.
+ *
+ * @p button is `WXBGI_MOUSE_LEFT`, `WXBGI_MOUSE_RIGHT`, or
+ * `WXBGI_MOUSE_MIDDLE`. @p action is `WXBGI_KEY_PRESS` or
+ * `WXBGI_KEY_RELEASE`. @p mods is a bitfield of modifier keys.
+ */
+typedef void (BGI_CALL *WxbgiMouseButtonHook)(int button, int action, int mods);
+
+/**
+ * @brief User hook fired after each mouse scroll (wheel) event.
+ *
+ * @p xoffset is the horizontal scroll delta; @p yoffset is the vertical
+ * scroll delta.  Positive @p yoffset means scroll up/forward; negative
+ * means scroll down/backward.  Parameters mirror the GLFW scroll callback.
+ */
+typedef void (BGI_CALL *WxbgiScrollHook)(double xoffset, double yoffset);
+
+/** @} */
+
+/**
+ * @name Input default-behavior flags
+ * Bitmask constants for `wxbgi_set_input_defaults()`.
+ * Combine with bitwise OR; pass `WXBGI_DEFAULT_ALL` to restore all defaults.
+ * @{
+ */
+/** Key-code queuing: keyCallback updates keyQueue + charCallback queues chars. */
+#define WXBGI_DEFAULT_KEY_QUEUE    0x01
+/** Cursor tracking: cursorPosCallback writes mouseX / mouseY / mouseMoved. */
+#define WXBGI_DEFAULT_CURSOR_TRACK 0x02
+/** Mouse-button picking: mouseButtonCallback calls overlayPerformPick(). */
+#define WXBGI_DEFAULT_MOUSE_PICK   0x04
+/** Scroll accumulation: scrollCallback accumulates scrollDeltaX / scrollDeltaY. */
+#define WXBGI_DEFAULT_SCROLL_ACCUM 0x08
+/** All default behaviors enabled (initial state after initwindow). */
+#define WXBGI_DEFAULT_ALL          0x0F
+/** All default behaviors disabled. */
+#define WXBGI_DEFAULT_NONE         0x00
+/** @} */
+
 namespace bgi
 {
 
@@ -397,6 +479,23 @@ namespace bgi
         int mouseX{0};
         int mouseY{0};
         bool mouseMoved{false}; ///< Set true by cursorPosCallback; cleared by wxbgi_mouse_moved().
+
+        // --- User input hook callbacks (optional; fire after library logic) ---
+        WxbgiKeyHook         userKeyHook{nullptr};         ///< Called after keyCallback logic; may be NULL.
+        WxbgiCharHook        userCharHook{nullptr};        ///< Called after charCallback logic; may be NULL.
+        WxbgiCursorPosHook   userCursorPosHook{nullptr};   ///< Called after cursorPosCallback logic; may be NULL.
+        WxbgiMouseButtonHook userMouseButtonHook{nullptr}; ///< Called after mouseButtonCallback logic; may be NULL.
+        WxbgiScrollHook      userScrollHook{nullptr};      ///< Called after scrollCallback logic; may be NULL.
+
+        // --- Scroll state ---
+        double scrollDeltaX{0.0}; ///< Accumulated horizontal scroll; cleared by wxbgi_get_scroll_delta().
+        double scrollDeltaY{0.0}; ///< Accumulated vertical scroll; cleared by wxbgi_get_scroll_delta().
+
+        // --- Input default-behavior flags ---
+        // Bitmask of WXBGI_DEFAULT_* constants. Controls which library default
+        // behaviors (key queuing, cursor tracking, pick on click, scroll accumulation)
+        // are active. Set via wxbgi_set_input_defaults(); initial value = WXBGI_DEFAULT_ALL.
+        int inputDefaultFlags{WXBGI_DEFAULT_ALL};
 
         // --- Camera registry (DdsCamera is the source of truth) ---
         // shared_ptr<DdsCamera> maps are indexes into the DDS; Camera3D data

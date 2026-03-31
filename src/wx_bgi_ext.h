@@ -77,6 +77,240 @@ BGI_API void BGI_CALL wxbgi_get_mouse_pos(int *x, int *y);
  */
 BGI_API int BGI_CALL wxbgi_mouse_moved(void);
 
+// ---------------------------------------------------------------------------
+// User Input Hook Callbacks
+// ---------------------------------------------------------------------------
+
+/**
+ * @defgroup wxbgi_input_hooks_api User Input Hook Registration
+ * @brief Register optional user-supplied callbacks that fire after the
+ *        library has completed its own internal event processing.
+ *
+ * The library retains ownership of all GLFW callbacks.  These functions let
+ * you attach supplementary logic to keyboard and mouse events without
+ * interfering with the key queue, keyDown state, mouse position tracking,
+ * or the click-to-pick selection system.
+ *
+ * **Execution model:** Each hook fires synchronously from within the
+ * corresponding GLFW callback, which executes while the library's internal
+ * mutex is held (inside `glfwPollEvents()`).
+ *
+ * @warning Hooks **must not** call any `wxbgi_*` function.  Doing so will
+ *          deadlock because the non-recursive internal mutex is already held.
+ *          Safe operations from a hook: update your own variables, set flags,
+ *          call non-wxbgi code.
+ *
+ * Pass `NULL` to any registration function to remove a previously installed hook.
+ * @{
+ */
+
+/// @name Action and button constants (mirror GLFW values)
+/// Use these in hook implementations instead of including GLFW headers.
+///@{
+#define WXBGI_KEY_PRESS    1  ///< Key or button pressed
+#define WXBGI_KEY_RELEASE  0  ///< Key or button released
+#define WXBGI_KEY_REPEAT   2  ///< Key held down (auto-repeat)
+#define WXBGI_MOUSE_LEFT   0  ///< Left mouse button
+#define WXBGI_MOUSE_RIGHT  1  ///< Right mouse button
+#define WXBGI_MOUSE_MIDDLE 2  ///< Middle mouse button
+#define WXBGI_MOD_SHIFT    0x0001  ///< Shift modifier held
+#define WXBGI_MOD_CTRL     0x0002  ///< Control modifier held
+#define WXBGI_MOD_ALT      0x0004  ///< Alt modifier held
+///@}
+
+/**
+ * @brief Registers a user hook invoked after each key press, repeat, or release.
+ *
+ * The hook receives the same parameters as the GLFW key callback:
+ * @p key is a GLFW key constant (e.g. `GLFW_KEY_ESCAPE` = 256; plain ASCII
+ * letters use their uppercase ASCII code), @p scancode is the raw OS scancode,
+ * @p action is one of `WXBGI_KEY_PRESS` / `WXBGI_KEY_RELEASE` /
+ * `WXBGI_KEY_REPEAT`, and @p mods is a bitfield of `WXBGI_MOD_SHIFT`,
+ * `WXBGI_MOD_CTRL`, `WXBGI_MOD_ALT`.
+ *
+ * @param cb Function pointer to install, or NULL to remove the current hook.
+ */
+BGI_API void BGI_CALL wxbgi_set_key_hook(WxbgiKeyHook cb);
+
+/**
+ * @brief Registers a user hook invoked after each printable character input event.
+ *
+ * Fires only for printable characters (Unicode codepoints 1–255 accepted by this
+ * library).  Control characters (Tab=9, Enter=13, Escape=27) are handled by the
+ * key hook instead.
+ *
+ * @param cb Function pointer to install, or NULL to remove the current hook.
+ */
+BGI_API void BGI_CALL wxbgi_set_char_hook(WxbgiCharHook cb);
+
+/**
+ * @brief Registers a user hook invoked after every cursor position update.
+ *
+ * @p x and @p y are the cursor's new position in window pixels, origin at the
+ * top-left corner (same coordinate system as `wxbgi_get_mouse_pos()`).
+ *
+ * @param cb Function pointer to install, or NULL to remove the current hook.
+ */
+BGI_API void BGI_CALL wxbgi_set_cursor_pos_hook(WxbgiCursorPosHook cb);
+
+/**
+ * @brief Registers a user hook invoked after each mouse button press or release.
+ *
+ * @p button is `WXBGI_MOUSE_LEFT`, `WXBGI_MOUSE_RIGHT`, or `WXBGI_MOUSE_MIDDLE`.
+ * @p action is `WXBGI_KEY_PRESS` or `WXBGI_KEY_RELEASE`.
+ * @p mods is a bitfield of modifier keys.
+ *
+ * Note: the library's own pick/selection logic runs before this hook is called,
+ * so `gState.selectedObjectIds` already reflects the result of a left-click pick.
+ *
+ * @param cb Function pointer to install, or NULL to remove the current hook.
+ */
+BGI_API void BGI_CALL wxbgi_set_mouse_button_hook(WxbgiMouseButtonHook cb);
+
+/**
+ * @brief Registers a user hook invoked after each mouse scroll (wheel) event.
+ *
+ * @p xoffset is the horizontal scroll delta; @p yoffset is the vertical
+ * scroll delta (positive = scroll up/forward).
+ *
+ * @param cb Function pointer to install, or NULL to remove the current hook.
+ */
+BGI_API void BGI_CALL wxbgi_set_scroll_hook(WxbgiScrollHook cb);
+
+/** @} */
+
+/**
+ * @defgroup wxbgi_scroll_api Mouse Scroll API
+ * @brief Functions for reading accumulated scroll wheel input.
+ * @{
+ */
+
+/**
+ * @brief Reads and atomically clears the accumulated scroll deltas.
+ *
+ * Returns the total horizontal and vertical scroll since the last call.
+ * Both deltas are reset to 0.0 after this call.  Either output pointer
+ * may be NULL if that axis is not needed.
+ *
+ * @param dx Receives accumulated horizontal scroll (positive = right).
+ * @param dy Receives accumulated vertical scroll (positive = up/forward).
+ */
+BGI_API void BGI_CALL wxbgi_get_scroll_delta(double *dx, double *dy);
+
+/** @} */
+
+/**
+ * @defgroup wxbgi_input_defaults Input Default-Behavior Control
+ * @brief API for bypassing or re-enabling the library's built-in input processing.
+ *
+ * By default, the library performs the following actions inside its GLFW callbacks:
+ *
+ * | Flag | Default action |
+ * |---|---|
+ * | `WXBGI_DEFAULT_KEY_QUEUE` | Translate GLFW keys to DOS codes; push to `keyQueue`. |
+ * | `WXBGI_DEFAULT_CURSOR_TRACK` | Write cursor position to `mouseX`/`mouseY`; set `mouseMoved`. |
+ * | `WXBGI_DEFAULT_MOUSE_PICK` | On left-click, call `overlayPerformPick()` to update `selectedObjectIds`. |
+ * | `WXBGI_DEFAULT_SCROLL_ACCUM` | Accumulate scroll deltas in `scrollDeltaX`/`scrollDeltaY`. |
+ *
+ * Clearing a flag disables only that default.  User hooks always fire regardless
+ * of flags.  Call `wxbgi_set_input_defaults(WXBGI_DEFAULT_ALL)` to restore all
+ * defaults; `wxbgi_set_input_defaults(WXBGI_DEFAULT_NONE)` to disable all.
+ * @{
+ */
+
+/**
+ * @brief Sets the active input default-behavior flags.
+ *
+ * @param flags Bitwise OR of `WXBGI_DEFAULT_*` constants
+ *              (e.g. `WXBGI_DEFAULT_ALL & ~WXBGI_DEFAULT_MOUSE_PICK`
+ *              to keep all defaults except object picking).
+ */
+BGI_API void BGI_CALL wxbgi_set_input_defaults(int flags);
+
+/**
+ * @brief Returns the current input default-behavior bitmask.
+ *
+ * @return Bitwise OR of active `WXBGI_DEFAULT_*` flags.
+ */
+BGI_API int BGI_CALL wxbgi_get_input_defaults(void);
+
+/** @} */
+
+/**
+ * @defgroup wxbgi_hook_context Hook-Context DDS Functions
+ * @brief Functions safe to call from within user hook callbacks.
+ *
+ * All other `wxbgi_*` functions acquire `gMutex` and will deadlock if called
+ * from a hook callback (which fires with the mutex already held).  The
+ * `wxbgi_hk_*` functions intentionally skip mutex acquisition and are
+ * designed specifically for use inside hook callbacks.
+ *
+ * @warning Call `wxbgi_hk_*` functions **only** from within a registered
+ *          `WxbgiKeyHook`, `WxbgiCharHook`, `WxbgiCursorPosHook`,
+ *          `WxbgiMouseButtonHook`, or `WxbgiScrollHook` callback.
+ *          Calling them from outside a hook (where the mutex is NOT held)
+ *          introduces a data race.
+ * @{
+ */
+
+/** @brief Returns the current mouse X position (hook-context safe). */
+BGI_API int BGI_CALL wxbgi_hk_get_mouse_x(void);
+/** @brief Returns the current mouse Y position (hook-context safe). */
+BGI_API int BGI_CALL wxbgi_hk_get_mouse_y(void);
+
+/** @brief Returns the number of currently selected DDS objects (hook-context safe). */
+BGI_API int BGI_CALL wxbgi_hk_dds_get_selected_count(void);
+
+/**
+ * @brief Copies the ID of the nth selected object into @p outId (hook-context safe).
+ *
+ * @param index  Zero-based index into the selection list.
+ * @param outId  Buffer to receive the null-terminated ID string; may be NULL.
+ * @param maxLen Capacity of @p outId buffer including the null terminator.
+ * @return Length of the full ID string, or -1 if @p index is out of range.
+ */
+BGI_API int BGI_CALL wxbgi_hk_dds_get_selected_id(int index, char *outId, int maxLen);
+
+/**
+ * @brief Returns 1 if the DDS object with the given ID is selected (hook-context safe).
+ * @param id Object ID string; may be NULL (returns 0).
+ */
+BGI_API int BGI_CALL wxbgi_hk_dds_is_selected(const char *id);
+
+/**
+ * @brief Adds the DDS object with the given ID to the selection (hook-context safe).
+ *
+ * Has no effect if the object is already selected or @p id is NULL.
+ */
+BGI_API void BGI_CALL wxbgi_hk_dds_select(const char *id);
+
+/**
+ * @brief Removes the DDS object with the given ID from the selection (hook-context safe).
+ *
+ * Has no effect if the object is not selected or @p id is NULL.
+ */
+BGI_API void BGI_CALL wxbgi_hk_dds_deselect(const char *id);
+
+/** @brief Clears the entire DDS selection (hook-context safe). */
+BGI_API void BGI_CALL wxbgi_hk_dds_deselect_all(void);
+
+/**
+ * @brief Manually runs the DDS pick algorithm at screen position (@p x, @p y)
+ *        and updates @p selectedObjectIds (hook-context safe).
+ *
+ * Equivalent to the left-click pick that `WXBGI_DEFAULT_MOUSE_PICK` normally
+ * triggers.  Useful when that default is disabled and you want to implement
+ * your own pick logic before calling this.
+ *
+ * @param x    Screen X in window pixels.
+ * @param y    Screen Y in window pixels.
+ * @param ctrl Non-zero to toggle (Ctrl+click behaviour); 0 for single select.
+ * @return Number of selected objects after the pick.
+ */
+BGI_API int BGI_CALL wxbgi_hk_dds_pick_at(int x, int y, int ctrl);
+
+/** @} */
+
 /**
  * @brief Optional internal test seam APIs.
  *
@@ -104,6 +338,75 @@ BGI_API int BGI_CALL wxbgi_test_inject_key_code(int keyCode);
  * Enqueues `0` followed by @p scanCode to mirror translated extended key reads.
  */
 BGI_API int BGI_CALL wxbgi_test_inject_extended_scan(int scanCode);
+
+/**
+ * @brief Test seam: simulate the full `keyCallback` pipeline.
+ *
+ * Updates `gState.keyDown[key]` (all actions), translates special/control
+ * keys into queue entries (press/repeat only), then calls the registered
+ * `userKeyHook` if set — faithfully replicating what `keyCallback` does
+ * without requiring a real GLFW key event.
+ *
+ * @param key      GLFW key constant (e.g. `GLFW_KEY_A` = 65).
+ * @param scancode OS scancode (passed to hook; not used for queue logic).
+ * @param action   `WXBGI_KEY_PRESS`, `WXBGI_KEY_REPEAT`, or `WXBGI_KEY_RELEASE`.
+ * @param mods     Modifier bitfield (e.g. `WXBGI_MOD_SHIFT`).
+ * @return 0 on success, -1 if no window is open.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_key(int key, int scancode, int action, int mods);
+
+/**
+ * @brief Test seam: simulate the full `charCallback` pipeline.
+ *
+ * Applies the same codepoint filter as `charCallback` (drops codepoints
+ * outside 1–255 and drops Tab/Enter/Escape without calling the hook),
+ * pushes accepted codepoints into `keyQueue`, then calls the registered
+ * `userCharHook` if set.
+ *
+ * @param codepoint Unicode codepoint to simulate (1–255 accepted).
+ * @return 0 on success, -1 if no window is open.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_char(unsigned int codepoint);
+
+/**
+ * @brief Test seam: simulate the full `cursorPosCallback` pipeline.
+ *
+ * Writes @p x / @p y into `gState.mouseX` / `gState.mouseY`, sets
+ * `gState.mouseMoved = true`, then calls the registered
+ * `userCursorPosHook` if set.
+ *
+ * @param x New cursor X position in window pixels (top-left origin).
+ * @param y New cursor Y position in window pixels.
+ * @return 0 on success, -1 if no window is open.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_cursor(int x, int y);
+
+/**
+ * @brief Test seam: simulate the full `mouseButtonCallback` pipeline.
+ *
+ * Calls the registered `userMouseButtonHook` if set.  The DDS pick logic
+ * (`overlayPerformPick`) is intentionally omitted — it requires a valid
+ * rendered framebuffer that is not available in headless test contexts.
+ *
+ * @param button Mouse button index (`WXBGI_MOUSE_LEFT`, etc.).
+ * @param action `WXBGI_KEY_PRESS` or `WXBGI_KEY_RELEASE`.
+ * @param mods   Modifier bitfield.
+ * @return 0 on success, -1 if no window is open.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_mouse_button(int button, int action, int mods);
+
+/**
+ * @brief Test seam: simulate the full `scrollCallback` pipeline.
+ *
+ * Accumulates @p xoffset / @p yoffset into `gState.scrollDeltaX/Y` (if
+ * `WXBGI_DEFAULT_SCROLL_ACCUM` is active), then calls the registered
+ * `userScrollHook` if set — faithfully replicating what `scrollCallback` does.
+ *
+ * @param xoffset Horizontal scroll delta.
+ * @param yoffset Vertical scroll delta (positive = up/forward).
+ * @return 0 on success, -1 if no window is open.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_scroll(double xoffset, double yoffset);
 #endif
 /**
  * @brief Reports whether the window received a close request.

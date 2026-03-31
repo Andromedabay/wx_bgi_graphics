@@ -16,7 +16,7 @@ INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/ScreenShots.md" \
                          "@CMAKE_SOURCE_DIR@/Camera3D_Map.md" \
                          "@CMAKE_SOURCE_DIR@/Camera2D_Map.md" \
-                         "@CMAKE_SOURCE_DIR@/KeyboardAndMouse.md" \
+                         "@CMAKE_SOURCE_DIR@/InputsProcessing.md" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_ext.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_3d.h" \

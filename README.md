@@ -55,9 +55,9 @@ The library provides two camera modes, both built on the `Camera3D` struct:
 
 - **[VisualAids.md](./VisualAids.md)** -- visual overlays for camera/UCS workflows: reference grid, UCS axes, concentric circles + crosshair, and per-camera selection cursor.
 
-## Keyboard and Mouse Reference
+## Input Processing Reference
 
-- **[KeyboardAndMouse.md](./KeyboardAndMouse.md)** -- complete guide to keyboard and mouse event handling: GLFW callbacks, DOS-style extended key codes, keyboard queue, mouse position tracking, click-to-pick pipeline, thread safety rules, and full code map.
+- **[InputsProcessing.md](./InputsProcessing.md)** -- complete guide to keyboard and mouse event handling: GLFW callbacks, DOS-style extended key codes, keyboard queue, mouse position tracking, click-to-pick pipeline, user hook (callback chaining) system, thread safety rules, and full code map.
 
 ## Screenshots
 

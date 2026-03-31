@@ -5,10 +5,12 @@
 #include "wx_bgi_ext.h"
 
 #include "bgi_draw.h"
+#include "bgi_overlay.h"
 #include "bgi_state.h"
 
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <mutex>
 
 namespace
@@ -132,6 +134,125 @@ BGI_API int BGI_CALL wxbgi_mouse_moved(void)
     return moved ? 1 : 0;
 }
 
+BGI_API void BGI_CALL wxbgi_set_key_hook(WxbgiKeyHook cb)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.userKeyHook = cb;
+}
+
+BGI_API void BGI_CALL wxbgi_set_char_hook(WxbgiCharHook cb)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.userCharHook = cb;
+}
+
+BGI_API void BGI_CALL wxbgi_set_cursor_pos_hook(WxbgiCursorPosHook cb)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.userCursorPosHook = cb;
+}
+
+BGI_API void BGI_CALL wxbgi_set_mouse_button_hook(WxbgiMouseButtonHook cb)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.userMouseButtonHook = cb;
+}
+
+BGI_API void BGI_CALL wxbgi_set_scroll_hook(WxbgiScrollHook cb)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.userScrollHook = cb;
+}
+
+BGI_API void BGI_CALL wxbgi_get_scroll_delta(double *dx, double *dy)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (dx) *dx = bgi::gState.scrollDeltaX;
+    if (dy) *dy = bgi::gState.scrollDeltaY;
+    bgi::gState.scrollDeltaX = 0.0;
+    bgi::gState.scrollDeltaY = 0.0;
+}
+
+BGI_API void BGI_CALL wxbgi_set_input_defaults(int flags)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.inputDefaultFlags = flags;
+}
+
+BGI_API int BGI_CALL wxbgi_get_input_defaults(void)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    return bgi::gState.inputDefaultFlags;
+}
+
+// ---- Hook-context DDS functions (no mutex acquire; caller holds gMutex) ----
+
+BGI_API int BGI_CALL wxbgi_hk_get_mouse_x(void)
+{
+    return bgi::gState.mouseX;
+}
+
+BGI_API int BGI_CALL wxbgi_hk_get_mouse_y(void)
+{
+    return bgi::gState.mouseY;
+}
+
+BGI_API int BGI_CALL wxbgi_hk_dds_get_selected_count(void)
+{
+    return static_cast<int>(bgi::gState.selectedObjectIds.size());
+}
+
+BGI_API int BGI_CALL wxbgi_hk_dds_get_selected_id(int index, char *outId, int maxLen)
+{
+    if (index < 0 || index >= static_cast<int>(bgi::gState.selectedObjectIds.size()))
+        return -1;
+    const std::string &id = bgi::gState.selectedObjectIds[static_cast<std::size_t>(index)];
+    if (outId && maxLen > 0)
+    {
+        const std::size_t n = static_cast<std::size_t>(maxLen - 1);
+        id.copy(outId, n);
+        outId[std::min(n, id.size())] = '\0';
+    }
+    return static_cast<int>(id.size());
+}
+
+BGI_API int BGI_CALL wxbgi_hk_dds_is_selected(const char *id)
+{
+    if (!id) return 0;
+    const std::string sid(id);
+    for (const auto &s : bgi::gState.selectedObjectIds)
+        if (s == sid) return 1;
+    return 0;
+}
+
+BGI_API void BGI_CALL wxbgi_hk_dds_select(const char *id)
+{
+    if (!id) return;
+    const std::string sid(id);
+    for (const auto &s : bgi::gState.selectedObjectIds)
+        if (s == sid) return;
+    bgi::gState.selectedObjectIds.push_back(sid);
+}
+
+BGI_API void BGI_CALL wxbgi_hk_dds_deselect(const char *id)
+{
+    if (!id) return;
+    const std::string sid(id);
+    auto &v = bgi::gState.selectedObjectIds;
+    v.erase(std::remove(v.begin(), v.end(), sid), v.end());
+}
+
+BGI_API void BGI_CALL wxbgi_hk_dds_deselect_all(void)
+{
+    bgi::gState.selectedObjectIds.clear();
+}
+
+BGI_API int BGI_CALL wxbgi_hk_dds_pick_at(int x, int y, int ctrl)
+{
+    bgi::overlayPerformPick(x, y, ctrl != 0);
+    return static_cast<int>(bgi::gState.selectedObjectIds.size());
+}
+
 #ifdef WXBGI_ENABLE_TEST_SEAMS
 BGI_API int BGI_CALL wxbgi_test_clear_key_queue(void)
 {
@@ -174,6 +295,166 @@ BGI_API int BGI_CALL wxbgi_test_inject_extended_scan(int scanCode)
 
     bgi::gState.keyQueue.push(0);
     bgi::gState.keyQueue.push(scanCode);
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_simulate_key(int key, int scancode, int action, int mods)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    // Replicate keyCallback: update keyDown for all action types.
+    if (key >= 0 && key < static_cast<int>(bgi::gState.keyDown.size()))
+    {
+        bgi::gState.keyDown[static_cast<std::size_t>(key)] =
+            (action != WXBGI_KEY_RELEASE) ? std::uint8_t{1U} : std::uint8_t{0U};
+    }
+
+    // On release: call hook then return (mirrors keyCallback early-return path).
+    if (action != WXBGI_KEY_PRESS && action != WXBGI_KEY_REPEAT)
+    {
+        if (bgi::gState.userKeyHook)
+            bgi::gState.userKeyHook(key, scancode, action, mods);
+        bgi::gState.lastResult = bgi::grOk;
+        return 0;
+    }
+
+    // Press/repeat: translate special keys into keyQueue entries (mirrors keyCallback switch).
+    if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE)
+    {
+        auto pushKey = [](int k) { bgi::gState.keyQueue.push(k); };
+        auto pushExt = [&pushKey](int scan) { pushKey(0); pushKey(scan); };
+
+        switch (key)
+        {
+        case GLFW_KEY_ESCAPE:                pushKey(27);   break;
+        case GLFW_KEY_ENTER:  /* fall-through */
+        case GLFW_KEY_KP_ENTER:              pushKey(13);   break;
+        case GLFW_KEY_TAB:                   pushKey(9);    break;
+        case GLFW_KEY_BACKSPACE:             pushKey(8);    break;
+        case GLFW_KEY_UP:                    pushExt(72);   break;
+        case GLFW_KEY_DOWN:                  pushExt(80);   break;
+        case GLFW_KEY_LEFT:                  pushExt(75);   break;
+        case GLFW_KEY_RIGHT:                 pushExt(77);   break;
+        case GLFW_KEY_HOME:                  pushExt(71);   break;
+        case GLFW_KEY_END:                   pushExt(79);   break;
+        case GLFW_KEY_PAGE_UP:               pushExt(73);   break;
+        case GLFW_KEY_PAGE_DOWN:             pushExt(81);   break;
+        case GLFW_KEY_INSERT:                pushExt(82);   break;
+        case GLFW_KEY_DELETE:                pushExt(83);   break;
+        case GLFW_KEY_F1:                    pushExt(59);   break;
+        case GLFW_KEY_F2:                    pushExt(60);   break;
+        case GLFW_KEY_F3:                    pushExt(61);   break;
+        case GLFW_KEY_F4:                    pushExt(62);   break;
+        case GLFW_KEY_F5:                    pushExt(63);   break;
+        case GLFW_KEY_F6:                    pushExt(64);   break;
+        case GLFW_KEY_F7:                    pushExt(65);   break;
+        case GLFW_KEY_F8:                    pushExt(66);   break;
+        case GLFW_KEY_F9:                    pushExt(67);   break;
+        case GLFW_KEY_F10:                   pushExt(68);   break;
+        case GLFW_KEY_F11:                   pushExt(133);  break;
+        case GLFW_KEY_F12:                   pushExt(134);  break;
+        default: break; // Printable keys: charCallback handles them in real usage.
+        }
+    }
+
+    if (bgi::gState.userKeyHook)
+        bgi::gState.userKeyHook(key, scancode, action, mods);
+
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_simulate_char(unsigned int codepoint)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    // Replicate charCallback filter exactly (including early return for
+    // out-of-range and control chars — hook NOT called for those).
+    if (codepoint <= 0U || codepoint > 255U)
+    {
+        bgi::gState.lastResult = bgi::grOk;
+        return 0;
+    }
+    if (codepoint == 9U || codepoint == 13U || codepoint == 27U)
+    {
+        bgi::gState.lastResult = bgi::grOk;
+        return 0;
+    }
+
+    if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE)
+        bgi::gState.keyQueue.push(static_cast<int>(codepoint));
+
+    if (bgi::gState.userCharHook)
+        bgi::gState.userCharHook(codepoint);
+
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_simulate_cursor(int x, int y)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_CURSOR_TRACK)
+    {
+        bgi::gState.mouseX     = x;
+        bgi::gState.mouseY     = y;
+        bgi::gState.mouseMoved = true;
+    }
+
+    if (bgi::gState.userCursorPosHook)
+        bgi::gState.userCursorPosHook(x, y);
+
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_simulate_mouse_button(int button, int action, int mods)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    // overlayPerformPick is intentionally omitted (requires rendered framebuffer).
+    if (bgi::gState.userMouseButtonHook)
+        bgi::gState.userMouseButtonHook(button, action, mods);
+
+    bgi::gState.lastResult = bgi::grOk;
+    return 0;
+}
+
+BGI_API int BGI_CALL wxbgi_test_simulate_scroll(double xoffset, double yoffset)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!ensureReadyUnlocked())
+    {
+        return -1;
+    }
+
+    if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_SCROLL_ACCUM)
+    {
+        bgi::gState.scrollDeltaX += xoffset;
+        bgi::gState.scrollDeltaY += yoffset;
+    }
+
+    if (bgi::gState.userScrollHook)
+        bgi::gState.userScrollHook(xoffset, yoffset);
+
     bgi::gState.lastResult = bgi::grOk;
     return 0;
 }
