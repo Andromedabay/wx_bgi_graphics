@@ -134,9 +134,9 @@ set(SRCS
     src/bgi_solid_api.cpp
     src/bgi_solid_render.cpp
     src/bgi_export.cpp
+    src/bgi_gl.cpp
     src/bgi_overlay.cpp
     src/bgi_overlay_api.cpp
-    src/bgi_gl.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
@@ -257,6 +257,7 @@ add_custom_command(
             $<TARGET_FILE_DIR:test_solids>
 )
 
+# Input hook automated test (Phase 2 requires WXBGI_ENABLE_TEST_SEAMS)
 add_executable(test_input_hooks examples/cpp/test_input_hooks.cpp)
 target_link_libraries(test_input_hooks PRIVATE wx_bgi_opengl)
 target_compile_definitions(test_input_hooks PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
@@ -267,8 +268,9 @@ add_custom_command(
             $<TARGET_FILE_DIR:test_input_hooks>
 )
 
+# Input hook interactive demo
 add_executable(wxbgi_input_hooks_cpp examples/cpp/wxbgi_input_hooks.cpp)
-target_link_libraries(wxbgi_input_hooks_cpp PRIVATE wx_bgi_opengl)
+target_link_libraries(wxbgi_input_hooks_cpp PRIVATE wx_bgi_opengl glfw)
 add_custom_command(
     TARGET wxbgi_input_hooks_cpp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -276,6 +278,7 @@ add_custom_command(
             $<TARGET_FILE_DIR:wxbgi_input_hooks_cpp>
 )
 
+# Scroll + bypass + hk_dds automated test (requires WXBGI_ENABLE_TEST_SEAMS)
 add_executable(test_input_bypass examples/cpp/test_input_bypass.cpp)
 target_link_libraries(test_input_bypass PRIVATE wx_bgi_opengl)
 target_compile_definitions(test_input_bypass PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
@@ -447,11 +450,11 @@ if(BUILD_TESTING)
     add_test(NAME test_solids            COMMAND $<TARGET_FILE:test_solids>)
     set_tests_properties(test_solids            PROPERTIES TIMEOUT 30)
 
-    add_test(NAME test_input_hooks  COMMAND $<TARGET_FILE:test_input_hooks>)
-    set_tests_properties(test_input_hooks  PROPERTIES TIMEOUT 20)
+    add_test(NAME test_input_hooks       COMMAND $<TARGET_FILE:test_input_hooks>)
+    set_tests_properties(test_input_hooks       PROPERTIES TIMEOUT 20)
 
-    add_test(NAME test_input_bypass COMMAND $<TARGET_FILE:test_input_bypass>)
-    set_tests_properties(test_input_bypass PROPERTIES TIMEOUT 20)
+    add_test(NAME test_input_bypass      COMMAND $<TARGET_FILE:test_input_bypass>)
+    set_tests_properties(test_input_bypass      PROPERTIES TIMEOUT 20)
 
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -517,17 +520,27 @@ if(BUILD_TESTING)
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_coverage
             TIMEOUT 20
         )
-        # ---- test_input_hooks Pascal ----
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_hooks_pascal)
+
+        # -------------------------------------------------------------------
+        # Input hook Pascal test
+        # -------------------------------------------------------------------
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_input_hooks)
+
+        # When WXBGI_ENABLE_TEST_SEAMS is ON, pass the matching define to FPC
+        # so {$IFDEF WXBGI_ENABLE_TEST_SEAMS} blocks are compiled in.
+        set(WXBGI_FPC_SEAMS_FLAG "")
+        if(WXBGI_ENABLE_TEST_SEAMS)
+            set(WXBGI_FPC_SEAMS_FLAG "-dWXBGI_ENABLE_TEST_SEAMS")
+        endif()
 
         add_custom_command(
-            OUTPUT ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+            OUTPUT ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
             COMMAND ${FPC_COMPILER}
+                    ${WXBGI_FPC_SEAMS_FLAG}
                     -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
-                    -dWXBGI_ENABLE_TEST_SEAMS
                     -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
-                    -FE${CMAKE_BINARY_DIR}/test_input_hooks_pascal
-                    -FU${CMAKE_BINARY_DIR}/test_input_hooks_pascal
+                    -FE${CMAKE_BINARY_DIR}/pascal_input_hooks
+                    -FU${CMAKE_BINARY_DIR}/pascal_input_hooks
                     ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/test_input_hooks.pas
             DEPENDS
                 wx_bgi_opengl
@@ -540,23 +553,79 @@ if(BUILD_TESTING)
             test_input_hooks_pascal_build
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     $<TARGET_FILE:wx_bgi_opengl>
-                    ${CMAKE_BINARY_DIR}/test_input_hooks_pascal
+                    ${CMAKE_BINARY_DIR}/pascal_input_hooks
             DEPENDS
                 wx_bgi_opengl
-                ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+                ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
         )
 
-        # ---- test_input_bypass Pascal ----
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_bypass_pascal)
+        add_test(
+            NAME test_input_hooks_pascal_build
+            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG>
+                    --target test_input_hooks_pascal_build
+        )
+        set_tests_properties(test_input_hooks_pascal_build PROPERTIES TIMEOUT 120)
 
+        if(UNIX AND NOT APPLE)
+            add_test(
+                NAME test_input_hooks_pascal_run
+                COMMAND ${CMAKE_COMMAND} -E env
+                        "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/pascal_input_hooks:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
+                        ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+            )
+        else()
+            add_test(
+                NAME test_input_hooks_pascal_run
+                COMMAND ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+            )
+        endif()
+        set_tests_properties(
+            test_input_hooks_pascal_run
+            PROPERTIES
+            DEPENDS test_input_hooks_pascal_build
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_input_hooks
+            TIMEOUT 20
+        )
+
+        # -------------------------------------------------------------------
+        # Input hook Pascal interactive demo (build target only, not a test)
+        # -------------------------------------------------------------------
         add_custom_command(
-            OUTPUT ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+            OUTPUT ${CMAKE_BINARY_DIR}/pascal_input_hooks/demo_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
             COMMAND ${FPC_COMPILER}
                     -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
-                    -dWXBGI_ENABLE_TEST_SEAMS
                     -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
-                    -FE${CMAKE_BINARY_DIR}/test_input_bypass_pascal
-                    -FU${CMAKE_BINARY_DIR}/test_input_bypass_pascal
+                    -FE${CMAKE_BINARY_DIR}/pascal_input_hooks
+                    -FU${CMAKE_BINARY_DIR}/pascal_input_hooks
+                    ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_input_hooks.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_input_hooks.pas
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            VERBATIM
+        )
+
+        add_custom_target(
+            demo_input_hooks_pascal_build
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/pascal_input_hooks
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_BINARY_DIR}/pascal_input_hooks/demo_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+        )
+
+        # -------------------------------------------------------------------
+        # Bypass/scroll/hk test — Pascal (build + run)
+        # -------------------------------------------------------------------
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+            COMMAND ${FPC_COMPILER}
+                    ${WXBGI_FPC_SEAMS_FLAG}
+                    -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
+                    -FE${CMAKE_BINARY_DIR}/pascal_input_hooks
+                    -FU${CMAKE_BINARY_DIR}/pascal_input_hooks
                     ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/test_input_bypass.pas
             DEPENDS
                 wx_bgi_opengl
@@ -569,67 +638,39 @@ if(BUILD_TESTING)
             test_input_bypass_pascal_build
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     $<TARGET_FILE:wx_bgi_opengl>
-                    ${CMAKE_BINARY_DIR}/test_input_bypass_pascal
+                    ${CMAKE_BINARY_DIR}/pascal_input_hooks
             DEPENDS
                 wx_bgi_opengl
-                ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+                ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
         )
 
-        if(BUILD_TESTING)
+        add_test(
+            NAME test_input_bypass_pascal_build
+            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG>
+                    --target test_input_bypass_pascal_build
+        )
+        set_tests_properties(test_input_bypass_pascal_build PROPERTIES TIMEOUT 120)
+
+        if(UNIX AND NOT APPLE)
             add_test(
-                NAME test_input_hooks_pascal_build
-                COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG> --target test_input_hooks_pascal_build
+                NAME test_input_bypass_pascal_run
+                COMMAND ${CMAKE_COMMAND} -E env
+                        "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/pascal_input_hooks:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
+                        ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
             )
-            set_tests_properties(test_input_hooks_pascal_build PROPERTIES TIMEOUT 120)
-
-            if(UNIX AND NOT APPLE)
-                add_test(
-                    NAME test_input_hooks_pascal_run
-                    COMMAND ${CMAKE_COMMAND} -E env
-                            "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/test_input_hooks_pascal:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
-                            ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
-                )
-            else()
-                add_test(
-                    NAME test_input_hooks_pascal_run
-                    COMMAND ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
-                )
-            endif()
-            set_tests_properties(
-                test_input_hooks_pascal_run
-                PROPERTIES
-                DEPENDS test_input_hooks_pascal_build
-                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_hooks_pascal
-                TIMEOUT 20
-            )
-
+        else()
             add_test(
-                NAME test_input_bypass_pascal_build
-                COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG> --target test_input_bypass_pascal_build
-            )
-            set_tests_properties(test_input_bypass_pascal_build PROPERTIES TIMEOUT 120)
-
-            if(UNIX AND NOT APPLE)
-                add_test(
-                    NAME test_input_bypass_pascal_run
-                    COMMAND ${CMAKE_COMMAND} -E env
-                            "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/test_input_bypass_pascal:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
-                            ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
-                )
-            else()
-                add_test(
-                    NAME test_input_bypass_pascal_run
-                    COMMAND ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
-                )
-            endif()
-            set_tests_properties(
-                test_input_bypass_pascal_run
-                PROPERTIES
-                DEPENDS test_input_bypass_pascal_build
-                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_bypass_pascal
-                TIMEOUT 20
+                NAME test_input_bypass_pascal_run
+                COMMAND ${CMAKE_BINARY_DIR}/pascal_input_hooks/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
             )
         endif()
+        set_tests_properties(
+            test_input_bypass_pascal_run
+            PROPERTIES
+            DEPENDS test_input_bypass_pascal_build
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_input_hooks
+            TIMEOUT 20
+        )
     endif()
 endif()
 

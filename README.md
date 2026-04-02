@@ -1,4 +1,4 @@
-# wx_BGI_Graphics
+﻿# wx_BGI_Graphics
 
 wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatible API (Borland Graphics Interface) on top of OpenGL, GLFW and GLEW. The goal is to keep old Pascal/C/C++ graphics programs usable with minimal source changes while staying cross-platform on Windows, Linux, and macOS.
 
@@ -43,7 +43,7 @@ Public API declarations are available in:
 - `src/wx_bgi.h` (classic BGI API)
 - `src/wx_bgi_ext.h` (modern extension helpers)
 - `src/wx_bgi_3d.h` (camera, UCS, world-coordinate extension API)
-- `src/wx_bgi_dds.h` (Drawing Description Data Structure — DDS/CHDOP/DDJ/DDY)
+- `src/wx_bgi_dds.h` (Drawing Description Data Structure -- DDS/CHDOP/DDJ/DDY)
 
 See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP object hierarchy, all `wxbgi_dds_*` functions, and usage examples.
 
@@ -57,6 +57,10 @@ The library provides two camera modes, both built on the `Camera3D` struct:
 ## Visual Aids Reference
 
 - **[VisualAids.md](./VisualAids.md)** -- visual overlays for camera/UCS workflows: reference grid, UCS axes, concentric circles + crosshair, and per-camera selection cursor.
+
+## Input Processing Reference
+
+- **[InputsProcessing.md](./InputsProcessing.md)** -- complete guide to keyboard and mouse event handling: GLFW callbacks, DOS-style extended key codes, keyboard queue, mouse position tracking, click-to-pick pipeline, user hook (callback chaining) system, thread safety rules, and full code map.
 
 ## Screenshots
 
@@ -169,7 +173,7 @@ The camera demo (`wxbgi_camera_demo_cpp`) uses a different, always-available mec
 .\build\Debug\wxbgi_camera_demo_cpp.exe --test
 ```
 
-CTest invokes this automatically — see the `wxbgi_camera_demo_cpp` test entry in `CMakeLists.txt`.
+CTest invokes this automatically -- see the `wxbgi_camera_demo_cpp` test entry in `CMakeLists.txt`.
 
 ### Advanced API Usage Example
 
@@ -214,7 +218,7 @@ printf("Framebuffer: %d x %d\n", w, h);
 ## wxWidgets Embedded Canvas
 
 The library ships an optional static integration library `wx_bgi_wx` that lets you host
-the BGI drawing surface — cameras, viewports, DDS scene graph — inside a **wxWidgets**
+the BGI drawing surface -- cameras, viewports, DDS scene graph -- inside a **wxWidgets**
 `wxFrame` alongside menus, toolbars, status bars, and other controls.
 
 Enable it at configure time:
@@ -308,7 +312,7 @@ The text renderer now uses a scalable stroke-font implementation rather than the
 
 The current stroke-font implementation is still lightweight, but it is materially closer to classic BGI behavior than the old bitmap-only path.
   
-The library has one shared glyph dataset used by all 5 font profiles (DEFAULT_FONT, TRIPLEX_FONT, SMALL_FONT, SANS_SERIF_FONT, GOTHIC_FONT). The profiles apply different scale, thickness, and slant on top of the same strokes — so adding glyphs once covers all fonts. All printable ASCII Glyphs are included now with Release v1.1.0.
+The library has one shared glyph dataset used by all 5 font profiles (DEFAULT_FONT, TRIPLEX_FONT, SMALL_FONT, SANS_SERIF_FONT, GOTHIC_FONT). The profiles apply different scale, thickness, and slant on top of the same strokes -- so adding glyphs once covers all fonts. All printable ASCII Glyphs are included now with Release v1.1.0.
 
 ## BGI Double Buffering Tutorial
 Please read more about this at [./Tutorial.md](./Tutorial.md)
@@ -326,16 +330,16 @@ Commands to launch each example in an interactive session after a Debug build.
 # C++ API coverage (opens a window, draws, then closes automatically)
 .\build\Debug\bgi_api_coverage_cpp.exe
 
-# Keyboard queue demo (interactive — press keys, close window to exit)
+# Keyboard queue demo (interactive -- press keys, close window to exit)
 .\build\Debug\wxbgi_keyboard_queue_cpp.exe
 
-# Camera demo (interactive — W/A/S/D pan, +/- zoom, arrow keys orbit, Esc to exit)
+# Camera demo (interactive -- W/A/S/D pan, +/- zoom, arrow keys orbit, Esc to exit)
 .\build\Debug\wxbgi_camera_demo_cpp.exe
 
-# Pascal BGI demo (interactive — requires FreePascal build step first)
+# Pascal BGI demo (interactive -- requires FreePascal build step first)
 .\build\bgidemo_pascal\bgidemo.exe
 
-# Pascal keyboard queue demo (interactive — requires FreePascal build step first)
+# Pascal keyboard queue demo (interactive -- requires FreePascal build step first)
 .\build\keyboard_queue_pascal\demo_wxbgi_keyboard_queue.exe
 
 # Python API coverage (exits automatically; pass DLL path as argument)
@@ -367,7 +371,7 @@ export LD_LIBRARY_PATH="$HOME/source/wx_bgi_graphics/build/bgidemo_pascal:$LD_LI
 python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so
 ```
 
-> **Note:** The camera demo also accepts a `--test` flag (`wxbgi_camera_demo_cpp --test`) which draws one frame and exits immediately — this is the mode used by CTest.
+> **Note:** The camera demo also accepts a `--test` flag (`wxbgi_camera_demo_cpp --test`) which draws one frame and exits immediately -- this is the mode used by CTest.
 
 ### Example - demoFreePascal
 
@@ -544,7 +548,7 @@ This repository is based on Open-Source Code from 8 different sources:
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
          - Techniques mentioned at URL [https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html](https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html).  
     2. CMake Template, from lszl84, MIT License  
-    3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license  
+    3. glfw Library, from Marcus Geelnard & Camilla Lowy, Zlib license  
     4. glew Library, from https://github.com/nigels-com/glew, Custom License  
     5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
     6. JSON Library, from citation.APA="Lohmann, N. (2025). JSON for Modern C++ (Version 3.12.0) [Computer software]. https://github.com/nlohmann", MIT License  

@@ -6,7 +6,6 @@
 
 #include "bgi_draw.h"
 #include "bgi_font.h"
-#include "bgi_gl.h"
 #include "bgi_image.h"
 #include "bgi_state.h"
 #include "bgi_dds.h"
@@ -37,111 +36,115 @@ namespace
     void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
         (void)window;
+        (void)scancode;
+        (void)mods;
 
-        // keyDown is always updated regardless of bypass flags
+        // keyDown[] always updated regardless of bypass flags (raw hardware state).
         if (key >= 0 && key < static_cast<int>(bgi::gState.keyDown.size()))
         {
             bgi::gState.keyDown[static_cast<std::size_t>(key)] = action != GLFW_RELEASE ? 1U : 0U;
         }
 
-        if (bgi::gState.userKeyHook != nullptr)
-        {
-            bgi::gState.userKeyHook(key, scancode, action, mods);
-        }
-
         if (action != GLFW_PRESS && action != GLFW_REPEAT)
         {
+            if (bgi::gState.userKeyHook)
+            {
+                bgi::gState.userKeyHook(key, scancode, action, mods);
+            }
             return;
         }
 
-        if (!(bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE))
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE)
         {
-            return;
+            switch (key)
+            {
+            case GLFW_KEY_ESCAPE:
+                queueKeyCode(27);
+                break;
+            case GLFW_KEY_ENTER:
+            case GLFW_KEY_KP_ENTER:
+                queueKeyCode(13);
+                break;
+            case GLFW_KEY_TAB:
+                queueKeyCode(9);
+                break;
+            case GLFW_KEY_BACKSPACE:
+                queueKeyCode(8);
+                break;
+            case GLFW_KEY_UP:
+                queueExtendedKey(72);
+                break;
+            case GLFW_KEY_DOWN:
+                queueExtendedKey(80);
+                break;
+            case GLFW_KEY_LEFT:
+                queueExtendedKey(75);
+                break;
+            case GLFW_KEY_RIGHT:
+                queueExtendedKey(77);
+                break;
+            case GLFW_KEY_HOME:
+                queueExtendedKey(71);
+                break;
+            case GLFW_KEY_END:
+                queueExtendedKey(79);
+                break;
+            case GLFW_KEY_PAGE_UP:
+                queueExtendedKey(73);
+                break;
+            case GLFW_KEY_PAGE_DOWN:
+                queueExtendedKey(81);
+                break;
+            case GLFW_KEY_INSERT:
+                queueExtendedKey(82);
+                break;
+            case GLFW_KEY_DELETE:
+                queueExtendedKey(83);
+                break;
+            case GLFW_KEY_F1:
+                queueExtendedKey(59);
+                break;
+            case GLFW_KEY_F2:
+                queueExtendedKey(60);
+                break;
+            case GLFW_KEY_F3:
+                queueExtendedKey(61);
+                break;
+            case GLFW_KEY_F4:
+                queueExtendedKey(62);
+                break;
+            case GLFW_KEY_F5:
+                queueExtendedKey(63);
+                break;
+            case GLFW_KEY_F6:
+                queueExtendedKey(64);
+                break;
+            case GLFW_KEY_F7:
+                queueExtendedKey(65);
+                break;
+            case GLFW_KEY_F8:
+                queueExtendedKey(66);
+                break;
+            case GLFW_KEY_F9:
+                queueExtendedKey(67);
+                break;
+            case GLFW_KEY_F10:
+                queueExtendedKey(68);
+                break;
+            case GLFW_KEY_F11:
+                queueExtendedKey(133);
+                break;
+            case GLFW_KEY_F12:
+                queueExtendedKey(134);
+                break;
+            default:
+                break;
+            }
         }
 
-        switch (key)
+        if (bgi::gState.userKeyHook)
         {
-        case GLFW_KEY_ESCAPE:
-            queueKeyCode(27);
-            break;
-        case GLFW_KEY_ENTER:
-        case GLFW_KEY_KP_ENTER:
-            queueKeyCode(13);
-            break;
-        case GLFW_KEY_TAB:
-            queueKeyCode(9);
-            break;
-        case GLFW_KEY_BACKSPACE:
-            queueKeyCode(8);
-            break;
-        case GLFW_KEY_UP:
-            queueExtendedKey(72);
-            break;
-        case GLFW_KEY_DOWN:
-            queueExtendedKey(80);
-            break;
-        case GLFW_KEY_LEFT:
-            queueExtendedKey(75);
-            break;
-        case GLFW_KEY_RIGHT:
-            queueExtendedKey(77);
-            break;
-        case GLFW_KEY_HOME:
-            queueExtendedKey(71);
-            break;
-        case GLFW_KEY_END:
-            queueExtendedKey(79);
-            break;
-        case GLFW_KEY_PAGE_UP:
-            queueExtendedKey(73);
-            break;
-        case GLFW_KEY_PAGE_DOWN:
-            queueExtendedKey(81);
-            break;
-        case GLFW_KEY_INSERT:
-            queueExtendedKey(82);
-            break;
-        case GLFW_KEY_DELETE:
-            queueExtendedKey(83);
-            break;
-        case GLFW_KEY_F1:
-            queueExtendedKey(59);
-            break;
-        case GLFW_KEY_F2:
-            queueExtendedKey(60);
-            break;
-        case GLFW_KEY_F3:
-            queueExtendedKey(61);
-            break;
-        case GLFW_KEY_F4:
-            queueExtendedKey(62);
-            break;
-        case GLFW_KEY_F5:
-            queueExtendedKey(63);
-            break;
-        case GLFW_KEY_F6:
-            queueExtendedKey(64);
-            break;
-        case GLFW_KEY_F7:
-            queueExtendedKey(65);
-            break;
-        case GLFW_KEY_F8:
-            queueExtendedKey(66);
-            break;
-        case GLFW_KEY_F9:
-            queueExtendedKey(67);
-            break;
-        case GLFW_KEY_F10:
-            queueExtendedKey(68);
-            break;
-        case GLFW_KEY_F11:
-            queueExtendedKey(133);
-            break;
-        case GLFW_KEY_F12:
-            queueExtendedKey(134);
-            break;
-        default:
-            break;
+            bgi::gState.userKeyHook(key, scancode, action, mods);
         }
     }
 
@@ -158,17 +161,15 @@ namespace
             return;
         }
 
-        if (bgi::gState.userCharHook != nullptr)
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE)
+        {
+            queueKeyCode(static_cast<int>(codepoint));
+        }
+
+        if (bgi::gState.userCharHook)
         {
             bgi::gState.userCharHook(codepoint);
         }
-
-        if (!(bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE))
-        {
-            return;
-        }
-
-        queueKeyCode(static_cast<int>(codepoint));
     }
 
     void cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
@@ -180,9 +181,10 @@ namespace
             bgi::gState.mouseY     = static_cast<int>(ypos);
             bgi::gState.mouseMoved = true;
         }
-        if (bgi::gState.userCursorHook != nullptr)
+
+        if (bgi::gState.userCursorPosHook)
         {
-            bgi::gState.userCursorHook(xpos, ypos);
+            bgi::gState.userCursorPosHook(static_cast<int>(xpos), static_cast<int>(ypos));
         }
     }
 
@@ -200,7 +202,8 @@ namespace
             // abort() in MSVC debug builds.
             bgi::overlayPerformPick(bgi::gState.mouseX, bgi::gState.mouseY, ctrl);
         }
-        if (bgi::gState.userMouseButtonHook != nullptr)
+
+        if (bgi::gState.userMouseButtonHook)
         {
             bgi::gState.userMouseButtonHook(button, action, mods);
         }
@@ -214,7 +217,8 @@ namespace
             bgi::gState.scrollDeltaX += xoffset;
             bgi::gState.scrollDeltaY += yoffset;
         }
-        if (bgi::gState.userScrollHook != nullptr)
+
+        if (bgi::gState.userScrollHook)
         {
             bgi::gState.userScrollHook(xoffset, yoffset);
         }
@@ -240,13 +244,8 @@ namespace
 
         bgi::destroyWindowIfNeeded();
 
-        // Request OpenGL 3.3 compatibility profile so that:
-        // - Modern shaders (#version 330) and VAOs (GL 3.0+) compile and run.
-        // - Legacy fixed-function calls (glBegin/glEnd/glOrtho) remain valid
-        //   in the legacy GL_POINTS render path.
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
         glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
 
         bgi::gState.windowTitle = (title != nullptr && *title != '\0') ? title : "BGI OpenGL Wrapper";
@@ -272,7 +271,6 @@ namespace
 #endif
 
         bgi::resetStateForWindow(width, height, doubleBuffered);
-        bgi::glPassInit(width, height);
         glfwSetKeyCallback(bgi::gState.window, keyCallback);
         glfwSetCharCallback(bgi::gState.window, charCallback);
         glfwSetCursorPosCallback(bgi::gState.window, cursorPosCallback);

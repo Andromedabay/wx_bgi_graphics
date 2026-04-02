@@ -1,7 +1,7 @@
-# wxWidgets Embedded Canvas
+﻿# wxWidgets Embedded Canvas
 
 `wx_bgi_wx` is an optional static library that lets you embed the BGI OpenGL
-drawing surface — cameras, viewports, DDS scene graph — inside a **wxWidgets**
+drawing surface -- cameras, viewports, DDS scene graph -- inside a **wxWidgets**
 `wxFrame` alongside menus, toolbars, status bars, and other controls.
 
 <!-- ------------------------------------------------------------------ -->
@@ -34,7 +34,7 @@ public:
         auto* canvas = new wxbgi::WxBgiCanvas(this);
         canvas->SetAutoRefreshHz(60);
 
-        // Draw once — canvas repaints automatically
+        // Draw once -- canvas repaints automatically
         setcolor(YELLOW);
         circle(400, 300, 100);
     }
@@ -134,9 +134,9 @@ public:
 `WxBgiCanvas` uses a lazy-initialization pattern following the official wxWidgets
 OpenGL sample (`cube.cpp`):
 
-1. **Constructor** — no GL work, no wx introspection, no `wxGLContext` creation.
+1. **Constructor** -- no GL work, no wx introspection, no `wxGLContext` creation.
    Just sets up event bindings.
-2. **First `Render()` call** (triggered by first `OnPaint`) — creates
+2. **First `Render()` call** (triggered by first `OnPaint`) -- creates
    `wxGLContext`, calls `glewInit()`, calls `wxbgi_wx_init_for_canvas(w, h)`.
    This sets `BgiState::wxEmbedded = true`, allocates CPU page buffers, creates
    the default `"default"` camera (pixel-space orthographic), and the default
@@ -167,15 +167,15 @@ WxBgiCanvas::OnPaint()        (wx mode -- embedded)
 `wx_bgi_opengl.dll`.  This is critical on Windows:
 
 > When a DLL statically links wxWidgets it gets its **own private copy** of all
-> wx globals (`wxTheApp`, GL factory, timer factory, …).  That copy has no
+> wx globals (`wxTheApp`, GL factory, timer factory, ...).  That copy has no
 > `wxApp` registered (only the EXE's `wxIMPLEMENT_APP` sets `wxTheApp`).  Any
 > wx assertion from inside the DLL's message handler causes a
 > `STATUS_FATAL_USER_CALLBACK_EXCEPTION` (0xC000041D) crash.
 
 By placing `WxBgiCanvas` in the STATIC lib it compiles into the EXE's address
 space where `wxTheApp` is valid.  The DLL exposes only plain C functions
-(`wxbgi_wx_render_page_gl`, `wxbgi_wx_key_event`, …) that `WxBgiCanvas` calls
-through the normal import table — no wx objects cross the DLL boundary.
+(`wxbgi_wx_render_page_gl`, `wxbgi_wx_key_event`, ...) that `WxBgiCanvas` calls
+through the normal import table -- no wx objects cross the DLL boundary.
 
 ### Resize
 
@@ -223,16 +223,16 @@ the GLFW callbacks perform in standalone mode.
 | `wxEVT_KEY_DOWN` | `gState.keyDown[glfwKey] = 1`; key queue push | `userKeyHook` (action=PRESS) |
 | `wxEVT_KEY_UP` | `gState.keyDown[glfwKey] = 0` | `userKeyHook` (action=RELEASE) |
 | `wxEVT_CHAR` | `gState.keyQueue` push (unicode) | `userCharHook` |
-| `wxEVT_MOTION` | `gState.mouseX/Y`; `mouseMoved=true` | `userCursorHook` |
-| `wxEVT_LEFT_DOWN/UP` | — | `userMouseButtonHook` (button=LEFT) |
-| `wxEVT_RIGHT_DOWN/UP` | — | `userMouseButtonHook` (button=RIGHT) |
-| `wxEVT_MIDDLE_DOWN/UP` | — | `userMouseButtonHook` (button=MIDDLE) |
+| `wxEVT_MOTION` | `gState.mouseX/Y`; `mouseMoved=true` | `userCursorPosHook` |
+| `wxEVT_LEFT_DOWN/UP` | -- | `userMouseButtonHook` (button=LEFT) |
+| `wxEVT_RIGHT_DOWN/UP` | -- | `userMouseButtonHook` (button=RIGHT) |
+| `wxEVT_MIDDLE_DOWN/UP` | -- | `userMouseButtonHook` (button=MIDDLE) |
 | `wxEVT_MOUSEWHEEL` | `gState.scrollDeltaX/Y` accumulate | `userScrollHook` |
 
 wx key codes are translated to GLFW key constants for `keyDown[]` indexing.
 The mapping is defined in `WxBgiCanvas::WxKeyToGlfw()` inside
 `src/wx/wx_bgi_canvas.cpp`.  GLFW headers are **not** available in
-`wx_bgi_wx` — constants are defined locally.
+`wx_bgi_wx` -- constants are defined locally.
 
 ---
 
@@ -241,7 +241,7 @@ The mapping is defined in `WxBgiCanvas::WxKeyToGlfw()` inside
 All hook registration functions work identically in wx mode:
 
 ```cpp
-// Register a scroll hook — fires whenever the mouse wheel turns
+// Register a scroll hook -- fires whenever the mouse wheel turns
 wxbgi_set_scroll_hook([](double dx, double dy, int mods) {
     printf("Scroll: %.1f  %.1f\n", dx, dy);
 });
@@ -319,9 +319,9 @@ delete myGlCtx;
 ## Thread Safety
 
 - All `wxbgi_*` and classic BGI functions acquire `gMutex` internally.
-- `WxBgiCanvas` methods run on the wx main thread — no additional locking needed.
+- `WxBgiCanvas` methods run on the wx main thread -- no additional locking needed.
 - User hook callbacks fire **inside** the gMutex lock.  Do **not** call any
-  `wxbgi_*` function from within a hook callback — that will deadlock.
+  `wxbgi_*` function from within a hook callback -- that will deadlock.
   Use flags or queues to communicate back to the main thread instead.
 
 ---
@@ -340,7 +340,7 @@ no API changes required.
 `examples/wx/wx_bgi_solids_test.cpp` is an automated CTest entry
 (`wx_bgi_solids_test`, 15-second timeout).  It:
 
-1. Creates a `SolidsFrame` with a `WxBgiCanvas` (640×480).
+1. Creates a `SolidsFrame` with a `WxBgiCanvas` (640x480).
 2. Sets up a perspective camera `"testcam"`.
 3. Draws a solid **cube** (RED), **sphere** (CYAN), and **cylinder** (YELLOW).
 4. Closes automatically after **3 seconds**.
@@ -389,7 +389,7 @@ a ground grid, and XYZ axes (red/green/blue).
 | `+` / `-` | Zoom in / out |
 | `W` | Toggle wireframe / solid |
 | `R` | Reset camera to default position |
-| Left-drag | Orbit (azimuth × elevation) |
+| Left-drag | Orbit (azimuth x elevation) |
 | Mouse scroll | Zoom |
 
 Camera state (azimuth, elevation, distance) is displayed in the status bar.
@@ -401,9 +401,9 @@ Camera state (azimuth, elevation, distance) is displayed in the status bar.
 
 **Implementation pattern:** The scene is built once into the DDS (retained-mode
 scene graph) via `wxbgi_solid_*` calls.  On each camera change only
-`wxbgi_render_dds("cam3d")` is called after updating the camera eye position —
+`wxbgi_render_dds("cam3d")` is called after updating the camera eye position --
 there is no need to re-submit geometry every frame.
 
 ---
 
-*See also: [README.md](README.md) · [InputsProcessing.md](InputsProcessing.md) · [DDS.md](DDS.md)*
+*See also: [README.md](README.md) * [InputsProcessing.md](InputsProcessing.md) * [DDS.md](DDS.md)*

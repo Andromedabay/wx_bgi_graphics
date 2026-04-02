@@ -1,11 +1,11 @@
-# Drawing Description Data Structure (DDS)
+﻿# Drawing Description Data Structure (DDS)
 
 ## Acronym Glossary
 
 | Acronym | Expanded Form | Meaning |
 |---------|--------------|---------|
 | **DDS** | Drawing Description Data Structure | The in-memory retained-mode scene graph that holds every drawing object created during a session. |
-| **DDDS** | Drawing Description Data Structure (alternative form) | Interchangeable with DDS — used in early design notes; the shorter form **DDS** is preferred in code and API names. |
+| **DDDS** | Drawing Description Data Structure (alternative form) | Interchangeable with DDS -- used in early design notes; the shorter form **DDS** is preferred in code and API names. |
 | **CHDOP** | Class Hierarchy of Drawing Object Primitives | The C++ class/struct hierarchy that represents individual objects stored inside the DDS (points, lines, circles, cameras, UCS frames, 3D solids, etc.). |
 | **DDJ** | Drawing Data JSON | A JSON-format serialisation of the full DDS scene, produced by `wxbgi_dds_to_json()` and consumed by `wxbgi_dds_from_json()`. |
 | **DDY** | Drawing Data YAML | A YAML-format serialisation of the full DDS scene, produced by `wxbgi_dds_to_yaml()` and consumed by `wxbgi_dds_from_yaml()`. |
@@ -22,7 +22,7 @@ Cameras (`wxbgi_cam_*` / `wxbgi_cam2d_*`), User Coordinate Systems (`wxbgi_ucs_*
 
 Key design choices:
 
-- **Collection:** `std::unordered_map` (O(1) direct access by string ID) combined with a `std::vector` insertion-order index — giving both quick direct access and sequential traversal.
+- **Collection:** `std::unordered_map` (O(1) direct access by string ID) combined with a `std::vector` insertion-order index -- giving both quick direct access and sequential traversal.
 - **Default scene:** A default camera named `"default"` and a world UCS named `"world"` are created automatically on `initwindow()` / `initgraph()`.
 - **Retained-mode render:** Call `wxbgi_render_dds(camName)` to replay the full scene through any camera. All three panels of the camera demo use this to show the same DDS from different viewpoints simultaneously.
 - **Serialisation:** The scene can be exported to DDJ or DDY at any time and re-imported to restore or share it.
@@ -67,7 +67,7 @@ Key design choices:
 |----------|-------------|
 | `wxbgi_render_dds(camName)` | Traverse the full DDS and render every visible object through the named camera into the active BGI pixel buffer. Pass `NULL` to use the active camera. |
 
-### Serialisation — DDJ (JSON)
+### Serialisation -- DDJ (JSON)
 
 | Function | Description |
 |----------|-------------|
@@ -76,7 +76,7 @@ Key design choices:
 | `wxbgi_dds_save_json(filePath)` | Save DDJ to a file. Returns 0 on success. |
 | `wxbgi_dds_load_json(filePath)` | Load DDJ from a file. Returns 0 on success. |
 
-### Serialisation — DDY (YAML)
+### Serialisation -- DDY (YAML)
 
 | Function | Description |
 |----------|-------------|
@@ -131,7 +131,7 @@ The following constants identify the concrete CHDOP sub-type of each DDS entry:
 
 initwindow(800, 600, "DDS Demo", 0, 0, 1, 1);
 
-// Classic BGI calls — each one also writes a CHDOP entry to the DDS.
+// Classic BGI calls -- each one also writes a CHDOP entry to the DDS.
 setcolor(WHITE);
 circle(400, 300, 80);
 rectangle(200, 150, 600, 450);
@@ -172,7 +172,7 @@ The `WxBgiCanvas` destructor handles this automatically, so user code only needs
 this call when managing a custom `wxGLContext` lifecycle:
 
 ```cpp
-// Custom GL context teardown — make context current first.
+// Custom GL context teardown -- make context current first.
 canvas->SetCurrent(*myGlContext);
 wxbgi_gl_pass_destroy();   // release VAOs, VBOs, textures, programs
 delete myGlContext;
@@ -199,7 +199,7 @@ wxbgi_set_legacy_gl_render(1);   // 1 = legacy GL_POINTS, 0 = texture quad (defa
 |----------|-------|-------------|
 | `WXBGI_SOLID_WIREFRAME` | 0 | Edges only, current line colour |
 | `WXBGI_SOLID_SOLID` | 1 | Filled faces, current face colour |
-| `WXBGI_SOLID_FLAT` | 1 | Alias for `WXBGI_SOLID_SOLID` — flat-shaded Phong pass (future GL-5) |
+| `WXBGI_SOLID_FLAT` | 1 | Alias for `WXBGI_SOLID_SOLID` -- flat-shaded Phong pass (future GL-5) |
 | `WXBGI_SOLID_SMOOTH` | 2 | Smooth (Gouraud-interpolated) Phong shading per vertex (future GL-5) |
 
 ### Lighting API (`wx_bgi_dds.h`)
