@@ -150,3 +150,74 @@ printf("Objects in DDS: %d\n", wxbgi_dds_object_count());
 wxbgi_dds_clear();
 wxbgi_dds_load_json("scene.ddj");
 ```
+
+---
+
+## GL Rendering Pipeline (wx Mode)
+
+When using `wx_bgi_wx`, the BGI pixel buffer is composited to the screen via an
+OpenGL texture quad pass rather than the legacy per-pixel `GL_POINTS` path.
+The modern path is selected automatically when the driver supports **OpenGL 3.3**
+(virtually all hardware since 2010).  On older drivers the library falls back
+silently to the legacy path.
+
+### Explicit GL Cleanup
+
+When the application destroys its `wxGLContext`, call `wxbgi_gl_pass_destroy()`
+**with the context still current** to release all internal GL objects (textures,
+VAOs, shader programs).  Omitting this can cause GPU driver crashes during
+process shutdown on some Windows configurations.
+
+The `WxBgiCanvas` destructor handles this automatically, so user code only needs
+this call when managing a custom `wxGLContext` lifecycle:
+
+```cpp
+// Custom GL context teardown — make context current first.
+canvas->SetCurrent(*myGlContext);
+wxbgi_gl_pass_destroy();   // release VAOs, VBOs, textures, programs
+delete myGlContext;
+```
+
+### Diagnostic: Legacy GL Fallback
+
+Force the legacy `GL_POINTS` rendering path at runtime (useful for comparing
+output or isolating GL driver issues):
+
+```c
+wxbgi_set_legacy_gl_render(1);   // 1 = legacy GL_POINTS, 0 = texture quad (default)
+```
+
+---
+
+## 3D Solid Shading Modes and Lighting API
+
+3D solid primitives support two draw modes and a Phong-style lighting model.
+
+### Draw Mode Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `WXBGI_SOLID_WIREFRAME` | 0 | Edges only, current line colour |
+| `WXBGI_SOLID_SOLID` | 1 | Filled faces, current face colour |
+| `WXBGI_SOLID_FLAT` | 1 | Alias for `WXBGI_SOLID_SOLID` — flat-shaded Phong pass (future GL-5) |
+| `WXBGI_SOLID_SMOOTH` | 2 | Smooth (Gouraud-interpolated) Phong shading per vertex (future GL-5) |
+
+### Lighting API (`wx_bgi_dds.h`)
+
+These functions configure the Phong lighting model used when `WXBGI_SOLID_FLAT`
+or `WXBGI_SOLID_SMOOTH` is active.  The parameters are stored in `BgiState` and
+will be applied by the GPU solid-render pass (GL-5 phase, pending).
+
+| Function | Description |
+|----------|-------------|
+| `wxbgi_solid_set_light_dir(x, y, z)` | Primary (key) light direction vector (will be normalised). |
+| `wxbgi_solid_set_light_space(worldSpace)` | `1` = light direction in world space; `0` = view/eye space. |
+| `wxbgi_solid_set_fill_light(x, y, z, strength)` | Secondary fill light direction + intensity scalar. |
+| `wxbgi_solid_set_ambient(a)` | Ambient light intensity `[0..1]`. |
+| `wxbgi_solid_set_diffuse(d)` | Diffuse reflection coefficient `[0..1]`. |
+| `wxbgi_solid_set_specular(s, shininess)` | Specular intensity and Phong shininess exponent. |
+
+Default lighting:
+- Key light: `(1, 1, 2)` world-space (upper-right-forward).
+- Fill light: `(-1, 0.5, 0.5)` at strength `0.3`.
+- Ambient `0.2`, diffuse `0.7`, specular `0.4` / shininess `32`.

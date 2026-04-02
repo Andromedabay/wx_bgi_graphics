@@ -31,6 +31,13 @@ BGI_API void BGI_CALL wxbgi_solid_set_draw_mode(int mode);
 /** Returns the current solid draw mode (WXBGI_SOLID_WIREFRAME or WXBGI_SOLID_SOLID). */
 BGI_API int  BGI_CALL wxbgi_solid_get_draw_mode(void);
 
+/** Change the draw mode on ALL solid objects currently in the DDS scene.
+ *  This is a fast in-place update (no re-render, no JSON round-trip).
+ *  Useful for switching the whole scene between wireframe and filled without
+ *  rebuilding geometry.
+ *  @param mode  WXBGI_SOLID_WIREFRAME (0) or WXBGI_SOLID_SOLID (1). */
+BGI_API void BGI_CALL wxbgi_dds_set_solid_draw_mode(int mode);
+
 /** Set the edge colour (BGI palette index) for subsequently created solids. */
 BGI_API void BGI_CALL wxbgi_solid_set_edge_color(int color);
 

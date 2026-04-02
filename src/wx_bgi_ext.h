@@ -2,6 +2,21 @@
 
 #include "bgi_types.h"
 
+// ---------------------------------------------------------------------------
+// GLFW-compatible action and button constants (safe to use without GLFW headers)
+// ---------------------------------------------------------------------------
+#ifndef WXBGI_KEY_PRESS
+#  define WXBGI_KEY_RELEASE  0
+#  define WXBGI_KEY_PRESS    1
+#  define WXBGI_KEY_REPEAT   2
+#endif
+
+#ifndef WXBGI_MOUSE_LEFT
+#  define WXBGI_MOUSE_LEFT   0
+#  define WXBGI_MOUSE_RIGHT  1
+#  define WXBGI_MOUSE_MIDDLE 2
+#endif
+
 /**
  * @file wx_bgi_ext.h
  * @brief Advanced non-BGI extension API for modern OpenGL workflows.
@@ -104,7 +119,126 @@ BGI_API int BGI_CALL wxbgi_test_inject_key_code(int keyCode);
  * Enqueues `0` followed by @p scanCode to mirror translated extended key reads.
  */
 BGI_API int BGI_CALL wxbgi_test_inject_extended_scan(int scanCode);
+/**
+ * @brief Internal test seam: simulates a key event (like keyCallback).
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_key(int key, int scancode, int action, int mods);
+/**
+ * @brief Internal test seam: simulates a char event (like charCallback).
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_char(unsigned int codepoint);
+/**
+ * @brief Internal test seam: simulates cursor movement (like cursorPosCallback).
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_cursor(double xpos, double ypos);
+/**
+ * @brief Internal test seam: simulates a mouse button event.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_mouse_button(int button, int action, int mods);
+/**
+ * @brief Internal test seam: simulates a scroll event.
+ */
+BGI_API int BGI_CALL wxbgi_test_simulate_scroll(double xoffset, double yoffset);
 #endif
+/** @defgroup wxbgi_user_hooks User Input Hooks
+ *  @brief Install user callbacks fired from GLFW input event callbacks.
+ *  @{
+ */
+
+/**
+ * @brief Installs a user key hook called from keyCallback.
+ * Pass NULL to remove.
+ */
+BGI_API void BGI_CALL wxbgi_set_key_hook(WxbgiKeyHook cb);
+
+/**
+ * @brief Installs a user character hook called from charCallback.
+ * Pass NULL to remove.
+ */
+BGI_API void BGI_CALL wxbgi_set_char_hook(WxbgiCharHook cb);
+
+/**
+ * @brief Installs a user cursor-position hook called from cursorPosCallback.
+ * Pass NULL to remove.
+ */
+BGI_API void BGI_CALL wxbgi_set_cursor_pos_hook(WxbgiCursorPosHook cb);
+
+/**
+ * @brief Installs a user mouse-button hook called from mouseButtonCallback.
+ * Pass NULL to remove.
+ */
+BGI_API void BGI_CALL wxbgi_set_mouse_button_hook(WxbgiMouseButtonHook cb);
+
+/**
+ * @brief Installs a user scroll-wheel hook called from scrollCallback.
+ * Fires regardless of the WXBGI_DEFAULT_SCROLL_ACCUM bypass flag. Pass NULL to remove.
+ */
+BGI_API void BGI_CALL wxbgi_set_scroll_hook(WxbgiScrollHook cb);
+
+/** @} */
+
+/** @defgroup wxbgi_scroll_api Scroll / Wheel Events
+ *  @brief Read accumulated mouse wheel deltas.
+ *  @{
+ */
+
+/**
+ * @brief Reads and clears the accumulated mouse scroll deltas.
+ * Call from your main loop. The deltas are zeroed after reading.
+ * @param dx Receives horizontal delta (may be NULL).
+ * @param dy Receives vertical delta (may be NULL).
+ */
+BGI_API void BGI_CALL wxbgi_get_scroll_delta(double *dx, double *dy);
+
+/** @} */
+
+/** @defgroup wxbgi_input_defaults Input Default Behavior
+ *  @brief Select which built-in callback behaviors are active.
+ *  @{
+ */
+
+/**
+ * @brief Sets the active input-default flags bitmask.
+ * @param flags Any combination of WXBGI_DEFAULT_* constants.
+ */
+BGI_API void BGI_CALL wxbgi_set_input_defaults(int flags);
+
+/**
+ * @brief Returns the current input-default flags bitmask.
+ */
+BGI_API int  BGI_CALL wxbgi_get_input_defaults(void);
+
+/** @} */
+
+/** @defgroup wxbgi_hook_context Hook-Context DDS Functions
+ *  @brief DDS manipulation functions safe to call from inside hook callbacks.
+ *  These functions do NOT acquire gMutex and are safe to call from hook callbacks
+ *  (which fire while gMutex is held). Calling them outside a hook is a data race
+ *  in multi-threaded code.
+ *  @{
+ */
+BGI_API int  BGI_CALL wxbgi_hk_get_mouse_x(void);
+BGI_API int  BGI_CALL wxbgi_hk_get_mouse_y(void);
+BGI_API int  BGI_CALL wxbgi_hk_dds_get_selected_count(void);
+/**
+ * @param index Zero-based index into the current selection.
+ * @param buf   Buffer to receive the object ID string.
+ * @param maxLen Size of buf in bytes.
+ * @return Length of the ID string, or -1 if index is out of range.
+ */
+BGI_API int  BGI_CALL wxbgi_hk_dds_get_selected_id(int index, char *buf, int maxLen);
+BGI_API int  BGI_CALL wxbgi_hk_dds_is_selected(const char *id);
+BGI_API void BGI_CALL wxbgi_hk_dds_select(const char *id);
+BGI_API void BGI_CALL wxbgi_hk_dds_deselect(const char *id);
+BGI_API void BGI_CALL wxbgi_hk_dds_deselect_all(void);
+/**
+ * @brief Runs the spatial pick algorithm at pixel (x, y).
+ * @param ctrl Non-zero = toggle-select; zero = replace selection.
+ * @return New selection count.
+ */
+BGI_API int  BGI_CALL wxbgi_hk_dds_pick_at(int x, int y, int ctrl);
+/** @} */
+
 /**
  * @brief Reports whether the window received a close request.
  *
@@ -358,5 +492,82 @@ BGI_API int BGI_CALL wxbgi_export_png_camera_view(const char *camName,
 
 
 /** @} */  // wxbgi_export_api
+
+/** @defgroup wxbgi_wx_api wxWidgets Embedding API
+ *  @brief C API functions for hosting the BGI surface inside a wxGLCanvas.
+ *
+ *  These functions are used by @c WxBgiCanvas (and any custom GL canvas)
+ *  to bridge the wx-side event handlers and the BGI state managed inside
+ *  @c wx_bgi_opengl.dll.  All locking is handled internally.
+ *  @{
+ */
+
+/**
+ * @brief Initialise BGI state for wxWidgets-embedded mode (no GLFW).
+ *
+ * Call once from your @c WxBgiCanvas constructor replacement or for headless
+ * testing.  Allocates CPU page-buffers and registers the default camera/UCS.
+ * The actual GL context must already be current before calling
+ * @c wxbgi_wx_render_page_gl().
+ */
+BGI_API void BGI_CALL wxbgi_wx_init_for_canvas(int width, int height);
+
+/**
+ * @brief Render the BGI pixel buffer using the currently active OpenGL context.
+ *
+ * Call from inside your @c OnPaint / @c EVT_PAINT handler, after
+ * @c SetCurrent(*glContext).  Locks the BGI mutex internally.
+ */
+BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height);
+
+/**
+ * @brief Notify BGI that the canvas has been resized.
+ *
+ * Call from @c EVT_SIZE.  Reallocates page buffers for the new dimensions.
+ */
+BGI_API void BGI_CALL wxbgi_wx_resize(int width, int height);
+
+/**
+ * @brief Get the current BGI canvas dimensions.
+ */
+BGI_API void BGI_CALL wxbgi_wx_get_size(int* width, int* height);
+
+/**
+ * @brief Inject a keyboard key press or release event into BGI.
+ *
+ * @param glfwKey  GLFW key code (or equivalent mapping).
+ * @param action   1 = press, 0 = release.
+ */
+BGI_API void BGI_CALL wxbgi_wx_key_event(int glfwKey, int action);
+
+/**
+ * @brief Inject a Unicode character event into the BGI key queue.
+ *
+ * @param codepoint  Unicode code point (1–255).
+ */
+BGI_API void BGI_CALL wxbgi_wx_char_event(int codepoint);
+
+/**
+ * @brief Inject a mouse-move event into BGI.
+ */
+BGI_API void BGI_CALL wxbgi_wx_mouse_move(int x, int y);
+
+/**
+ * @brief Inject a mouse-button press or release into BGI.
+ *
+ * @param btn     @c WXBGI_MOUSE_LEFT / @c WXBGI_MOUSE_RIGHT / @c WXBGI_MOUSE_MIDDLE.
+ * @param action  @c WXBGI_KEY_PRESS or @c WXBGI_KEY_RELEASE.
+ */
+BGI_API void BGI_CALL wxbgi_wx_mouse_button(int btn, int action);
+
+/**
+ * @brief Inject a scroll event into BGI.
+ *
+ * @param xDelta  Horizontal scroll delta.
+ * @param yDelta  Vertical scroll delta (positive = scroll up).
+ */
+BGI_API void BGI_CALL wxbgi_wx_scroll(double xDelta, double yDelta);
+
+/** @} */  // wxbgi_wx_api
 
 /** @} */  // wxbgi_ext_api

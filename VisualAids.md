@@ -27,7 +27,7 @@ BGI viewport clipping applies so only the portion inside each panel is drawn.
 - Enable/disable and query:
   - `wxbgi_overlay_grid_enable()`
   - `wxbgi_overlay_grid_disable()`
-  - `wxbgi_overlay_grid_is_enabled()` → `1` / `0`
+  - `wxbgi_overlay_grid_is_enabled()` -> `1` / `0`
 - Configuration:
   - `wxbgi_overlay_grid_set_spacing(worldUnits)` — distance between lines (> 0)
   - `wxbgi_overlay_grid_set_extent(halfExtentInLines)` — lines each side of origin (≥ 1)
@@ -56,7 +56,7 @@ shown simultaneously.
 - Enable/disable and query:
   - `wxbgi_overlay_ucs_axes_enable()`
   - `wxbgi_overlay_ucs_axes_disable()`
-  - `wxbgi_overlay_ucs_axes_is_enabled()` → `1` / `0`
+  - `wxbgi_overlay_ucs_axes_is_enabled()` -> `1` / `0`
 - Configuration:
   - `wxbgi_overlay_ucs_axes_show_world(show)` — show world-origin axes
   - `wxbgi_overlay_ucs_axes_show_active(show)` — show active-UCS axes
@@ -84,7 +84,7 @@ providing immediate scale feedback.
 - Enable/disable and query:
   - `wxbgi_overlay_concentric_enable(camName)` — `NULL`/`""` = active camera
   - `wxbgi_overlay_concentric_disable(camName)`
-  - `wxbgi_overlay_concentric_is_enabled(camName)` → `1` / `0`
+  - `wxbgi_overlay_concentric_is_enabled(camName)` -> `1` / `0`
 - Configuration:
   - `wxbgi_overlay_concentric_set_count(camName, count)` — clamped to `1..8`
   - `wxbgi_overlay_concentric_set_radii(camName, innerRadius, outerRadius)`
@@ -113,7 +113,7 @@ visible on top of scene content.
 - Enable/disable and query:
   - `wxbgi_overlay_cursor_enable(camName)` — also activates click-to-select
   - `wxbgi_overlay_cursor_disable(camName)`
-  - `wxbgi_overlay_cursor_is_enabled(camName)` → `1` / `0`
+  - `wxbgi_overlay_cursor_is_enabled(camName)` -> `1` / `0`
 - Configuration:
   - `wxbgi_overlay_cursor_set_size(camName, sizePx)` — clamped to `2..16`
   - `wxbgi_overlay_cursor_set_color(camName, colorScheme)`
@@ -254,7 +254,7 @@ struct OverlayUcsAxesState
     bool  enabled    {false};
     bool  showWorld  {true};            // draw world UCS at (0,0,0)
     bool  showActive {true};            // draw active UCS at its origin
-    float axisLength {80.f};            // world units origin→tip
+    float axisLength {80.f};            // world units origin->tip
 } overlayUcsAxes;
 
 // ---- Selection state -------------------------------------------------------
@@ -343,7 +343,7 @@ if NOT wasSelected:
     selectedObjectIds.push_back(nearestId)   // select
 else if multiSelect:
     selectedObjectIds.erase(nearestId)       // CTRL+click toggle off
-// plain click on already-selected: cleared above → deselected
+// plain click on already-selected: cleared above -> deselected
 ```
 
 3. Break — first matching camera viewport wins.
@@ -374,7 +374,7 @@ front).  Per-type logic:
 ```
 for each camera:
     render DDS scene objects
-    drawOverlaysForCamera(camName, cam)   ← grid, UCS axes, concentric circles
+    drawOverlaysForCamera(camName, cam)   <- grid, UCS axes, concentric circles
     flushToScreen()
         +-- drawSelectionCursorsGL()      <- selection cursor (OpenGL pass)
 ```
@@ -429,7 +429,7 @@ struct, then releases the mutex.
 | `wxbgi_overlay_ucs_axes_show_active(n)` | Sets `overlayUcsAxes.showActive` |
 | `wxbgi_overlay_ucs_axes_set_length(f)` | Sets `overlayUcsAxes.axisLength` (> 0) |
 
-### Concentric Circles (per-camera, `camName` = `NULL`/`""` → active camera)
+### Concentric Circles (per-camera, `camName` = `NULL`/`""` -> active camera)
 
 | Function | Description |
 |---|---|
@@ -482,8 +482,8 @@ bgi_overlay_api.cpp     (public C API implementation: lock gMutex, mutate gState
                           BgiState::selectedObjectIds / selectionFlashScheme / selectionPickRadiusPx)
 
 bgi_dds_render.cpp  (calls drawOverlaysForCamera + renderObject flash logic)
-bgi_api.cpp         (mouseButtonCallback → overlayPerformPick)
-bgi_draw.cpp        (flushToScreen → drawSelectionCursorsGL)
+bgi_api.cpp         (mouseButtonCallback -> overlayPerformPick)
+bgi_draw.cpp        (flushToScreen -> drawSelectionCursorsGL)
 ```
 
 ---

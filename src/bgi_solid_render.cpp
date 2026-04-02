@@ -127,8 +127,38 @@ void renderTriangles(const bgi::Camera3D &cam,
         glm::vec3 viewDir  = eye - centroid;
         bool frontFace = glm::dot(normal, viewDir) > 0.f;
 
-        // Sutherland-Hodgman: clip the triangle against near + far Z planes
-        // in 4-D clip space, then project and rasterize each resulting sub-triangle.
+        const int ec = (bgi::gState.solidColorOverride >= 0)
+                           ? bgi::gState.solidColorOverride
+                           : tri.edgeColor;
+
+        // Wireframe: clip each of the 3 original edges individually with
+        // clipLineZPlanes (full 6-plane frustum clip).  This guarantees exactly
+        // 3 line draws per triangle regardless of how many frustum planes the
+        // triangle crosses.  The SH polygon fan approach below can produce up to
+        // 7 sub-triangles × 3 edges = 21 line draws when a triangle clips against
+        // several planes simultaneously, causing a multi-second stall in Debug builds.
+        if (mode == bgi::SolidDrawMode::Wireframe)
+        {
+            auto drawEdge = [&](const glm::vec3 &va, const glm::vec3 &vb)
+            {
+                glm::vec4 A = bgi::cameraWorldToClip(cam, bgi::gState.width, bgi::gState.height,
+                                                     va.x, va.y, va.z);
+                glm::vec4 B = bgi::cameraWorldToClip(cam, bgi::gState.width, bgi::gState.height,
+                                                     vb.x, vb.y, vb.z);
+                if (!bgi::clipLineZPlanes(A, B)) return;
+                int ax = 0, ay = 0, bx = 0, by = 0;
+                if (!projectCP(cam, A, ax, ay)) return;
+                if (!projectCP(cam, B, bx, by)) return;
+                bgi::drawLineInternal(ax, ay, bx, by, ec);
+            };
+            drawEdge(tri.v[0], tri.v[1]);
+            drawEdge(tri.v[1], tri.v[2]);
+            drawEdge(tri.v[2], tri.v[0]);
+            continue;
+        }
+
+        // Solid mode: Sutherland-Hodgman clips the triangle to the full view
+        // frustum, then fills front-facing sub-triangles and draws their edges.
         std::vector<glm::vec4> clip4 = {
             bgi::cameraWorldToClip(cam, bgi::gState.width, bgi::gState.height,
                                    tri.v[0].x, tri.v[0].y, tri.v[0].z),
@@ -141,7 +171,6 @@ void renderTriangles(const bgi::Camera3D &cam,
         if (clip4.size() < 3)
             continue;
 
-        // Triangle fan from vertex 0 of the clipped polygon
         for (std::size_t fi = 1; fi + 1 < clip4.size(); ++fi)
         {
             int px0 = 0, py0 = 0, px1 = 0, py1 = 0, px2 = 0, py2 = 0;
@@ -153,7 +182,7 @@ void renderTriangles(const bgi::Camera3D &cam,
                 {px0, py0}, {px1, py1}, {px2, py2}
             };
 
-            if (mode == bgi::SolidDrawMode::Solid && frontFace)
+            if (frontFace)
             {
                 const int fc = (bgi::gState.solidColorOverride >= 0)
                                    ? bgi::gState.solidColorOverride
@@ -167,12 +196,7 @@ void renderTriangles(const bgi::Camera3D &cam,
                 bgi::gState.fillColor   = savedFillCol;
             }
 
-            {
-                const int ec = (bgi::gState.solidColorOverride >= 0)
-                                   ? bgi::gState.solidColorOverride
-                                   : tri.edgeColor;
-                bgi::drawPolygonInternal(pts, ec);
-            }
+            bgi::drawPolygonInternal(pts, ec);
         }
     }
 }

@@ -772,6 +772,9 @@ void drawOverlaysForCamera(const std::string &camName, const Camera3D &cam)
 
 void drawSelectionCursorsGL()
 {
+    // In wx-embedded mode GLFW is not initialised — skip GLFW timing.
+    if (gState.wxEmbedded) return;
+
     // Colour palette: [colorScheme 0..2][phase 0=bright / 1=dark][R, G, B] 0-255.
     static constexpr float kColors[3][2][3] = {
         {{100.f, 150.f, 255.f}, {20.f,  60.f, 180.f}},  // 0 = blue

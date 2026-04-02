@@ -75,7 +75,9 @@
 
 // Solid draw mode constants
 #define WXBGI_SOLID_WIREFRAME  0
-#define WXBGI_SOLID_SOLID      1
+#define WXBGI_SOLID_SOLID      1   ///< Backward-compat alias for FLAT
+#define WXBGI_SOLID_FLAT       1   ///< GL Phong flat shading + depth buffer
+#define WXBGI_SOLID_SMOOTH     2   ///< GL Phong smooth (Gouraud) shading + depth buffer
 
 // CoordSpace constants (returned by wxbgi_dds_get_coord_space).
 #define WXBGI_COORD_BGI_PIXEL  0  ///< Classic BGI pixel coords stored as world (x, y, 0).
@@ -265,6 +267,55 @@ BGI_API int BGI_CALL wxbgi_dds_load_yaml(const char *filePath);
  * (stub) so the header is stable from the start.
  */
 BGI_API void BGI_CALL wxbgi_render_dds(const char *camName);
+
+// =============================================================================
+// GL rendering mode control
+// =============================================================================
+
+/**
+ * @brief Enable or disable the legacy per-pixel GL_POINTS rendering path.
+ *
+ * When @p enable is non-zero, the page buffer is rendered using the old
+ * GL_POINTS loop (one glVertex2i per non-background pixel).  When zero (default),
+ * a much faster texture-based path is used.  The legacy path is provided only
+ * for backward-compatibility diagnostics.
+ */
+BGI_API void BGI_CALL wxbgi_set_legacy_gl_render(int enable);
+
+/**
+ * @brief Release all OpenGL objects managed by the GL render pass.
+ *
+ * Must be called with the GL context current and before destroying that
+ * context (e.g., from WxBgiCanvas destructor before deleting the wxGLContext).
+ * Safe to call when no GL pass was ever initialised (no-op in that case).
+ */
+BGI_API void BGI_CALL wxbgi_gl_pass_destroy(void);
+
+// =============================================================================
+// GL Phong lighting API
+// =============================================================================
+
+/** @brief Set the primary (key) light direction.
+ *  The vector is automatically normalised.  Default: (-0.577, 0.577, 0.577). */
+BGI_API void BGI_CALL wxbgi_solid_set_light_dir(float x, float y, float z);
+
+/** @brief Select light coordinate space.
+ *  @param worldSpace  1 = world-space light (default), 0 = view-space light. */
+BGI_API void BGI_CALL wxbgi_solid_set_light_space(int worldSpace);
+
+/** @brief Set the secondary (fill) light direction and relative strength.
+ *  Default direction: (0, -1, 0); default strength: 0.3. */
+BGI_API void BGI_CALL wxbgi_solid_set_fill_light(float x, float y, float z, float strength);
+
+/** @brief Set the ambient light intensity (0–1).  Default: 0.20. */
+BGI_API void BGI_CALL wxbgi_solid_set_ambient(float a);
+
+/** @brief Set the diffuse light intensity (0–1).  Default: 0.70. */
+BGI_API void BGI_CALL wxbgi_solid_set_diffuse(float d);
+
+/** @brief Set the specular intensity and shininess exponent.
+ *  Defaults: specular = 0.30, shininess = 32. */
+BGI_API void BGI_CALL wxbgi_solid_set_specular(float s, float shininess);
 
 #ifdef __cplusplus
 } // extern "C"

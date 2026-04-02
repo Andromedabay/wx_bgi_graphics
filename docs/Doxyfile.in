@@ -22,6 +22,8 @@ INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_dds.h" \
                          "@CMAKE_SOURCE_DIR@/src/bgi_types.h" \
                          "@CMAKE_SOURCE_DIR@/Tutorial.md" \
+                         "@CMAKE_SOURCE_DIR@/WxWidgets.md" \
+                         "@CMAKE_SOURCE_DIR@/InputsProcessing.md" \
                          "@CMAKE_SOURCE_DIR@/examples/bgidemo-pascal/README.md"
 FILE_PATTERNS          = *.h *.md
 RECURSIVE              = NO

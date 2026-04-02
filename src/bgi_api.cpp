@@ -6,6 +6,7 @@
 
 #include "bgi_draw.h"
 #include "bgi_font.h"
+#include "bgi_gl.h"
 #include "bgi_image.h"
 #include "bgi_state.h"
 #include "bgi_dds.h"
@@ -36,15 +37,24 @@ namespace
     void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
         (void)window;
-        (void)scancode;
-        (void)mods;
 
+        // keyDown is always updated regardless of bypass flags
         if (key >= 0 && key < static_cast<int>(bgi::gState.keyDown.size()))
         {
             bgi::gState.keyDown[static_cast<std::size_t>(key)] = action != GLFW_RELEASE ? 1U : 0U;
         }
 
+        if (bgi::gState.userKeyHook != nullptr)
+        {
+            bgi::gState.userKeyHook(key, scancode, action, mods);
+        }
+
         if (action != GLFW_PRESS && action != GLFW_REPEAT)
+        {
+            return;
+        }
+
+        if (!(bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE))
         {
             return;
         }
@@ -148,21 +158,39 @@ namespace
             return;
         }
 
+        if (bgi::gState.userCharHook != nullptr)
+        {
+            bgi::gState.userCharHook(codepoint);
+        }
+
+        if (!(bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE))
+        {
+            return;
+        }
+
         queueKeyCode(static_cast<int>(codepoint));
     }
 
     void cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
     {
         (void)window;
-        bgi::gState.mouseX     = static_cast<int>(xpos);
-        bgi::gState.mouseY     = static_cast<int>(ypos);
-        bgi::gState.mouseMoved = true;
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_CURSOR_TRACK)
+        {
+            bgi::gState.mouseX     = static_cast<int>(xpos);
+            bgi::gState.mouseY     = static_cast<int>(ypos);
+            bgi::gState.mouseMoved = true;
+        }
+        if (bgi::gState.userCursorHook != nullptr)
+        {
+            bgi::gState.userCursorHook(xpos, ypos);
+        }
     }
 
     void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
     {
         (void)window;
-        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        if ((bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_MOUSE_PICK) &&
+            button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
         {
             const bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
             // NOTE: Do NOT acquire gMutex here.  All GLFW callbacks fire
@@ -171,6 +199,24 @@ namespace
             // Re-acquiring a non-recursive std::mutex on the same thread calls
             // abort() in MSVC debug builds.
             bgi::overlayPerformPick(bgi::gState.mouseX, bgi::gState.mouseY, ctrl);
+        }
+        if (bgi::gState.userMouseButtonHook != nullptr)
+        {
+            bgi::gState.userMouseButtonHook(button, action, mods);
+        }
+    }
+
+    void scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
+    {
+        (void)window;
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_SCROLL_ACCUM)
+        {
+            bgi::gState.scrollDeltaX += xoffset;
+            bgi::gState.scrollDeltaY += yoffset;
+        }
+        if (bgi::gState.userScrollHook != nullptr)
+        {
+            bgi::gState.userScrollHook(xoffset, yoffset);
         }
     }
 
@@ -194,8 +240,13 @@ namespace
 
         bgi::destroyWindowIfNeeded();
 
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        // Request OpenGL 3.3 compatibility profile so that:
+        // - Modern shaders (#version 330) and VAOs (GL 3.0+) compile and run.
+        // - Legacy fixed-function calls (glBegin/glEnd/glOrtho) remain valid
+        //   in the legacy GL_POINTS render path.
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
         glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
 
         bgi::gState.windowTitle = (title != nullptr && *title != '\0') ? title : "BGI OpenGL Wrapper";
@@ -221,10 +272,12 @@ namespace
 #endif
 
         bgi::resetStateForWindow(width, height, doubleBuffered);
+        bgi::glPassInit(width, height);
         glfwSetKeyCallback(bgi::gState.window, keyCallback);
         glfwSetCharCallback(bgi::gState.window, charCallback);
         glfwSetCursorPosCallback(bgi::gState.window, cursorPosCallback);
         glfwSetMouseButtonCallback(bgi::gState.window, mouseButtonCallback);
+        glfwSetScrollCallback(bgi::gState.window, scrollCallback);
         bgi::gState.lastResult = bgi::grOk;
         bgi::flushToScreen();
         return true;

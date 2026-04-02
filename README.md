@@ -34,6 +34,9 @@ The library now includes classic BGI-style support for:
 - double-buffer style page selection via `setactivepage`, `setvisualpage`, `getactivepage`, `getvisualpage`, `swapbuffers`
 - additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
 - retained-mode scene graph (DDS / DDDS) with JSON and YAML serialisation via `wxbgi_dds_*`
+- 3D solid primitives (box, sphere, cylinder, cone, torus) with wireframe and filled draw modes via `wxbgi_solid_*`
+- Phong lighting model (key + fill lights, ambient/diffuse/specular) configured via `wxbgi_solid_set_light_*`
+- wxWidgets embedded canvas (`wx_bgi_wx`) with OpenGL 3.3 texture-quad compositing and automatic legacy fallback
 
 Public API declarations are available in:
 
@@ -208,6 +211,92 @@ wxbgi_get_framebuffer_size(&w, &h);
 printf("Framebuffer: %d x %d\n", w, h);
 ```
 
+## wxWidgets Embedded Canvas
+
+The library ships an optional static integration library `wx_bgi_wx` that lets you host
+the BGI drawing surface — cameras, viewports, DDS scene graph — inside a **wxWidgets**
+`wxFrame` alongside menus, toolbars, status bars, and other controls.
+
+Enable it at configure time:
+
+```sh
+cmake -S . -B build -DWXBGI_ENABLE_WX=ON
+```
+
+wxWidgets 3.2.5 is fetched automatically via FetchContent.  No manual install is needed.
+
+```cpp
+#include <wx/wx.h>
+#include "wx_bgi_wx.h"   // WxBgiCanvas
+#include "wx_bgi.h"      // Classic BGI API
+
+class MyFrame : public wxFrame {
+public:
+    MyFrame() : wxFrame(nullptr, wxID_ANY, "My App", wxDefaultPosition, wxSize(800,600)) {
+        auto* canvas = new wxbgi::WxBgiCanvas(this);
+        canvas->SetAutoRefreshHz(60);
+        setcolor(YELLOW);
+        circle(400, 300, 100);
+    }
+};
+```
+
+See **[WxWidgets.md](./WxWidgets.md)** for the full integration guide, event routing table,
+3D camera setup in wx mode, and the automated solids test.
+
+## 3D Solid Primitives and Shading
+
+The `wx_bgi_dds.h` header exposes retained-mode 3D solid primitives that are
+stored in the DDS scene graph and rendered through any `Camera3D` via
+`wxbgi_render_dds()`.
+
+### Draw Modes
+
+| Constant | Description |
+|----------|-------------|
+| `WXBGI_SOLID_WIREFRAME` | Edge-only rendering using the current line colour. |
+| `WXBGI_SOLID_SOLID` / `WXBGI_SOLID_FLAT` | Filled faces; flat Phong shading via GPU depth pass (pending GL-5). |
+| `WXBGI_SOLID_SMOOTH` | Smooth per-vertex Gouraud/Phong shading (pending GL-5). |
+
+```c
+wxbgi_solid_set_draw_mode(WXBGI_SOLID_SOLID);
+wxbgi_solid_set_face_color(CYAN);
+wxbgi_solid_sphere(0.f, 0.f, 0.f, 2.f, 32, 16);
+wxbgi_solid_box(-3.f, -1.f, -1.f, 3.f, 1.f, 1.f);
+```
+
+### Phong Lighting API
+
+Configure the key and fill lights plus material properties:
+
+```c
+#include "wx_bgi_dds.h"
+
+wxbgi_solid_set_light_dir(1.f, 1.f, 2.f);            // key light direction
+wxbgi_solid_set_light_space(1);                        // 1=world-space, 0=eye-space
+wxbgi_solid_set_fill_light(-1.f, 0.5f, 0.5f, 0.3f);  // fill direction + strength
+wxbgi_solid_set_ambient(0.2f);
+wxbgi_solid_set_diffuse(0.7f);
+wxbgi_solid_set_specular(0.4f, 32.f);
+```
+
+> **Note:** Phong-shaded GPU solid rendering (depth buffer, correct
+> occlusion) is infrastructure-complete (shaders in `bgi_gl_shaders.h`,
+> `LightState` in `BgiState`) but the wiring to the draw pipeline (GL-5
+> through GL-8) is pending.  Current solid rendering uses the CPU-side
+> projected-triangle path; depth-ordering artefacts may be visible.
+
+### GL Rendering Path (wx Mode)
+
+In wx mode the BGI pixel buffer is composited via an OpenGL 3.3 texture quad.
+The library detects the available GL version at runtime and falls back to the
+legacy `GL_POINTS` path automatically on older hardware.  To force the legacy
+path explicitly:
+
+```c
+wxbgi_set_legacy_gl_render(1);  // 1 = legacy, 0 = texture quad (default)
+```
+
 ## Text Rendering
 
 The text renderer now uses a scalable stroke-font implementation rather than the earlier fixed 5x7 bitmap glyphs. That change improves compatibility in a few important ways:
@@ -306,6 +395,7 @@ python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so
    - GLEW
    - GLM
    - OpenGL
+   - wxWidgets
    - CMake
    - Doxygen (for API documentation generation)
 
@@ -319,7 +409,7 @@ To build this project yourself, ensure you have the following tools and librarie
 
 Dependency note:
 
-- GLFW 3.4, GLEW 2.2.0, and GLM 1.0.1 are fetched automatically by CMake `FetchContent`; no manual dependency installation is required.
+- GLFW 3.4, GLEW 2.2.0, GLM 1.0.1, wxWidgets are fetched automatically by CMake `FetchContent`; no manual dependency installation is required.
 
 ## Building the Project
 
@@ -449,7 +539,7 @@ In the current Windows environment, the C++ and Python coverage examples are exe
 
 This code is Open Source and Free to use with no warranties or claims.
   
-This repository is based on Open-Source Code from 7 different source:  
+This repository is based on Open-Source Code from 8 different sources:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
          - Techniques mentioned at URL [https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html](https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html).  
@@ -459,7 +549,8 @@ This repository is based on Open-Source Code from 7 different source:
     5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
     6. JSON Library, from citation.APA="Lohmann, N. (2025). JSON for Modern C++ (Version 3.12.0) [Computer software]. https://github.com/nlohmann", MIT License  
     7. YAML Library, from https://github.com/jbeder/yaml-cpp , MIT License  
-  
+    8. wxWidgets, from https://github.com/wxWidgets/wxWidgets, wxWindows Library Licence, Version 3.1  
+
 Depends on C/C++ Template created by Luke of devmindscapetutorilas:
  - [www.onlyfastcode.com](https://www.onlyfastcode.com)
  - [https://devmindscape.com/](https://devmindscape.com/)

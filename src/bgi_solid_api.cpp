@@ -39,6 +39,33 @@ BGI_API int BGI_CALL wxbgi_solid_get_draw_mode(void)
     return bgi::gState.solidDrawMode;
 }
 
+BGI_API void BGI_CALL wxbgi_dds_set_solid_draw_mode(int mode)
+{
+    const auto dm = static_cast<bgi::SolidDrawMode>(mode);
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    for (const auto &id : bgi::gState.dds->order)
+    {
+        auto it = bgi::gState.dds->index.find(id);
+        if (it == bgi::gState.dds->index.end() || it->second->deleted)
+            continue;
+        switch (it->second->type)
+        {
+        case bgi::DdsObjectType::Box:
+        case bgi::DdsObjectType::Sphere:
+        case bgi::DdsObjectType::Cylinder:
+        case bgi::DdsObjectType::Cone:
+        case bgi::DdsObjectType::Torus:
+        case bgi::DdsObjectType::HeightMap:
+        case bgi::DdsObjectType::ParamSurface:
+        case bgi::DdsObjectType::Extrusion:
+            static_cast<bgi::DdsSolid3D *>(it->second.get())->drawMode = dm;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 BGI_API void BGI_CALL wxbgi_solid_set_edge_color(int color)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);

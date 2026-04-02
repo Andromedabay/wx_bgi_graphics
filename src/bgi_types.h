@@ -22,6 +22,43 @@
 
 struct GLFWwindow;
 
+/** @defgroup wxbgi_input_hook_types Input Hook Callback Types
+ *  @brief Typedefs for user-supplied input event callback functions.
+ *  @{
+ */
+/// @brief Callback type for GLFW-style key events.
+typedef void (BGI_CALL *WxbgiKeyHook)(int key, int scancode, int action, int mods);
+
+/// @brief Callback type for Unicode character input events.
+typedef void (BGI_CALL *WxbgiCharHook)(unsigned int codepoint);
+
+/// @brief Callback type for cursor position changes.
+typedef void (BGI_CALL *WxbgiCursorPosHook)(double xpos, double ypos);
+
+/// @brief Callback type for mouse button events.
+typedef void (BGI_CALL *WxbgiMouseButtonHook)(int button, int action, int mods);
+
+/// @brief Callback type for mouse scroll (wheel) events.
+typedef void (BGI_CALL *WxbgiScrollHook)(double xoffset, double yoffset);
+/** @} */
+
+/** @defgroup wxbgi_input_defaults_flags Default input behavior control flags
+ *  @{
+ */
+/// Bit flag: library's keyCallback queues translated key/char codes.
+#define WXBGI_DEFAULT_KEY_QUEUE      0x01
+/// Bit flag: cursorPosCallback updates gState.mouseX/Y and mouseMoved.
+#define WXBGI_DEFAULT_CURSOR_TRACK   0x02
+/// Bit flag: mouseButtonCallback calls overlayPerformPick on left-click.
+#define WXBGI_DEFAULT_MOUSE_PICK     0x04
+/// Bit flag: scrollCallback accumulates gState.scrollDeltaX/Y.
+#define WXBGI_DEFAULT_SCROLL_ACCUM   0x08
+/// All four defaults active (initial state).
+#define WXBGI_DEFAULT_ALL            0x0F
+/// All four defaults disabled.
+#define WXBGI_DEFAULT_NONE           0x00
+/** @} */
+
 namespace bgi
 {
 
@@ -344,6 +381,29 @@ namespace bgi
         bool  hasData{false};
     };
 
+    /**
+     * @brief Lighting parameters used by the GL Phong shading passes.
+     *
+     * Primary light direction is normalised by the API setter.
+     * All intensities are in [0,1]; shininess is a Phong exponent (e.g. 8..256).
+     */
+    struct LightState
+    {
+        // Primary (key) light direction — normalised, world-space by default.
+        float dirX{ -0.577f}, dirY{ 0.577f}, dirZ{0.577f};
+        bool  worldSpace{true};          ///< true = world-space, false = view-space
+
+        // Fill (secondary) light — softens shadows.
+        float fillX{0.f}, fillY{-1.f}, fillZ{0.f};
+        float fillStrength{0.30f};
+
+        // Phong material intensities.
+        float ambient  {0.20f};
+        float diffuse  {0.70f};
+        float specular {0.30f};
+        float shininess{32.f};
+    };
+
     // -------------------------------------------------------------------------
     // Forward declarations for DDS types (full definitions in bgi_dds.h).
     // These let BgiState hold shared_ptr<DdsCamera> and unique_ptr<DdsScene>
@@ -433,6 +493,25 @@ namespace bgi
         std::vector<std::string> selectedObjectIds;   ///< IDs of currently selected DDS drawing objects.
         int selectionFlashScheme {0};                 ///< Flash colour: 0 = orange (252), 1 = purple (253).
         int selectionPickRadiusPx{16};                ///< Screen-pixel pick threshold for object selection.
+
+        // --- User input hooks ---
+        WxbgiKeyHook          userKeyHook{nullptr};
+        WxbgiCharHook         userCharHook{nullptr};
+        WxbgiCursorPosHook    userCursorHook{nullptr};
+        WxbgiMouseButtonHook  userMouseButtonHook{nullptr};
+        WxbgiScrollHook       userScrollHook{nullptr};
+        double scrollDeltaX{0.0}; ///< Accumulated horizontal scroll delta.
+        double scrollDeltaY{0.0}; ///< Accumulated vertical scroll delta.
+
+        // --- Input default behavior flags ---
+        int inputDefaultFlags{WXBGI_DEFAULT_ALL}; ///< Bitmask controlling built-in callback behaviors.
+
+        // --- wx-embedded mode flag ---
+        bool wxEmbedded{false}; ///< True when the BGI surface is hosted inside a WxBgiCanvas.
+
+        // --- GL rendering mode ---
+        bool legacyGlRender{false}; ///< When true, uses the old GL_POINTS per-pixel path.
+        LightState lightState;       ///< Lighting parameters for GL Phong shading passes.
 
         // Explicitly declared(defined in bgi_state.cpp) so that the compiler
         // generates the destructor only where DdsScene is fully defined.

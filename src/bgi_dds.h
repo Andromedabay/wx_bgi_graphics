@@ -350,7 +350,7 @@ struct DdsImage : public DdsObject
 // Phase 4/5/6 — 3D Solid, Surface and Extrusion objects
 // =============================================================================
 
-enum class SolidDrawMode { Wireframe = 0, Solid = 1 };
+enum class SolidDrawMode { Wireframe = 0, Flat = 1, Smooth = 2, Solid = 1 };
 enum class ParamSurfaceFormula { Sphere = 0, Cylinder = 1, Torus = 2, Saddle = 3, Mobius = 4 };
 
 /** Base for all Phase 4/5/6 solid/surface/extrusion objects. */

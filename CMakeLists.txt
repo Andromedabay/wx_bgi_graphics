@@ -136,6 +136,7 @@ set(SRCS
     src/bgi_export.cpp
     src/bgi_overlay.cpp
     src/bgi_overlay_api.cpp
+    src/bgi_gl.cpp
 )
 
 add_library(wx_bgi_opengl SHARED ${SRCS})
@@ -254,6 +255,35 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:test_solids>
+)
+
+add_executable(test_input_hooks examples/cpp/test_input_hooks.cpp)
+target_link_libraries(test_input_hooks PRIVATE wx_bgi_opengl)
+target_compile_definitions(test_input_hooks PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
+add_custom_command(
+    TARGET test_input_hooks POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_input_hooks>
+)
+
+add_executable(wxbgi_input_hooks_cpp examples/cpp/wxbgi_input_hooks.cpp)
+target_link_libraries(wxbgi_input_hooks_cpp PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET wxbgi_input_hooks_cpp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:wxbgi_input_hooks_cpp>
+)
+
+add_executable(test_input_bypass examples/cpp/test_input_bypass.cpp)
+target_link_libraries(test_input_bypass PRIVATE wx_bgi_opengl)
+target_compile_definitions(test_input_bypass PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
+add_custom_command(
+    TARGET test_input_bypass POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_input_bypass>
 )
 
 find_package(Python3 COMPONENTS Interpreter)
@@ -417,6 +447,12 @@ if(BUILD_TESTING)
     add_test(NAME test_solids            COMMAND $<TARGET_FILE:test_solids>)
     set_tests_properties(test_solids            PROPERTIES TIMEOUT 30)
 
+    add_test(NAME test_input_hooks  COMMAND $<TARGET_FILE:test_input_hooks>)
+    set_tests_properties(test_input_hooks  PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_input_bypass COMMAND $<TARGET_FILE:test_input_bypass>)
+    set_tests_properties(test_input_bypass PROPERTIES TIMEOUT 20)
+
     if(Python3_Interpreter_FOUND)
         add_test(
             NAME bgi_api_coverage_python
@@ -481,5 +517,249 @@ if(BUILD_TESTING)
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_coverage
             TIMEOUT 20
         )
+        # ---- test_input_hooks Pascal ----
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_hooks_pascal)
+
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+            COMMAND ${FPC_COMPILER}
+                    -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -dWXBGI_ENABLE_TEST_SEAMS
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
+                    -FE${CMAKE_BINARY_DIR}/test_input_hooks_pascal
+                    -FU${CMAKE_BINARY_DIR}/test_input_hooks_pascal
+                    ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/test_input_hooks.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/test_input_hooks.pas
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            VERBATIM
+        )
+
+        add_custom_target(
+            test_input_hooks_pascal_build
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/test_input_hooks_pascal
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+        )
+
+        # ---- test_input_bypass Pascal ----
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_bypass_pascal)
+
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+            COMMAND ${FPC_COMPILER}
+                    -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -dWXBGI_ENABLE_TEST_SEAMS
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
+                    -FE${CMAKE_BINARY_DIR}/test_input_bypass_pascal
+                    -FU${CMAKE_BINARY_DIR}/test_input_bypass_pascal
+                    ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/test_input_bypass.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/test_input_bypass.pas
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            VERBATIM
+        )
+
+        add_custom_target(
+            test_input_bypass_pascal_build
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/test_input_bypass_pascal
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+        )
+
+        if(BUILD_TESTING)
+            add_test(
+                NAME test_input_hooks_pascal_build
+                COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG> --target test_input_hooks_pascal_build
+            )
+            set_tests_properties(test_input_hooks_pascal_build PROPERTIES TIMEOUT 120)
+
+            if(UNIX AND NOT APPLE)
+                add_test(
+                    NAME test_input_hooks_pascal_run
+                    COMMAND ${CMAKE_COMMAND} -E env
+                            "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/test_input_hooks_pascal:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
+                            ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+                )
+            else()
+                add_test(
+                    NAME test_input_hooks_pascal_run
+                    COMMAND ${CMAKE_BINARY_DIR}/test_input_hooks_pascal/test_input_hooks${CMAKE_EXECUTABLE_SUFFIX}
+                )
+            endif()
+            set_tests_properties(
+                test_input_hooks_pascal_run
+                PROPERTIES
+                DEPENDS test_input_hooks_pascal_build
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_hooks_pascal
+                TIMEOUT 20
+            )
+
+            add_test(
+                NAME test_input_bypass_pascal_build
+                COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG> --target test_input_bypass_pascal_build
+            )
+            set_tests_properties(test_input_bypass_pascal_build PROPERTIES TIMEOUT 120)
+
+            if(UNIX AND NOT APPLE)
+                add_test(
+                    NAME test_input_bypass_pascal_run
+                    COMMAND ${CMAKE_COMMAND} -E env
+                            "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/test_input_bypass_pascal:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
+                            ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+                )
+            else()
+                add_test(
+                    NAME test_input_bypass_pascal_run
+                    COMMAND ${CMAKE_BINARY_DIR}/test_input_bypass_pascal/test_input_bypass${CMAKE_EXECUTABLE_SUFFIX}
+                )
+            endif()
+            set_tests_properties(
+                test_input_bypass_pascal_run
+                PROPERTIES
+                DEPENDS test_input_bypass_pascal_build
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test_input_bypass_pascal
+                TIMEOUT 20
+            )
+        endif()
     endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Optional wxWidgets integration (OFF by default)
+# ---------------------------------------------------------------------------
+option(WXBGI_ENABLE_WX "Build the wxWidgets WxBgiCanvas integration library (requires network; fetches wxWidgets 3.2.5)" OFF)
+
+if(WXBGI_ENABLE_WX)
+    message(STATUS "Fetching wxWidgets 3.2.5...")
+    set(wxBUILD_SHARED  OFF CACHE BOOL "" FORCE)
+    set(wxBUILD_TESTS   OFF CACHE STRING "" FORCE)
+    set(wxBUILD_SAMPLES OFF CACHE STRING "" FORCE)
+    set(wxBUILD_DEMOS   OFF CACHE STRING "" FORCE)
+    FetchContent_Declare(
+        wxWidgets
+        GIT_REPOSITORY https://github.com/wxWidgets/wxWidgets.git
+        GIT_TAG        v3.2.5
+        GIT_SHALLOW    ON
+    )
+    FetchContent_MakeAvailable(wxWidgets)
+
+    # wx_bgi_wx — STATIC lib that compiles WxBgiCanvas into the APPLICATION,
+    # not the DLL.  This is critical: the canvas must use the EXE's copy of
+    # wxWidgets so that wxTheApp, wxGLContext, etc. resolve correctly.
+    # It links wx_bgi_opengl for the exported C API (wxbgi_wx_*).
+    add_library(wx_bgi_wx STATIC src/wx/wx_bgi_canvas.cpp)
+    target_include_directories(wx_bgi_wx
+        PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src
+               ${glew_SOURCE_DIR}/include)
+    target_compile_definitions(wx_bgi_wx PUBLIC WXBGI_ENABLE_WX GLEW_STATIC)
+    target_link_libraries(wx_bgi_wx PUBLIC wx_bgi_opengl GLEW::GLEW wxcore wxgl wxbase)
+    # Match the MSVC runtime of the core DLL (/MT or /MTd).
+    set_target_properties(wx_bgi_wx PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+    # The DLL only needs the new wxbgi_wx_* exported C functions (added to
+    # bgi_modern_api.cpp).  It does NOT compile wx_bgi_canvas.cpp.
+    # wx headers are needed only for the WXBGI_ENABLE_WX guard in state.
+    target_compile_definitions(wx_bgi_opengl PRIVATE WXBGI_ENABLE_WX)
+
+    # Automated headless solids test — CONSOLE exe, no wx event loop required.
+    # Tests that the BGI API works correctly in wx-embedded mode (initForWxCanvas +
+    # solid primitives + camera setup) without needing a display.
+    add_executable(wx_bgi_solids_test examples/wx/wx_bgi_solids_test.cpp)
+    target_link_libraries(wx_bgi_solids_test PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wx_bgi_solids_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wx_bgi_solids_test>
+    )
+
+    if(BUILD_TESTING)
+        add_test(NAME wx_bgi_solids_test COMMAND $<TARGET_FILE:wx_bgi_solids_test>)
+        set_tests_properties(wx_bgi_solids_test PROPERTIES TIMEOUT 15)
+    endif()
+
+    # Animated 3-D orbit test — WIN32 exe so no console window pops up.
+    # Renders 135 frames of a 360° camera orbit, then exits 0.
+    if(WIN32)
+        add_executable(wx_bgi_3d_orbit_test WIN32
+            examples/wx/wx_bgi_3d_orbit_test.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wx_bgi_3d_orbit_test MACOSX_BUNDLE
+            examples/wx/wx_bgi_3d_orbit_test.cpp)
+        set_target_properties(wx_bgi_3d_orbit_test PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wx_bgi_3d_orbit_test examples/wx/wx_bgi_3d_orbit_test.cpp)
+    endif()
+    target_link_libraries(wx_bgi_3d_orbit_test PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wx_bgi_3d_orbit_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wx_bgi_3d_orbit_test>
+    )
+
+    if(BUILD_TESTING)
+        add_test(NAME wx_bgi_3d_orbit_test
+                 COMMAND $<TARGET_FILE:wx_bgi_3d_orbit_test>)
+        # 30 s: 4.5 s animation + generous build/launch headroom
+        set_tests_properties(wx_bgi_3d_orbit_test PROPERTIES TIMEOUT 60)
+    endif()
+
+    # Interactive demo (WIN32/MACOSX_BUNDLE — not a CTest target)
+    if(WIN32)
+        add_executable(wx_bgi_app WIN32
+            examples/wx/wx_bgi_app.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wx_bgi_app MACOSX_BUNDLE examples/wx/wx_bgi_app.cpp)
+        set_target_properties(wx_bgi_app PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wx_bgi_app examples/wx/wx_bgi_app.cpp)
+    endif()
+    target_link_libraries(wx_bgi_app PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wx_bgi_app POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wx_bgi_app>
+    )
+
+    # 3-D interactive demo — orbit camera, solid primitives, mouse/keyboard
+    if(WIN32)
+        add_executable(wx_bgi_3d_app WIN32
+            examples/wx/wx_bgi_3d_app.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wx_bgi_3d_app MACOSX_BUNDLE examples/wx/wx_bgi_3d_app.cpp)
+        set_target_properties(wx_bgi_3d_app PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wx_bgi_3d_app examples/wx/wx_bgi_3d_app.cpp)
+    endif()
+    target_link_libraries(wx_bgi_3d_app PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wx_bgi_3d_app POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wx_bgi_3d_app>
+    )
 endif()
