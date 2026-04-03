@@ -24,6 +24,23 @@ if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
+# ---------------------------------------------------------------------------
+# Backend options
+# ---------------------------------------------------------------------------
+
+# Make wxWidgets the default window backend.
+option(WXBGI_ENABLE_WX
+    "Build with wxWidgets window backend (default: ON; fetches wxWidgets 3.2.5)"
+    ON)
+
+# GLFW standalone backend (auto-enabled when WX is OFF).
+option(WXBGI_ENABLE_GLFW
+    "Build with GLFW standalone window backend (default: ON when WXBGI_ENABLE_WX is OFF)"
+    OFF)
+if(NOT WXBGI_ENABLE_WX)
+    set(WXBGI_ENABLE_GLFW ON CACHE BOOL "GLFW fallback" FORCE)
+endif()
+
 message(STATUS "Fetching GLEW...")
 
 FetchContent_Declare(
@@ -90,7 +107,25 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yaml-cpp)
 
-# Build a static GLEW library from fetched sources to keep the build self-contained.
+# ---------------------------------------------------------------------------
+# Optional wxWidgets 3.2.5 (fetched when WXBGI_ENABLE_WX=ON)
+# ---------------------------------------------------------------------------
+if(WXBGI_ENABLE_WX)
+    message(STATUS "Fetching wxWidgets 3.2.5...")
+    set(wxBUILD_SHARED  OFF CACHE BOOL "" FORCE)
+    set(wxBUILD_TESTS   OFF CACHE STRING "" FORCE)
+    set(wxBUILD_SAMPLES OFF CACHE STRING "" FORCE)
+    set(wxBUILD_DEMOS   OFF CACHE STRING "" FORCE)
+    FetchContent_Declare(
+        wxWidgets
+        GIT_REPOSITORY https://github.com/wxWidgets/wxWidgets.git
+        GIT_TAG        v3.2.5
+        GIT_SHALLOW    ON
+    )
+    FetchContent_MakeAvailable(wxWidgets)
+endif()
+
+# Build a static GLEW libraryfrom fetched sources to keep the build self-contained.
 add_library(glew_static STATIC ${glew_SOURCE_DIR}/src/glew.c)
 add_library(GLEW::GLEW ALIAS glew_static)
 
@@ -139,11 +174,28 @@ set(SRCS
     src/bgi_overlay_api.cpp
 )
 
+if(WXBGI_ENABLE_WX)
+    list(APPEND SRCS
+        src/wx/wx_bgi_canvas.cpp
+        src/wx/bgi_wx_standalone.cpp
+    )
+endif()
+
 add_library(wx_bgi_opengl SHARED ${SRCS})
 
 target_include_directories(wx_bgi_opengl PUBLIC src)
 target_compile_definitions(wx_bgi_opengl PRIVATE GLEW_STATIC)
 target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp)
+
+if(WXBGI_ENABLE_WX)
+    target_link_libraries(wx_bgi_opengl PRIVATE wxcore wxgl wxbase)
+    target_include_directories(wx_bgi_opengl PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/wx
+        ${glew_SOURCE_DIR}/include)
+    target_compile_definitions(wx_bgi_opengl PRIVATE WXBGI_ENABLE_WX)
+    set_target_properties(wx_bgi_opengl PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 if(WXBGI_ENABLE_TEST_SEAMS)
     # Expose compile-time guard to both the library and consumers of the public
@@ -170,7 +222,7 @@ add_custom_command(
 )
 
 add_executable(wxbgi_keyboard_queue_cpp examples/cpp/wxbgi_keyboard_queue.cpp)
-target_link_libraries(wxbgi_keyboard_queue_cpp PRIVATE wx_bgi_opengl glfw)
+target_link_libraries(wxbgi_keyboard_queue_cpp PRIVATE wx_bgi_opengl)
 
 add_custom_command(
     TARGET wxbgi_keyboard_queue_cpp POST_BUILD
@@ -180,7 +232,7 @@ add_custom_command(
 )
 
 add_executable(wxbgi_camera_demo_cpp examples/cpp/wxbgi_camera_demo.cpp)
-target_link_libraries(wxbgi_camera_demo_cpp PRIVATE wx_bgi_opengl glfw)
+target_link_libraries(wxbgi_camera_demo_cpp PRIVATE wx_bgi_opengl)
 
 add_custom_command(
     TARGET wxbgi_camera_demo_cpp POST_BUILD
@@ -270,7 +322,7 @@ add_custom_command(
 
 # Input hook interactive demo
 add_executable(wxbgi_input_hooks_cpp examples/cpp/wxbgi_input_hooks.cpp)
-target_link_libraries(wxbgi_input_hooks_cpp PRIVATE wx_bgi_opengl glfw)
+target_link_libraries(wxbgi_input_hooks_cpp PRIVATE wx_bgi_opengl)
 add_custom_command(
     TARGET wxbgi_input_hooks_cpp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -675,24 +727,12 @@ if(BUILD_TESTING)
 endif()
 
 # ---------------------------------------------------------------------------
-# Optional wxWidgets integration (OFF by default)
+# wxWidgets static integration library (wx_bgi_wx) — for C++ apps that embed
+# WxBgiCanvas inside their own wxFrame.  The standalone C API
+# (wxbgi_wx_app_create / wxbgi_wx_frame_create / wxbgi_wx_app_main_loop) is
+# already compiled into wx_bgi_opengl.dll when WXBGI_ENABLE_WX=ON.
 # ---------------------------------------------------------------------------
-option(WXBGI_ENABLE_WX "Build the wxWidgets WxBgiCanvas integration library (requires network; fetches wxWidgets 3.2.5)" OFF)
-
 if(WXBGI_ENABLE_WX)
-    message(STATUS "Fetching wxWidgets 3.2.5...")
-    set(wxBUILD_SHARED  OFF CACHE BOOL "" FORCE)
-    set(wxBUILD_TESTS   OFF CACHE STRING "" FORCE)
-    set(wxBUILD_SAMPLES OFF CACHE STRING "" FORCE)
-    set(wxBUILD_DEMOS   OFF CACHE STRING "" FORCE)
-    FetchContent_Declare(
-        wxWidgets
-        GIT_REPOSITORY https://github.com/wxWidgets/wxWidgets.git
-        GIT_TAG        v3.2.5
-        GIT_SHALLOW    ON
-    )
-    FetchContent_MakeAvailable(wxWidgets)
-
     # wx_bgi_wx — STATIC lib that compiles WxBgiCanvas into the APPLICATION,
     # not the DLL.  This is critical: the canvas must use the EXE's copy of
     # wxWidgets so that wxTheApp, wxGLContext, etc. resolve correctly.
@@ -706,11 +746,6 @@ if(WXBGI_ENABLE_WX)
     # Match the MSVC runtime of the core DLL (/MT or /MTd).
     set_target_properties(wx_bgi_wx PROPERTIES
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
-    # The DLL only needs the new wxbgi_wx_* exported C functions (added to
-    # bgi_modern_api.cpp).  It does NOT compile wx_bgi_canvas.cpp.
-    # wx headers are needed only for the WXBGI_ENABLE_WX guard in state.
-    target_compile_definitions(wx_bgi_opengl PRIVATE WXBGI_ENABLE_WX)
 
     # Automated headless solids test — CONSOLE exe, no wx event loop required.
     # Tests that the BGI API works correctly in wx-embedded mode (initForWxCanvas +

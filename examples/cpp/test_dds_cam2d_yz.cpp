@@ -44,9 +44,10 @@ void fail(const char *msg)
 int main()
 {
     constexpr int kW = 640, kH = 480;
-    initwindow(kW, kH, "test_dds_cam2d_yz", 0, 0, 0, 0);
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_dds_cam2d_yz");
     if (graphresult() != 0)
-        fail("initwindow failed");
+        fail("wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Create the YZ-plane camera.
@@ -115,7 +116,8 @@ int main()
     // Pump one event cycle so the frame is visible (harmless in headless runs).
     wxbgi_poll_events();
 
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_dds_cam2d_yz]\n");
     return 0;
 }

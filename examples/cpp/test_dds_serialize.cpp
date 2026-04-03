@@ -16,6 +16,7 @@
 
 #include "wx_bgi.h"
 #include "wx_bgi_dds.h"
+#include "wx_bgi_ext.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -52,8 +53,9 @@ int main()
     // Open a small off-screen-like window (required for all BGI API calls).
     // -----------------------------------------------------------------------
     constexpr int kW = 320, kH = 240;
-    initwindow(kW, kH, "test_dds_serialize", 0, 0, 0, 0);
-    require(graphresult() == 0, "initwindow failed");
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_dds_serialize");
+    require(graphresult() == 0, "wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Draw two primitives with known parameters.
@@ -120,7 +122,8 @@ int main()
     // -----------------------------------------------------------------------
     // Clean up.
     // -----------------------------------------------------------------------
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_dds_serialize]\n");
     return 0;
 }

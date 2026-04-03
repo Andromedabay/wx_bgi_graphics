@@ -50,11 +50,10 @@ const
   GLFW_KEY_UP = 265;
 
 { ----- BGI API declarations ----- }
-function  initwindow(width, height: LongInt; title: PChar;
-                     left, top, dbflag, closeflag: LongInt): LongInt;
-          cdecl; external BgiLib;
-procedure closegraph;
-          cdecl; external BgiLib;
+procedure wxbgi_wx_app_create; cdecl; external BgiLib;
+procedure wxbgi_wx_frame_create(width, height: LongInt; title: PChar); cdecl; external BgiLib;
+procedure wxbgi_wx_app_main_loop; cdecl; external BgiLib;
+procedure wxbgi_wx_close_after_ms(ms: LongInt); cdecl; external BgiLib;
 function  graphresult: LongInt;
           cdecl; external BgiLib;
 procedure setbkcolor(color: LongInt);
@@ -189,9 +188,9 @@ begin
   gPrevKeyCount := 0; gPrevMouseCount := 0; gPrevCharCount := 0;
   gMX := 0; gMY := 0;
 
-  Require(initwindow(400, 260, 'test_input_hooks_pascal', 0, 0, 0, 0) = 0,
-          'initwindow failed');
-  Require(graphresult = 0, 'graphresult failed after initwindow');
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(400, 260, 'test_input_hooks_pascal');
+  Require(graphresult = 0, 'wxbgi_wx_frame_create failed');
 
   { ---- Phase 1: registration / deregistration ---- }
   wxbgi_set_key_hook(@HookKey);
@@ -319,7 +318,7 @@ begin
   circle(200, 130, 40);
 {$ENDIF}
 
-  wxbgi_poll_events;
-  closegraph;
+  wxbgi_wx_close_after_ms(500);
+  wxbgi_wx_app_main_loop;
   WriteLn('PASS [test_input_hooks_pascal]');
 end.

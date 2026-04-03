@@ -115,9 +115,14 @@ void WxBgiCanvas::Render()
     }
     if (!m_bgiInited)
     {
-        const wxSize sz = GetClientSize();
-        wxbgi_wx_init_for_canvas(std::max(1, sz.GetWidth()),
-                                 std::max(1, sz.GetHeight()));
+        // Only call wxbgi_wx_init_for_canvas if BGI has not already been
+        // initialized externally (e.g. by wxbgi_wx_frame_create).
+        if (!wxbgi_is_ready())
+        {
+            const wxSize sz = GetClientSize();
+            wxbgi_wx_init_for_canvas(std::max(1, sz.GetWidth()),
+                                     std::max(1, sz.GetHeight()));
+        }
         m_bgiInited = true;
         SetFocus();
     }

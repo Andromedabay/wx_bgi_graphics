@@ -74,35 +74,18 @@ procedure Initialize;
 { Initialize graphics and report any errors that may occur }
 var
   InGraphicsMode : boolean; { Flags initialization of graphics mode }
-  PathToDriver   : string;  { Stores the DOS path to *.BGI & *.CHR }
 begin
   OldExitProc := ExitProc;                { save previous exit proc }
   ExitProc := @MyExitProc;                { insert our exit proc in chain }
-  PathToDriver := '';
-  repeat
 
-{$IFDEF Use8514}                          { check for Use8514 $DEFINE }
-    GraphDriver := IBM8514;
-    GraphMode := IBM8514Hi;
-{$ELSE}
-    GraphDriver := Detect;                { use autodetection }
-{$ENDIF}
+  WxAppCreate;
+  WxFrameCreate(1024, 768, 'BGI Demo');
+  ErrorCode := GraphResult;
+  if ErrorCode <> grOK then
+    Halt(1);
+  GraphDriver := VGA;
+  GraphMode := 0;
 
-    InitGraph(GraphDriver, GraphMode, PathToDriver);
-    ErrorCode := GraphResult;             { preserve error return }
-    if ErrorCode <> grOK then             { error? }
-    begin
-      Writeln('Graphics error: ', GraphErrorMsg(ErrorCode));
-      if ErrorCode = grFileNotFound then  { Can't find driver file }
-      begin
-        Writeln('Enter full path to BGI driver or type <Ctrl-Break> to quit:');
-        Readln(PathToDriver);
-        Writeln;
-      end
-      else
-        Halt(1);                          { Some other error: terminate }
-    end;
-  until ErrorCode = grOK;
   Randomize;                { init random number generator }
   MaxColor := GetMaxColor;  { Get the maximum allowable drawing color }
   MaxX := GetMaxX;          { Get screen resolution values }
@@ -1427,5 +1410,6 @@ begin { program body }
   FillPatternPlay;
   PolyPlay;
   SayGoodbye;
-  CloseGraph;
+  WxCloseAfterMs(3000);
+  WxAppMainLoop;
 end.

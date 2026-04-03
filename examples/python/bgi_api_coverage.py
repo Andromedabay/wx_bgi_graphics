@@ -34,7 +34,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def configure_prototypes(lib):
-    callback_type = ctypes.CFUNCTYPE(None)
+    WxbgiFrameCallback = ctypes.CFUNCTYPE(None)
     lib.arc.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
     lib.bar.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
     lib.bar3d.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
@@ -105,9 +105,9 @@ def configure_prototypes(lib):
     lib.putimage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int]
     lib.putpixel.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
     lib.rectangle.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
-    lib.registerbgidriver.argtypes = [callback_type]
+    lib.registerbgidriver.argtypes = [WxbgiFrameCallback]
     lib.registerbgidriver.restype = ctypes.c_int
-    lib.registerbgifont.argtypes = [callback_type]
+    lib.registerbgifont.argtypes = [WxbgiFrameCallback]
     lib.registerbgifont.restype = ctypes.c_int
     lib.restorecrtmode.argtypes = []
     lib.sector.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
@@ -163,18 +163,27 @@ def configure_prototypes(lib):
     lib.wxbgi_read_pixels_rgba8.restype = ctypes.c_int
     lib.wxbgi_write_pixels_rgba8.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int]
     lib.wxbgi_write_pixels_rgba8.restype = ctypes.c_int
-    return callback_type
+
+    lib.wxbgi_wx_app_create.argtypes = []
+    lib.wxbgi_wx_frame_create.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
+    lib.wxbgi_wx_app_main_loop.argtypes = []
+    lib.wxbgi_wx_close_frame.argtypes = []
+    lib.wxbgi_wx_close_after_ms.argtypes = [ctypes.c_int]
+    lib.wxbgi_wx_set_frame_rate.argtypes = [ctypes.c_int]
+    lib.wxbgi_wx_refresh.argtypes = []
+    lib.wxbgi_wx_set_idle_callback.argtypes = [WxbgiFrameCallback]
+    return WxbgiFrameCallback
 
 
 def main() -> int:
     library_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / ("wx_bgi_opengl.dll" if os.name == "nt" else "libwx_bgi_opengl.so")
     lib = ctypes.CDLL(str(library_path))
-    callback_type = configure_prototypes(lib)
+    WxbgiFrameCallback = configure_prototypes(lib)
 
     def _dummy() -> None:
         return None
 
-    dummy = callback_type(_dummy)
+    dummy = WxbgiFrameCallback(_dummy)
 
     driver = ctypes.c_int(-1)
     mode = ctypes.c_int(-1)
@@ -186,17 +195,16 @@ def main() -> int:
     require(lib.registerbgifont(dummy) == 0, "registerbgifont failed")
 
     # Some CI runners may fail initgraph due to desktop/OpenGL session constraints.
-    # Continue with initwindow coverage so the API surface is still validated.
+    # Continue with standalone wx window so the API surface is still validated.
     lib.initgraph(ctypes.byref(driver), ctypes.byref(mode), None)
     initgraph_status = lib.graphresult()
     if initgraph_status == 0:
         lib.closegraph()
 
-    initwindow_result = lib.initwindow(640, 480, b"Python BGI Coverage", 80, 80, 1, 1)
-    require(
-        initwindow_result == 0,
-        f"initwindow failed (initgraph status={initgraph_status}: {lib.grapherrormsg(initgraph_status).decode()})",
-    )
+    # Standalone wx window -- analogous to wxPython's wx.App() + wx.Frame()
+    lib.wxbgi_wx_app_create()
+    lib.wxbgi_wx_frame_create(640, 480, b"Python BGI Coverage")
+    require(lib.graphresult() == 0, "wxbgi_wx_frame_create failed to initialize BGI")
 
     require(lib.wxbgi_is_ready() == 1, "wxbgi_is_ready failed")
     require(lib.wxbgi_poll_events() == 0, "wxbgi_poll_events failed")
@@ -214,7 +222,7 @@ def main() -> int:
     require(fb_w.value > 0 and fb_h.value > 0, "framebuffer size invalid")
     require(lib.wxbgi_get_time_seconds() >= 0.0, "wxbgi_get_time_seconds failed")
     require(lib.wxbgi_get_proc_address(b"glClear") is not None, "wxbgi_get_proc_address failed")
-    require(lib.wxbgi_get_gl_string(0x1F02) is not None, "wxbgi_get_gl_string version missing")
+    require(lib.wxbgi_get_gl_string(2) is not None, "wxbgi_get_gl_string version missing")
 
     require(lib.wxbgi_begin_advanced_frame(0.05, 0.08, 0.12, 1.0, 1, 0) == 0, "wxbgi_begin_advanced_frame failed")
     require(lib.wxbgi_end_advanced_frame(0) == 0, "wxbgi_end_advanced_frame failed")
@@ -339,6 +347,8 @@ def main() -> int:
     _ = lib.grapherrormsg(lib.graphresult())
     lib.restorecrtmode()
     print("Python coverage completed")
+    lib.wxbgi_wx_close_after_ms(500)
+    lib.wxbgi_wx_app_main_loop()
     return 0
 
 

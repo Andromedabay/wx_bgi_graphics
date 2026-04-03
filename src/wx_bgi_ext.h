@@ -739,4 +739,69 @@ BGI_API void BGI_CALL wxbgi_wx_scroll(double xDelta, double yDelta);
 
 /** @} */  // wxbgi_wx_api
 
+/**
+ * @defgroup wxbgi_standalone_api Standalone wx Window API
+ * @ingroup wxbgi_ext_api
+ * @brief wxPython-style App/Frame/MainLoop API for Python, Pascal, and simple C programs.
+ *
+ * These functions create and run a wxWidgets window with an embedded
+ * WxBgiCanvas without requiring the caller to write any C++ wxFrame subclass.
+ *
+ * Typical usage (analogous to wxPython):
+ * @code
+ * // C / Python ctypes / Pascal cdecl:
+ * wxbgi_wx_app_create();
+ * wxbgi_wx_frame_create(640, 480, "My BGI App");
+ * // ... BGI drawing calls here (write to CPU offscreen buffer) ...
+ * wxbgi_wx_close_after_ms(5000);   // for automated tests
+ * wxbgi_wx_app_main_loop();        // blocking -- returns when window closes
+ * @endcode
+ *
+ * @warning Do NOT call wxbgi_wx_app_create() from a C++ application that
+ * already owns a wxApp via wxIMPLEMENT_APP.  In that case use the
+ * wx_bgi_wx static library and WxBgiCanvas directly.
+ * @{
+ */
+
+/** @brief Create the wx application instance. Analogous to @c wx.App() in wxPython.
+ *  Must be called once before wxbgi_wx_frame_create(). Safe to call multiple times
+ *  (idempotent if a wxApp already exists). */
+BGI_API void BGI_CALL wxbgi_wx_app_create(void);
+
+/** @brief Create a top-level wxFrame with an embedded WxBgiCanvas.
+ *  Analogous to @c wx.Frame() in wxPython. Also initialises the BGI CPU page
+ *  buffers (calls wxbgi_wx_init_for_canvas internally) so that BGI drawing
+ *  functions can be called before wxbgi_wx_app_main_loop(). */
+BGI_API void BGI_CALL wxbgi_wx_frame_create(int width, int height, const char* title);
+
+/** @brief Run the wx event loop. Analogous to @c app.MainLoop() in wxPython.
+ *  Blocks until all top-level windows are closed. Returns only after
+ *  cleanup. */
+BGI_API void BGI_CALL wxbgi_wx_app_main_loop(void);
+
+/** @brief Close the standalone frame immediately. */
+BGI_API void BGI_CALL wxbgi_wx_close_frame(void);
+
+/** @brief Schedule the frame to close after @p ms milliseconds.
+ *  Useful for automated tests that need a short visible window. */
+BGI_API void BGI_CALL wxbgi_wx_close_after_ms(int ms);
+
+/** @brief Callback type for animation / per-frame update. */
+typedef void (BGI_CALL *WxbgiFrameCallback)(void);
+
+/** @brief Register a per-frame callback. Called on each timer tick set by
+ *  wxbgi_wx_set_frame_rate(). Draw your scene here; the canvas is
+ *  automatically refreshed after the callback returns. Pass NULL to
+ *  deregister. */
+BGI_API void BGI_CALL wxbgi_wx_set_idle_callback(WxbgiFrameCallback fn);
+
+/** @brief Set the auto-refresh rate in frames per second (default 0 = no
+ *  auto-refresh). Must be called after wxbgi_wx_frame_create(). */
+BGI_API void BGI_CALL wxbgi_wx_set_frame_rate(int fps);
+
+/** @brief Request an immediate canvas repaint. */
+BGI_API void BGI_CALL wxbgi_wx_refresh(void);
+
+/** @} */ // wxbgi_standalone_api
+
 /** @} */  // wxbgi_ext_api

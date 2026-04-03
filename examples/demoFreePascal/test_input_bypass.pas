@@ -49,12 +49,12 @@ const
 // ---------------------------------------------------------------------------
 // BGI API declarations
 // ---------------------------------------------------------------------------
-procedure initwindow(width, height: Integer; title: PChar); cdecl;
-  external BgiLib name 'initwindow';
+procedure wxbgi_wx_app_create; cdecl; external BgiLib name 'wxbgi_wx_app_create';
+procedure wxbgi_wx_frame_create(width, height: Integer; title: PChar); cdecl; external BgiLib name 'wxbgi_wx_frame_create';
+procedure wxbgi_wx_app_main_loop; cdecl; external BgiLib name 'wxbgi_wx_app_main_loop';
+procedure wxbgi_wx_close_after_ms(ms: Integer); cdecl; external BgiLib name 'wxbgi_wx_close_after_ms';
 function graphresult: Integer; cdecl;
   external BgiLib name 'graphresult';
-procedure closegraph; cdecl;
-  external BgiLib name 'closegraph';
 function wxbgi_key_pressed: Integer; cdecl;
   external BgiLib name 'wxbgi_key_pressed';
 procedure wxbgi_get_mouse_pos(x, y: PInteger); cdecl;
@@ -359,7 +359,8 @@ begin
 {$ELSE}
   WriteLn('=== test_input_bypass (Pascal): automated mode ===');
 
-  initwindow(320, 240, 'test_input_bypass_pas');
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(320, 240, 'test_input_bypass_pas');
   if graphresult <> 0 then
   begin
     WriteLn(ErrOutput, 'initwindow failed');
@@ -370,7 +371,8 @@ begin
   TestBypassFlags;
   TestHookContextDds;
 
-  closegraph;
+  wxbgi_wx_close_after_ms(500);
+  wxbgi_wx_app_main_loop;
 
   if gFailures = 0 then
     WriteLn('All test_input_bypass Pascal tests PASSED.')

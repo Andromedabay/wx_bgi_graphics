@@ -16,6 +16,7 @@
 
 #include "wx_bgi.h"
 #include "wx_bgi_dds.h"
+#include "wx_bgi_ext.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -206,8 +207,9 @@ int main()
     // Initialise window.
     // -----------------------------------------------------------------------
     constexpr int kW = 320, kH = 240;
-    initwindow(kW, kH, "test_dds_deserialize", 0, 0, 0, 0);
-    require(graphresult() == 0, "initwindow failed");
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_dds_deserialize");
+    require(graphresult() == 0, "wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Test A: load DDJ — expect success and correct object count.
@@ -289,7 +291,8 @@ int main()
     rc = wxbgi_dds_from_json("{ this is not valid json }");
     require(rc == -1, "wxbgi_dds_from_json should return -1 for malformed input");
 
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_dds_deserialize]\n");
     return 0;
 }

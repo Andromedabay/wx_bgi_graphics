@@ -112,8 +112,9 @@ void require(bool cond, const char *msg)
 int main()
 {
     constexpr int kW = 400, kH = 260;
-    initwindow(kW, kH, "test_input_hooks", 0, 0, 0, 0);
-    require(graphresult() == 0, "initwindow failed");
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_input_hooks");
+    require(graphresult() == 0, "wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Phase 1: registration / deregistration (no TEST_SEAMS required)
@@ -256,7 +257,8 @@ int main()
 #endif
 
     wxbgi_poll_events();
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_input_hooks]\n");
     return 0;
 }

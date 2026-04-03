@@ -266,10 +266,11 @@ int main(int argc, char *argv[])
 #else
     std::printf("=== test_input_bypass: automated mode ===\n");
 
-    initwindow(320, 240, "test_input_bypass", 0, 0, 0, 0);
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(320, 240, "test_input_bypass");
     if (graphresult() != 0)
     {
-        std::fprintf(stderr, "initwindow failed\n");
+        std::fprintf(stderr, "wxbgi_wx_frame_create failed\n");
         return 1;
     }
 
@@ -277,7 +278,8 @@ int main(int argc, char *argv[])
     testBypassFlags();
     testHookContextDds();
 
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
 
     if (g_failures == 0)
         std::printf("\nAll test_input_bypass tests PASSED.\n");

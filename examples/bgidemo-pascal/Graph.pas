@@ -243,6 +243,15 @@ function WindowShouldClose: Boolean;
 function KeyPressed: Boolean;
 function ReadKey: Char;
 
+{ Standalone wx window API -- analogous to wxPython App/Frame/MainLoop }
+procedure WxAppCreate;
+procedure WxFrameCreate(Width, Height: Integer; const Title: string);
+procedure WxAppMainLoop;
+procedure WxCloseFrame;
+procedure WxCloseAfterMs(Ms: Integer);
+procedure WxSetFrameRate(Fps: Integer);
+procedure WxRefresh;
+
 implementation
 
 type
@@ -370,6 +379,13 @@ function _wxbgi_poll_events: LongInt; cdecl; external BgiLib name 'wxbgi_poll_ev
 function _wxbgi_key_pressed: LongInt; cdecl; external BgiLib name 'wxbgi_key_pressed';
 function _wxbgi_read_key: LongInt; cdecl; external BgiLib name 'wxbgi_read_key';
 function _wxbgi_should_close: LongInt; cdecl; external BgiLib name 'wxbgi_should_close';
+procedure _wxbgi_wx_app_create; cdecl; external BgiLib name 'wxbgi_wx_app_create';
+procedure _wxbgi_wx_frame_create(Width, Height: LongInt; Title: PChar); cdecl; external BgiLib name 'wxbgi_wx_frame_create';
+procedure _wxbgi_wx_app_main_loop; cdecl; external BgiLib name 'wxbgi_wx_app_main_loop';
+procedure _wxbgi_wx_close_frame; cdecl; external BgiLib name 'wxbgi_wx_close_frame';
+procedure _wxbgi_wx_close_after_ms(Ms: LongInt); cdecl; external BgiLib name 'wxbgi_wx_close_after_ms';
+procedure _wxbgi_wx_set_frame_rate(Fps: LongInt); cdecl; external BgiLib name 'wxbgi_wx_set_frame_rate';
+procedure _wxbgi_wx_refresh; cdecl; external BgiLib name 'wxbgi_wx_refresh';
 
 function SafeString(Value: PChar): string;
 begin
@@ -820,7 +836,8 @@ end;
 procedure RestoreCrtMode;
 begin
   _restorecrtmode;
-  WindowExpectedOpen := False;
+  { Keep WindowExpectedOpen = True so KeyPressed/ReadKey still work via the
+    keyboard queue.  The window stays alive; only an inCrtMode flag is set. }
 end;
 
 procedure PumpEvents;
@@ -855,6 +872,43 @@ begin
 
     Sleep(16);
   until False;
+end;
+
+procedure WxAppCreate;
+begin
+  _wxbgi_wx_app_create;
+end;
+
+procedure WxFrameCreate(Width, Height: Integer; const Title: string);
+begin
+  _wxbgi_wx_frame_create(Width, Height, PChar(AnsiString(Title)));
+  WindowExpectedOpen := True;
+end;
+
+procedure WxAppMainLoop;
+begin
+  _wxbgi_wx_app_main_loop;
+  WindowExpectedOpen := False;
+end;
+
+procedure WxCloseFrame;
+begin
+  _wxbgi_wx_close_frame;
+end;
+
+procedure WxCloseAfterMs(Ms: Integer);
+begin
+  _wxbgi_wx_close_after_ms(Ms);
+end;
+
+procedure WxSetFrameRate(Fps: Integer);
+begin
+  _wxbgi_wx_set_frame_rate(Fps);
+end;
+
+procedure WxRefresh;
+begin
+  _wxbgi_wx_refresh;
 end;
 
 end.

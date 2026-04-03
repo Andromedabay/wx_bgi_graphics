@@ -60,7 +60,7 @@ The library provides two camera modes, both built on the `Camera3D` struct:
 
 ## Input Processing Reference
 
-- **[InputsProcessing.md](./InputsProcessing.md)** -- complete guide to keyboard and mouse event handling: GLFW callbacks, DOS-style extended key codes, keyboard queue, mouse position tracking, click-to-pick pipeline, user hook (callback chaining) system, thread safety rules, and full code map.
+- **[InputsProcessing.md](./InputsProcessing.md)** -- complete guide to keyboard and mouse event handling: wx and GLFW backends, DOS-style extended key codes, keyboard queue, mouse position tracking, click-to-pick pipeline, user hook (callback chaining) system, thread safety rules, and full code map.
 
 ## Screenshots
 
@@ -108,8 +108,10 @@ Minimal camera setup example:
 ```c
 #include "wx_bgi.h"
 #include "wx_bgi_3d.h"
+#include "wx_bgi_ext.h"
 
-initwindow(1024, 720, "Camera Demo", 0, 0, 1, 1);
+wxbgi_wx_app_create();
+wxbgi_wx_frame_create(1024, 720, "Camera Demo");
 
 wxbgi_cam2d_create("plan");
 wxbgi_cam_set_active("plan");
@@ -119,6 +121,9 @@ wxbgi_cam2d_set_zoom("plan", 1.5f);
 setcolor(WHITE);
 wxbgi_world_line(-100.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f);
 wxbgi_world_circle(0.0f, 0.0f, 0.0f, 50.0f);
+
+wxbgi_wx_close_after_ms(5000);
+wxbgi_wx_app_main_loop();
 ```
 
 ### Keyboard Queue Helpers
@@ -177,28 +182,45 @@ CTest invokes this automatically -- see the `wxbgi_camera_demo_cpp` test entry i
 
 ### Advanced API Usage Example
 
-The snippet below shows a minimal frame loop that mixes classic BGI drawing with the extension API:
+The snippet below shows a minimal frame loop using the wx standalone API (default mode):
 
 ```c
 #include "wx_bgi.h"
 #include "wx_bgi_ext.h"
 
-/* open a double-buffered window the normal BGI way */
+static int g_frame = 0;
+
+void drawFrame(void) {
+    cleardevice();
+    setcolor(WHITE);
+    circle(320, 240, 50 + (g_frame++ % 100));
+    outtextxy(10, 10, "wx_BGI standalone loop");
+    swapbuffers();
+}
+
+int main(void) {
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(640, 480, "My Window");
+    wxbgi_set_vsync(1);
+    setbkcolor(0);   /* BLACK */
+    wxbgi_wx_set_idle_callback(drawFrame);
+    wxbgi_wx_set_frame_rate(60);
+    wxbgi_wx_app_main_loop();
+    return 0;
+}
+```
+
+**GLFW-mode** (with `WXBGI_ENABLE_WX=OFF`) uses the classic `initwindow` / frame loop pattern:
+
+```c
 initwindow(640, 480, "My Window", 0, 0, 1, 1);
 wxbgi_set_vsync(1);
-wxbgi_set_window_title("Running");
-
 while (wxbgi_should_close() == 0) {
-    /* pump OS events and clear to a dark background */
-    wxbgi_begin_advanced_frame(0.05f, 0.05f, 0.10f, 1.0f, /*clearColor=*/1, /*clearDepth=*/0);
-
-    /* classic BGI drawing */
+    wxbgi_begin_advanced_frame(0.05f, 0.05f, 0.10f, 1.0f, 1, 0);
     setcolor(WHITE);
     circle(320, 240, 100);
     outtextxy(10, 10, "Hello BGI");
-
-    /* flush OpenGL and swap buffers */
-    wxbgi_end_advanced_frame(/*swapBuffers=*/1);
+    wxbgi_end_advanced_frame(1);
 }
 closegraph();
 ```
@@ -215,19 +237,38 @@ wxbgi_get_framebuffer_size(&w, &h);
 printf("Framebuffer: %d x %d\n", w, h);
 ```
 
-## wxWidgets Embedded Canvas
+## wxWidgets Embedded Canvas (Default Backend)
 
-The library ships an optional static integration library `wx_bgi_wx` that lets you host
-the BGI drawing surface -- cameras, viewports, DDS scene graph -- inside a **wxWidgets**
-`wxFrame` alongside menus, toolbars, status bars, and other controls.
-
-Enable it at configure time:
+wxWidgets is the **default** rendering backend.  The DLL is built with wx support
+automatically — no extra CMake flag needed:
 
 ```sh
-cmake -S . -B build -DWXBGI_ENABLE_WX=ON
+cmake -S . -B build
+cmake --build build -j
 ```
 
-wxWidgets 3.2.5 is fetched automatically via FetchContent.  No manual install is needed.
+The library ships two wx integration options:
+
+### 1. Standalone wx API (Python / Pascal / C / simple C++)
+
+Open a wx window using only the C API — no wx C++ required:
+
+```c
+wxbgi_wx_app_create();
+wxbgi_wx_frame_create(640, 480, "My BGI App");
+setbkcolor(BLACK);
+setcolor(YELLOW);
+circle(320, 240, 100);
+wxbgi_wx_close_after_ms(5000);
+wxbgi_wx_app_main_loop();   // blocks until window closes
+```
+
+This is how the Python (`bgi_api_coverage.py`) and FreePascal programs work.
+
+### 2. Embedded Canvas (C++ with wxFrame)
+
+For C++ apps that need menus, status bars, or custom wx controls alongside the BGI surface,
+use `wx_bgi_wx.lib` + `WxBgiCanvas`:
 
 ```cpp
 #include <wx/wx.h>
@@ -245,8 +286,13 @@ public:
 };
 ```
 
-See **[WxWidgets.md](./WxWidgets.md)** for the full integration guide, event routing table,
-3D camera setup in wx mode, and the automated solids test.
+To build **without** wxWidgets (GLFW-only):
+```sh
+cmake -S . -B build -DWXBGI_ENABLE_WX=OFF
+```
+
+See **[WxWidgets.md](./WxWidgets.md)** for the full integration guide, standalone API reference,
+event routing table, 3D camera setup in wx mode, and automated tests.
 
 ## 3D Solid Primitives and Shading
 

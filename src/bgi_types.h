@@ -104,6 +104,50 @@ typedef void (BGI_CALL *WxbgiScrollHook)(double xoffset, double yoffset);
 #define WXBGI_DEFAULT_NONE         0x00
 /** @} */
 
+/**
+ * @name Navigation and function key codes
+ * Named constants for keyboard keys, matching GLFW values for hook callback
+ * compatibility. Use with `wxbgi_is_key_down()` and hook callbacks.
+ * @{
+ */
+#define WXBGI_KEY_SPACE         32
+#define WXBGI_KEY_APOSTROPHE    39
+#define WXBGI_KEY_COMMA         44
+#define WXBGI_KEY_MINUS         45
+#define WXBGI_KEY_PERIOD        46
+#define WXBGI_KEY_SLASH         47
+#define WXBGI_KEY_SEMICOLON     59
+#define WXBGI_KEY_EQUAL         61
+#define WXBGI_KEY_LEFT_BRACKET  91
+#define WXBGI_KEY_RIGHT_BRACKET 93
+#define WXBGI_KEY_ESCAPE        256
+#define WXBGI_KEY_ENTER         257
+#define WXBGI_KEY_TAB           258
+#define WXBGI_KEY_BACKSPACE     259
+#define WXBGI_KEY_INSERT        260
+#define WXBGI_KEY_DELETE        261
+#define WXBGI_KEY_RIGHT         262
+#define WXBGI_KEY_LEFT          263
+#define WXBGI_KEY_DOWN          264
+#define WXBGI_KEY_UP            265
+#define WXBGI_KEY_PAGE_UP       266
+#define WXBGI_KEY_PAGE_DOWN     267
+#define WXBGI_KEY_HOME          268
+#define WXBGI_KEY_END           269
+#define WXBGI_KEY_F1            290
+#define WXBGI_KEY_F2            291
+#define WXBGI_KEY_F3            292
+#define WXBGI_KEY_F4            293
+#define WXBGI_KEY_F5            294
+#define WXBGI_KEY_F6            295
+#define WXBGI_KEY_F7            296
+#define WXBGI_KEY_F8            297
+#define WXBGI_KEY_F9            298
+#define WXBGI_KEY_F10           299
+#define WXBGI_KEY_F11           300
+#define WXBGI_KEY_F12           301
+/** @} */
+
 namespace bgi
 {
 
@@ -553,6 +597,12 @@ namespace bgi
 
         // --- wx-embedded mode flag ---
         bool wxEmbedded{false}; ///< True when the BGI surface is hosted inside a WxBgiCanvas.
+        bool shouldClose{false}; ///< In wx mode: set by wxbgi_request_close / frame close event.
+        bool inCrtMode{false};  ///< Set by restorecrtmode(); cleared by setgraphmode(). Window stays open.
+        /// Optional callback set by the standalone frame to pump wx events.
+        /// Called by wxbgi_poll_events() WITHOUT holding gMutex so wx handlers
+        /// can safely call back into the BGI API.
+        void (*wxPollCallback)(){nullptr};
 
         // --- GL rendering mode ---
         bool legacyGlRender{false}; ///< When true, uses the old GL_POINTS per-pixel path.

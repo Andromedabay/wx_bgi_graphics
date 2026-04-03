@@ -81,6 +81,14 @@ function  initwindow(width, height: LongInt; title: PChar;
                      left, top, dbflag, closeflag: LongInt): LongInt;
           cdecl; external BgiLib;
 procedure closegraph;         cdecl; external BgiLib;
+procedure wxbgi_wx_app_create; cdecl; external BgiLib;
+procedure wxbgi_wx_frame_create(width, height: LongInt; title: PChar); cdecl; external BgiLib;
+procedure wxbgi_wx_app_main_loop; cdecl; external BgiLib;
+procedure wxbgi_wx_close_frame; cdecl; external BgiLib;
+procedure wxbgi_wx_set_idle_callback(fn: Pointer); cdecl; external BgiLib;
+procedure wxbgi_wx_set_frame_rate(fps: LongInt); cdecl; external BgiLib;
+procedure cleardevice; cdecl; external BgiLib;
+function  swapbuffers: LongInt; cdecl; external BgiLib;
 procedure setbkcolor(c: LongInt); cdecl; external BgiLib;
 procedure setcolor(c: LongInt);   cdecl; external BgiLib;
 procedure settextstyle(font, dir, sz: LongInt); cdecl; external BgiLib;
@@ -124,7 +132,6 @@ var
   kColors: array[0..5] of LongInt;
 
   { Loop variable }
-  i, k: LongInt;
 
 { ----- Hook callbacks — do NOT call any wxbgi_* here (mutex is held) ----- }
 procedure HookKey(key, scancode, action, mods: LongInt); cdecl;
@@ -219,6 +226,55 @@ begin
             PChar(AnsiString('n=' + IntToStr(cnt))));
 end;
 
+{ ----- Frame callback for wx idle ----- }
+procedure DrawFrame; cdecl;
+var
+  k2, i: LongInt;
+begin
+  { Drain queue for Escape }
+  while wxbgi_key_pressed <> 0 do
+  begin
+    k2 := wxbgi_read_key;
+    if k2 = 27 then
+      wxbgi_wx_close_frame;
+  end;
+
+  cleardevice;
+
+  { Status panels }
+  DrawPanel(4,            kPY, kPW, kPH, LIGHTCYAN,   'KEY  HOOK', gKeyLast,    gKeyCount);
+  DrawPanel(8 + kPW,      kPY, kPW, kPH, LIGHTGREEN,  'CHAR HOOK', gCharLast,   gCharCount);
+  DrawPanel(12 + kPW * 2, kPY, kPW, kPH, YELLOW,      'CURSOR   ', gCursorLast, gCursorCount);
+  DrawPanel(16 + kPW * 3, kPY, kPW, kPH, LIGHTMAGENTA,'MOUSE    ', gMouseLast,  gMouseCount);
+
+  { Instructions }
+  setcolor(LIGHTGRAY);
+  outtextxy(6, kDrawY,
+    'Arrow keys = move marker | C = cycle colour | Left-click = stamp | Right-click = clear | type');
+
+  { Stamps }
+  for i := 0 to gStampCount - 1 do
+  begin
+    setfillstyle(SOLID_FILL, gStamps[i].Color);
+    setcolor(gStamps[i].Color);
+    fillellipse(gStamps[i].X, gStamps[i].Y, 14, 14);
+  end;
+
+  { Keyboard-controlled marker }
+  DrawCross(gMarkerX, gMarkerY, 12, LIGHTRED);
+
+  { Mouse cursor crosshair }
+  DrawCross(gCursorX, gCursorY, 12, YELLOW);
+
+  { Typed text bar }
+  setcolor(CYAN);
+  rectangle(4, kTextY - 4, kW - 4, kH - 6);
+  setcolor(WHITE);
+  outtextxy(10, kTextY, PChar(AnsiString('Typed: ' + gTyped)));
+
+  swapbuffers;
+end;
+
 { ----- Main ----- }
 begin
   { Init colour cycle }
@@ -234,10 +290,9 @@ begin
   gKeyLast := '(none)'; gCharLast := '(none)';
   gCursorLast := '(none)'; gMouseLast := '(none)';
 
-  if initwindow(kW, kH,
-                'wx_BGI input hooks demo (Pascal) - Esc to exit',
-                80, 80, 1, 1) <> 0 then
-    Halt(1);
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(kW, kH,
+    'wx_BGI input hooks demo (Pascal) - Esc to exit');
 
   settextstyle(DEFAULT_FONT, HORIZ_DIR, 1);
 
@@ -246,52 +301,7 @@ begin
   wxbgi_set_cursor_pos_hook(@HookCursor);
   wxbgi_set_mouse_button_hook(@HookMouse);
 
-  while wxbgi_should_close = 0 do
-  begin
-    { Drain queue for Escape }
-    while wxbgi_key_pressed <> 0 do
-    begin
-      k := wxbgi_read_key;
-      if k = 27 then
-        wxbgi_request_close;
-    end;
-
-    wxbgi_begin_advanced_frame(0.03, 0.03, 0.07, 1.0, 1, 0);
-
-    { Status panels }
-    DrawPanel(4,            kPY, kPW, kPH, LIGHTCYAN,   'KEY  HOOK', gKeyLast,    gKeyCount);
-    DrawPanel(8 + kPW,      kPY, kPW, kPH, LIGHTGREEN,  'CHAR HOOK', gCharLast,   gCharCount);
-    DrawPanel(12 + kPW * 2, kPY, kPW, kPH, YELLOW,      'CURSOR   ', gCursorLast, gCursorCount);
-    DrawPanel(16 + kPW * 3, kPY, kPW, kPH, LIGHTMAGENTA,'MOUSE    ', gMouseLast,  gMouseCount);
-
-    { Instructions }
-    setcolor(LIGHTGRAY);
-    outtextxy(6, kDrawY,
-      'Arrow keys = move marker | C = cycle colour | Left-click = stamp | Right-click = clear | type');
-
-    { Stamps }
-    for i := 0 to gStampCount - 1 do
-    begin
-      setfillstyle(SOLID_FILL, gStamps[i].Color);
-      setcolor(gStamps[i].Color);
-      fillellipse(gStamps[i].X, gStamps[i].Y, 14, 14);
-    end;
-
-    { Keyboard-controlled marker }
-    DrawCross(gMarkerX, gMarkerY, 12, LIGHTRED);
-
-    { Mouse cursor crosshair }
-    DrawCross(gCursorX, gCursorY, 12, YELLOW);
-
-    { Typed text bar }
-    setcolor(CYAN);
-    rectangle(4, kTextY - 4, kW - 4, kH - 6);
-    setcolor(WHITE);
-    outtextxy(10, kTextY, PChar(AnsiString('Typed: ' + gTyped)));
-
-    wxbgi_end_advanced_frame(1);
-    Sleep(16);
-  end;
-
-  closegraph;
+  wxbgi_wx_set_idle_callback(@DrawFrame);
+  wxbgi_wx_set_frame_rate(60);
+  wxbgi_wx_app_main_loop;
 end.

@@ -47,16 +47,34 @@ function.
 
 ## Overview
 
-Input handling in wx_BGI_Graphics is a **synchronous, single-threaded, callback-driven pipeline**
-built on top of GLFW. The programmer drives the input loop by calling `wxbgi_poll_events()` (or
-the frame helpers) from their main loop. GLFW then fires any registered callbacks synchronously on
-that same thread. Keyboard events are buffered in an in-memory queue; mouse position is tracked in
+Input handling in wx_BGI_Graphics is a **synchronous, single-threaded, callback-driven pipeline**.
+The library supports two backends:
+
+- **wx backend** (default): wxWidgets drives the event loop.  `WxBgiCanvas` translates wx events
+  into the same internal BGI state updates.  `wxbgi_poll_events()` is a no-op in this mode.
+- **GLFW backend** (opt-in via `WXBGI_ENABLE_WX=OFF`): The programmer drives the loop by calling
+  `wxbgi_poll_events()` which calls `glfwPollEvents()`.
+
+In both modes, keyboard events are buffered in an in-memory queue; mouse position is tracked in
 plain integer fields; mouse button clicks directly trigger the object pick/selection system.
+After each built-in callback completes, an optional **user hook** is called if one has been
+registered.
 
-After each built-in callback completes its own internal processing, an optional **user hook** is
-called if one has been registered. This gives library users a direct, low-latency path to all input
-events without losing any of the library's built-in functionality.
+**wx-mode pipeline:**
+```
+wx event loop (automatic)
+    |
+    +-- [wxEVT_KEY_DOWN]   --> WxBgiCanvas::OnKeyDown()  --> keyDown[] updated, keyQueue pushed
+    |                                                     --> userKeyHook() called if set
+    +-- [wxEVT_CHAR]       --> WxBgiCanvas::OnChar()     --> keyQueue pushed
+    |                                                     --> userCharHook() called if set
+    +-- [wxEVT_MOTION]     --> WxBgiCanvas::OnMouseMove()--> mouseX/Y updated
+    |                                                     --> userCursorPosHook() called if set
+    +-- [wxEVT_*_DOWN/UP]  --> WxBgiCanvas::OnMouse*()  --> overlayPerformPick(), selection
+                                                         --> userMouseButtonHook() called if set
+```
 
+**GLFW-mode pipeline:**
 ```
 Programmer main loop
     |

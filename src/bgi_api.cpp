@@ -1241,7 +1241,10 @@ BGI_API int BGI_CALL registerbgifont(void (*font)(void))
 
 BGI_API void BGI_CALL restorecrtmode(void)
 {
-    closegraph();
+    // Keep the window open so keyboard events keep flowing; just flag "crt mode".
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.inCrtMode = true;
+    bgi::gState.lastResult = bgi::grOk;
 }
 
 BGI_API void BGI_CALL sector(int x, int y, int stangle, int endangle, int xradius, int yradius)
@@ -1350,7 +1353,16 @@ BGI_API unsigned BGI_CALL setgraphbufsize(unsigned bufsize)
 BGI_API void BGI_CALL setgraphmode(int mode)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::gState.graphMode = mode;
+    bgi::gState.graphMode  = mode;
+    bgi::gState.inCrtMode  = false;
+    // Clear the screen so the program gets a clean graphics surface.
+    if (bgi::isReady())
+    {
+        bgi::clearActivePage(bgi::gState.bkColor);
+        bgi::gState.currentX = 0;
+        bgi::gState.currentY = 0;
+        bgi::flushToScreen();
+    }
     bgi::gState.lastResult = bgi::grOk;
 }
 

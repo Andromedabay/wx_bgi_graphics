@@ -7,20 +7,21 @@ drawing surface -- cameras, viewports, DDS scene graph -- inside a **wxWidgets**
 <!-- ------------------------------------------------------------------ -->
 ## Contents
 
-1. [Quick Start](#quick-start)
-2. [CMake Usage](#cmake-usage)
-3. [WxBgiCanvas API](#wxbgicanvas-api)
-4. [BGI Drawing in wx Mode](#bgi-drawing-in-wx-mode)
-5. [Event Routing Table](#event-routing-table)
-6. [Scroll and Input Hooks in wx Mode](#scroll-and-input-hooks-in-wx-mode)
-7. [3D Camera and Solid Primitives](#3d-camera-and-solid-primitives)
-8. [Thread Safety](#thread-safety)
-9. [Multi-Canvas (Future)](#multi-canvas-future)
-10. [Automated Test](#automated-test)
+1. [Quick Start — C++ with WxBgiCanvas](#quick-start)
+2. [Standalone wx API (Python / Pascal / C)](#standalone-wx-api-python--pascal--c)
+3. [CMake Usage](#cmake-usage)
+4. [WxBgiCanvas API](#wxbgicanvas-api)
+5. [BGI Drawing in wx Mode](#bgi-drawing-in-wx-mode)
+6. [Event Routing Table](#event-routing-table)
+7. [Scroll and Input Hooks in wx Mode](#scroll-and-input-hooks-in-wx-mode)
+8. [3D Camera and Solid Primitives](#3d-camera-and-solid-primitives)
+9. [Thread Safety](#thread-safety)
+10. [Multi-Canvas (Future)](#multi-canvas-future)
+11. [Automated Test](#automated-test)
 
 ---
 
-## Quick Start
+## Quick Start — C++ with WxBgiCanvas
 
 ```cpp
 #include <wx/wx.h>
@@ -43,6 +44,137 @@ public:
 
 ---
 
+## Standalone wx API (Python / Pascal / C)
+
+The library includes a **standalone wx window API** modelled on wxPython's
+`wx.App` / `wx.Frame` / `wx.App.MainLoop()` pattern.  It lets Python, Pascal,
+plain C, or any ctypes-compatible language open a wx window and draw with the
+full BGI API — without writing a single line of wxWidgets C++.
+
+> **Note:** Do **not** mix `wxbgi_wx_app_create()` with `wxIMPLEMENT_APP` or
+> `wx_bgi_wx.lib` in the same program.  For C++ apps that want a custom
+> `wxFrame`, use `wx_bgi_wx.lib` + `WxBgiCanvas` directly.
+
+### API Reference
+
+```c
+// Initialise the wx application object (call once, before frame creation).
+void wxbgi_wx_app_create(void);
+
+// Create and show a BGI window of the given pixel dimensions.
+void wxbgi_wx_frame_create(int width, int height, const char* title);
+
+// Enter the wx event loop.  Does not return until the window is closed
+// (or wxbgi_wx_close_frame / wxbgi_wx_close_after_ms fires).
+void wxbgi_wx_app_main_loop(void);
+
+// Close the window immediately.
+void wxbgi_wx_close_frame(void);
+
+// Schedule the window to close after `ms` milliseconds.
+void wxbgi_wx_close_after_ms(int ms);
+
+// Register a frame callback (C function pointer, cdecl) that is called
+// by the refresh timer every tick before the canvas repaints.
+// Signature: void myCallback(void);
+void wxbgi_wx_set_idle_callback(WxbgiFrameCallback fn);
+
+// Set the repaint rate (default 0 = no periodic repaint).
+void wxbgi_wx_set_frame_rate(int fps);
+
+// Force an immediate canvas repaint outside the timer.
+void wxbgi_wx_refresh(void);
+```
+
+`WxbgiFrameCallback` is defined in `wx_bgi_ext.h`:
+```c
+typedef void (*WxbgiFrameCallback)(void);
+```
+
+### C Example
+
+```c
+#include "wx_bgi.h"
+#include "wx_bgi_ext.h"
+
+static int g_frame = 0;
+
+void drawFrame(void) {
+    cleardevice();
+    setcolor(YELLOW);
+    circle(320, 240, 40 + (g_frame++ % 80));
+    outtextxy(10, 10, "wx standalone BGI!");
+    swapbuffers();
+}
+
+int main(void) {
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(640, 480, "My BGI App");
+    setbkcolor(BLACK);
+    wxbgi_wx_set_idle_callback(drawFrame);
+    wxbgi_wx_set_frame_rate(60);
+    wxbgi_wx_app_main_loop();
+    return 0;
+}
+```
+
+### Python Example
+
+```python
+import ctypes, os, sys
+from pathlib import Path
+
+lib = ctypes.CDLL(str(Path(__file__).parent / "wx_bgi_opengl.dll"))
+# ... configure argtypes/restypes ...
+
+lib.wxbgi_wx_app_create()
+lib.wxbgi_wx_frame_create(640, 480, b"Python BGI")
+lib.setbkcolor(0)   # BLACK
+lib.setcolor(14)    # YELLOW
+lib.circle(320, 240, 100)
+lib.outtextxy(10, 10, b"Hello from Python!")
+lib.wxbgi_wx_close_after_ms(3000)
+lib.wxbgi_wx_app_main_loop()
+```
+
+### FreePascal Example
+
+```pascal
+program PascalBGI;
+uses SysUtils;
+
+const BgiLib = 'wx_bgi_opengl.dll';
+procedure wxbgi_wx_app_create; cdecl; external BgiLib;
+procedure wxbgi_wx_frame_create(w,h:Integer;t:PChar); cdecl; external BgiLib;
+procedure wxbgi_wx_app_main_loop; cdecl; external BgiLib;
+procedure wxbgi_wx_close_after_ms(ms:Integer); cdecl; external BgiLib;
+procedure setcolor(c:Integer); cdecl; external BgiLib;
+procedure circle(x,y,r:Integer); cdecl; external BgiLib;
+
+begin
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(640, 480, 'Pascal BGI');
+  setcolor(14);
+  circle(320, 240, 100);
+  wxbgi_wx_close_after_ms(3000);
+  wxbgi_wx_app_main_loop;
+end.
+```
+
+### How It Works
+
+1. `wxbgi_wx_app_create()` allocates a minimal `BgiStandaloneApp` (subclass of
+   `wxApp`) and calls `wxInitialize()`.
+2. `wxbgi_wx_frame_create()` creates a `BgiStandaloneFrame` hosting a single
+   `WxBgiCanvas`, calls `wxbgi_wx_init_for_canvas(w, h)` to set up the BGI CPU
+   page buffers, then shows the frame.  All BGI drawing calls made after this
+   point write into the page buffer and are displayed on the next paint.
+3. `wxbgi_wx_app_main_loop()` runs a Win32 message pump.  When the frame is
+   closed (timer, user click, or `wxbgi_wx_close_frame()`), the pump exits and
+   the function returns.
+
+---
+
 ## CMake Usage
 
 ```cmake
@@ -53,7 +185,7 @@ project(MyApp)
 # Point to your wx_bgi installation
 find_package(wx_bgi_opengl REQUIRED)
 
-# Build with wx support enabled
+# Build with wx support enabled (ON by default)
 option(WXBGI_ENABLE_WX "Enable wxWidgets canvas" ON)
 add_subdirectory(path/to/wx_bgi_private)
 
@@ -61,10 +193,17 @@ add_executable(MyApp main.cpp)
 target_link_libraries(MyApp PRIVATE wx_bgi_wx)
 ```
 
-Or when building wx_bgi itself:
+Or when building wx_bgi itself — wx is ON by default, no flag needed:
 
 ```sh
-cmake -S . -B build -DWXBGI_ENABLE_WX=ON
+cmake -S . -B build
+cmake --build build -j
+```
+
+To build **without** wxWidgets (GLFW-only, smaller DLL):
+
+```sh
+cmake -S . -B build -DWXBGI_ENABLE_WX=OFF
 cmake --build build -j
 ```
 
