@@ -40,13 +40,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen \
+            libwxgtk3.2-dev libwxgtk-gl3.2-dev \
             libgtk-3-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev xvfb
 
       - name: Install Doxygen (macOS)
         if: runner.os == 'macOS'
-        run: brew install doxygen
+        run: brew install doxygen wxwidgets
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -95,12 +96,12 @@ jobs:
       - name: Configure (Linux Debug)
         if: runner.os == 'Linux'
         # Debug CI enables deterministic keyboard seam checks (test-only surface).
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=ON -DWXBGI_SYSTEM_WX=ON
 
       - name: Configure (macOS Debug)
         if: runner.os == 'macOS'
         # Debug CI enables deterministic keyboard seam checks (test-only surface).
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWXBGI_ENABLE_TEST_SEAMS=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWXBGI_ENABLE_TEST_SEAMS=ON -DWXBGI_SYSTEM_WX=ON
 
       - name: Build (Linux/macOS Debug)
         if: runner.os != 'Windows'
@@ -148,13 +149,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen \
+            libwxgtk3.2-dev libwxgtk-gl3.2-dev \
             libgtk-3-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev xvfb
 
       - name: Install Doxygen (macOS)
         if: runner.os == 'macOS'
-        run: brew install doxygen
+        run: brew install doxygen wxwidgets
 
       - name: Configure (Windows Release)
         if: runner.os == 'Windows'
@@ -210,12 +212,12 @@ jobs:
       - name: Configure (Linux Release)
         if: runner.os == 'Linux'
         # Release artifacts must not expose test seam injection APIs.
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF -DWXBGI_SYSTEM_WX=ON
 
       - name: Configure (macOS Release)
         if: runner.os == 'macOS'
         # Release artifacts must not expose test seam injection APIs.
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DWXBGI_ENABLE_TEST_SEAMS=OFF
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DWXBGI_ENABLE_TEST_SEAMS=OFF -DWXBGI_SYSTEM_WX=ON
 
       - name: Build (Linux/macOS Release)
         if: runner.os != 'Windows'
@@ -287,13 +289,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y doxygen zip \
             texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended latexmk \
+            libwxgtk3.2-dev libwxgtk-gl3.2-dev \
             libgtk-3-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev
 
       - name: Configure (Release)
         # Published docs should reflect release-safe API surface (seams OFF).
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF -DWXBGI_ENABLE_TEST_SEAMS=OFF -DWXBGI_SYSTEM_WX=ON
 
       - name: Generate docs
         run: |

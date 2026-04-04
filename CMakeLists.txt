@@ -124,21 +124,64 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(yaml-cpp)
 
 # ---------------------------------------------------------------------------
-# Optional wxWidgets 3.2.5 (fetched when WXBGI_ENABLE_WX=ON)
+# wxWidgets — unified interface target `wx_bgi_wx_iface`
+#
+# Two strategies, selected by WXBGI_SYSTEM_WX:
+#
+#   OFF (default) — FetchContent builds wxWidgets 3.2.5 from source.
+#                   Best for self-contained local/Windows builds.
+#   ON            — find_package(wxWidgets) uses the system install.
+#                   Required on CI for Linux (libwxgtk3.2-dev) and
+#                   macOS (brew install wxwidgets) to avoid the 15-min
+#                   source build and the bundled-libpng fp.h error.
 # ---------------------------------------------------------------------------
 if(WXBGI_ENABLE_WX)
-    message(STATUS "Fetching wxWidgets 3.2.5...")
-    set(wxBUILD_SHARED  OFF CACHE BOOL "" FORCE)
-    set(wxBUILD_TESTS   OFF CACHE STRING "" FORCE)
-    set(wxBUILD_SAMPLES OFF CACHE STRING "" FORCE)
-    set(wxBUILD_DEMOS   OFF CACHE STRING "" FORCE)
-    FetchContent_Declare(
-        wxWidgets
-        GIT_REPOSITORY https://github.com/wxWidgets/wxWidgets.git
-        GIT_TAG        v3.2.5
-        GIT_SHALLOW    ON
-    )
-    FetchContent_MakeAvailable(wxWidgets)
+    option(WXBGI_SYSTEM_WX
+        "Use system-installed wxWidgets (find_package) instead of building from source. \
+Enable on Linux/macOS CI after installing libwxgtk3.2-dev / brew wxwidgets."
+        OFF)
+
+    # Unified INTERFACE target — rest of the build always links wx_bgi_wx_iface.
+    add_library(wx_bgi_wx_iface INTERFACE)
+
+    if(WXBGI_SYSTEM_WX)
+        message(STATUS "Using system wxWidgets (find_package)...")
+        find_package(wxWidgets 3.0 REQUIRED COMPONENTS core gl base)
+
+        # Propagate all flags through the interface target without using the
+        # legacy wxWidgets_USE_FILE (which pollutes directory-level settings).
+        target_link_libraries(wx_bgi_wx_iface INTERFACE ${wxWidgets_LIBRARIES})
+        target_include_directories(wx_bgi_wx_iface INTERFACE ${wxWidgets_INCLUDE_DIRS})
+        if(wxWidgets_CXX_FLAGS)
+            separate_arguments(_wx_cxx_flags UNIX_COMMAND "${wxWidgets_CXX_FLAGS}")
+            target_compile_options(wx_bgi_wx_iface INTERFACE ${_wx_cxx_flags})
+        endif()
+        if(wxWidgets_DEFINITIONS)
+            target_compile_definitions(wx_bgi_wx_iface INTERFACE ${wxWidgets_DEFINITIONS})
+        endif()
+    else()
+        message(STATUS "Fetching wxWidgets 3.2.5...")
+        set(wxBUILD_SHARED  OFF CACHE BOOL "" FORCE)
+        set(wxBUILD_TESTS   OFF CACHE STRING "" FORCE)
+        set(wxBUILD_SAMPLES OFF CACHE STRING "" FORCE)
+        set(wxBUILD_DEMOS   OFF CACHE STRING "" FORCE)
+
+        if(APPLE)
+            # wxWidgets 3.2.x bundles libpng which includes <fp.h>. That header was
+            # removed from macOS SDKs in Xcode 15+ (macOS Sonoma/Sequoia). Use the
+            # macOS system libpng to avoid the build error.
+            set(wxUSE_LIBPNG sys CACHE STRING "" FORCE)
+        endif()
+
+        FetchContent_Declare(
+            wxWidgets
+            GIT_REPOSITORY https://github.com/wxWidgets/wxWidgets.git
+            GIT_TAG        v3.2.5
+            GIT_SHALLOW    ON
+        )
+        FetchContent_MakeAvailable(wxWidgets)
+        target_link_libraries(wx_bgi_wx_iface INTERFACE wxcore wxgl wxbase)
+    endif()
 endif()
 
 # Build a static GLEW libraryfrom fetched sources to keep the build self-contained.
@@ -204,7 +247,7 @@ target_compile_definitions(wx_bgi_opengl PRIVATE GLEW_STATIC)
 target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp)
 
 if(WXBGI_ENABLE_WX)
-    target_link_libraries(wx_bgi_opengl PRIVATE wxcore wxgl wxbase)
+    target_link_libraries(wx_bgi_opengl PRIVATE wx_bgi_wx_iface)
     target_include_directories(wx_bgi_opengl PRIVATE
         ${CMAKE_SOURCE_DIR}/src/wx
         ${glew_SOURCE_DIR}/include)
@@ -874,7 +917,7 @@ if(WXBGI_ENABLE_WX)
         PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src
                ${glew_SOURCE_DIR}/include)
     target_compile_definitions(wx_bgi_wx PUBLIC WXBGI_ENABLE_WX GLEW_STATIC)
-    target_link_libraries(wx_bgi_wx PUBLIC wx_bgi_opengl GLEW::GLEW wxcore wxgl wxbase)
+    target_link_libraries(wx_bgi_wx PUBLIC wx_bgi_opengl GLEW::GLEW wx_bgi_wx_iface)
     # Match the MSVC runtime of the core DLL (/MT or /MTd).
     set_target_properties(wx_bgi_wx PROPERTIES
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
