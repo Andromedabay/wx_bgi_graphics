@@ -347,6 +347,7 @@ begin
 
   setactivepage(1);
   setvisualpage(0);
+  delay(90);
   setwritemode(OR_PUT);
   putpixel(10, 10, GREEN);
   setwritemode(COPY_PUT);
@@ -356,7 +357,8 @@ begin
   { Reset both pages to 0 so subsequent drawing and display are consistent. }
   setactivepage(0);
   setvisualpage(0);
-
+  delay(90);
+  
   clearviewport;
   setviewport(0, 0, getwindowwidth - 1, getwindowheight - 1, 1);
   cleardevice;

@@ -75,7 +75,7 @@ private:
     Phase               m_phase  {kDrawPrimitives};
 
     // -----------------------------------------------------------------------
-    // Phase 0: colorful BGI primitive coverage (Pascal lines 257-319)
+    // Phase 0: colorful BGI primitive coverage 
     // -----------------------------------------------------------------------
 
     void drawPrimitives()
@@ -145,7 +145,7 @@ private:
     }
 
     // -----------------------------------------------------------------------
-    // API state checks after primitives are drawn (Pascal lines 324-360)
+    // API state checks after primitives are drawn 
     // -----------------------------------------------------------------------
 
     void checkApiCoverage()
@@ -180,7 +180,7 @@ private:
         int loMode = 0, hiMode = 0;
         getmoderange(DETECT, &loMode, &hiMode);
 
-        // Page-switching (mirrors Pascal lines 348-360)
+        // Page-switching 
         setactivepage(1);
         setvisualpage(0);
         delay(30);                           // brief pause with colorful page visible
@@ -196,7 +196,7 @@ private:
     }
 
     // -----------------------------------------------------------------------
-    // Phase 1: blue screen with final message (Pascal lines 362-374)
+    // Phase 1: blue screen with final message 
     // -----------------------------------------------------------------------
 
     void drawFinalScreen()
@@ -211,7 +211,7 @@ private:
     }
 
     // -----------------------------------------------------------------------
-    // Extension API checks (Pascal lines 371-402)
+    // Extension API checks 
     // -----------------------------------------------------------------------
 
     void checkExtensionApi()
