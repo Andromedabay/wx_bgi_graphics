@@ -75,6 +75,7 @@ WxBgiCanvas::WxBgiCanvas(wxWindow* parent, wxWindowID id,
 WxBgiCanvas::~WxBgiCanvas()
 {
     Unbind(wxEVT_IDLE, &WxBgiCanvas::OnIdle, this);
+#ifdef _WIN32
     if (m_glContext && m_glewInited)
     {
         // Make context current so GL cleanup calls are valid, then release
@@ -84,6 +85,10 @@ WxBgiCanvas::~WxBgiCanvas()
         SetCurrent(*m_glContext);
         wxbgi_gl_pass_destroy();
     }
+#endif
+    // On Linux/macOS: GL resources are released when the context is deleted.
+    // Calling SetCurrent here is unsafe — the X11/Wayland surface may already
+    // be invalid during frame destruction, causing glXMakeCurrent to segfault.
     delete m_glContext;
 }
 

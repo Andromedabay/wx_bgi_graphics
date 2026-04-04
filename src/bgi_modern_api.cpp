@@ -5,6 +5,8 @@
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
+#else
+#include <dlfcn.h>
 #endif
 
 #include "wx_bgi_ext.h"
@@ -659,7 +661,15 @@ BGI_API void *BGI_CALL wxbgi_get_proc_address(const char *procName)
         return hgl ? reinterpret_cast<void *>(GetProcAddress(hgl, procName)) : nullptr;
     }
 #endif
-    return reinterpret_cast<void *>(glfwGetProcAddress(procName));
+    // glfwGetProcAddress (glXGetProcAddress on Linux) returns NULL for core
+    // GL entry points on some Mesa configurations.  Fall back to dlsym so
+    // that base functions like glClear are found in libGL.so / libGL.dylib.
+    void *p = reinterpret_cast<void *>(glfwGetProcAddress(procName));
+#ifndef _WIN32
+    if (!p)
+        p = dlsym(RTLD_DEFAULT, procName);
+#endif
+    return p;
 }
 
 BGI_API const char *BGI_CALL wxbgi_get_gl_string(int which)
