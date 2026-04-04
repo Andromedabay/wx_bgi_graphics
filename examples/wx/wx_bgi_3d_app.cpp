@@ -3,7 +3,7 @@
 // Controls
 //   Arrow keys        Orbit the camera (azimuth / elevation)
 //   +  /  -           Zoom in / out
-//   W                 Toggle wireframe / solid
+//   W                 Cycle render mode: Wireframe → Flat → Smooth (Phong)
 //   Mouse left-drag   Orbit (azimuth × elevation)
 //   Mouse scroll      Zoom
 //   R                 Reset camera to default position
@@ -95,7 +95,8 @@ public:
             case '+': case '=':  m_cam.dist    -= 1.0f;  break;
             case '-': case '_':  m_cam.dist    += 1.0f;  break;
             case 'W': case 'w':
-                m_wireframe = !m_wireframe;
+                // Cycle: Wireframe(0) → Flat(1) → Smooth(2) → Wireframe(0)
+                m_drawMode = (m_drawMode + 1) % 3;
                 // Rebuild scene so DDS reflects new draw mode.
                 buildScene();
                 break;
@@ -153,7 +154,7 @@ public:
 private:
     wxbgi::WxBgiCanvas* m_canvas{nullptr};
     bool      m_ready{false};
-    bool      m_wireframe{false};
+    int       m_drawMode{WXBGI_SOLID_WIREFRAME}; // 0=wire, 1=flat, 2=smooth
     OrbitCam  m_cam;
     bool      m_dragging{false};
     wxPoint   m_dragPt;
@@ -191,8 +192,17 @@ private:
         wxbgi_dds_clear();
         cleardevice();
 
-        int mode = m_wireframe ? WXBGI_SOLID_WIREFRAME : WXBGI_SOLID_SOLID;
+        int mode = m_drawMode;
         wxbgi_solid_set_draw_mode(mode);
+
+        // Set up Phong lighting (used by FLAT and SMOOTH modes).
+        // Key light from upper-left-front; warm fill from below.
+        wxbgi_solid_set_light_dir(-0.577f, 0.577f, 0.577f);
+        wxbgi_solid_set_light_space(1);  // world-space
+        wxbgi_solid_set_fill_light(0.5f, -0.5f, -0.5f, 0.25f);
+        wxbgi_solid_set_ambient(0.20f);
+        wxbgi_solid_set_diffuse(0.70f);
+        wxbgi_solid_set_specular(0.40f, 48.f);
 
         // Ground grid (world lines in XY plane)
         setcolor(DARKGRAY);
@@ -235,14 +245,15 @@ private:
         // Overlay HUD (pixel-space BGI text, drawn AFTER render_dds)
         setcolor(WHITE);
         char buf[128];
+        const char* modeStr = (m_drawMode == WXBGI_SOLID_WIREFRAME) ? "Wireframe" :
+                              (m_drawMode == WXBGI_SOLID_FLAT)      ? "Flat"      : "Smooth";
         snprintf(buf, sizeof(buf),
                  "Azim %.0f  Elev %.0f  Dist %.1f  [%s]",
-                 m_cam.azimDeg, m_cam.elevDeg, m_cam.dist,
-                 m_wireframe ? "Wireframe" : "Solid");
+                 m_cam.azimDeg, m_cam.elevDeg, m_cam.dist, modeStr);
         outtextxy(8, 8, buf);
         setcolor(LIGHTGRAY);
         outtextxy(8, m_canvasH - 22, const_cast<char*>(
-            "Arrows:orbit  +/-:zoom  W:wireframe  R:reset  Drag:orbit  Scroll:zoom"));
+            "Arrows:orbit  +/-:zoom  W:cycle-mode  R:reset  Drag:orbit  Scroll:zoom"));
     }
 
     // ── first-paint deferred init ─────────────────────────────────────────
@@ -275,7 +286,8 @@ private:
                  "Azim=%.0f°  Elev=%.0f°  Dist=%.1f",
                  m_cam.azimDeg, m_cam.elevDeg, m_cam.dist);
         SetStatusText(buf, 0);
-        SetStatusText(m_wireframe ? "Wireframe" : "Solid", 1);
+        SetStatusText(m_drawMode == WXBGI_SOLID_WIREFRAME ? "Wireframe" :
+                      m_drawMode == WXBGI_SOLID_FLAT      ? "Flat"      : "Smooth", 1);
     }
 };
 

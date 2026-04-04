@@ -232,6 +232,13 @@ void deleteGlObjects()
 
 void glPassInit(int w, int h)
 {
+    // Ensure GLEW function pointers are initialised for this DLL.
+    // This is a no-op if already done, but is necessary because glewInit()
+    // called from the wx_bgi_wx static-lib has a separate function-pointer
+    // table and does NOT initialise the pointers inside this DLL.
+    glewExperimental = GL_TRUE;
+    glewInit();
+
     // Guard: glGenVertexArrays requires GL 3.0+.  If GLEW didn't load it (old
     // context or no current context), bail out silently.  The caller should
     // have already fallen back to legacyGlRender via the GLEW_VERSION_3_3 check.
@@ -309,8 +316,10 @@ void renderPageAsTexture(int w, int h)
     glClearColor(bg.r / 255.f, bg.g / 255.f, bg.b / 255.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Draw fullscreen quad.
+    // Draw fullscreen quad.  Depth writes are disabled so the cleared depth
+    // buffer (all 1.0) is preserved for the subsequent 3-D solid passes.
     glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
     glUseProgram(g_pageProgram);
     glActiveTexture(GL_TEXTURE0);
@@ -321,6 +330,7 @@ void renderPageAsTexture(int w, int h)
     glBindVertexArray(0);
     glUseProgram(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    glDepthMask(GL_TRUE);
 
     // Draw selection cursors (uses legacy GL but is fine as an overlay).
     drawSelectionCursorsGL();
@@ -408,8 +418,85 @@ void renderSolidsGLPass(const PendingGlRender &pending, int w, int h,
 }
 
 // ---------------------------------------------------------------------------
-// renderWorldLinesGLPass
+// renderWireframeGLPass — two-pass hidden-line wireframe
 // ---------------------------------------------------------------------------
+
+void renderWireframeGLPass(const PendingGlRender &pending, int w, int h,
+                            const glm::mat4 &vp, const glm::vec3 &camPos)
+{
+    if (!g_inited || !pending.hasWireframe())
+        return;
+
+    glViewport(0, 0, w, h);
+
+    // ------------------------------------------------------------------
+    // Pass 1 — populate depth buffer only (no colour output).
+    // Render the solid triangles with back-face culling so only the
+    // front surfaces write depth; back surfaces remain transparent.
+    //
+    // glPolygonOffset pushes the written depth values slightly farther
+    // from the camera (factor=1, units=1).  This creates a small bias
+    // so the edge lines drawn in Pass 2 (at their true, unbiased depth)
+    // are guaranteed to be closer than what was written here and will
+    // reliably pass GL_LEQUAL — eliminating co-planar Z-fighting.
+    // ------------------------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.f, 1.f);
+
+    glBindVertexArray(g_solidVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_solidVBO);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(pending.wireTriVerts.size() * sizeof(GlVertex)),
+                 pending.wireTriVerts.data(), GL_STREAM_DRAW);
+
+    // Use the flat program — colour is discarded but we need a valid MVP.
+    glUseProgram(g_flatProgram);
+    LightState dummy{};
+    setPhongUniforms(g_flatProgram, dummy, vp, camPos);
+    glDrawArrays(GL_TRIANGLES, 0,
+                 static_cast<GLsizei>(pending.wireTriVerts.size()));
+
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDisable(GL_CULL_FACE);
+
+    // ------------------------------------------------------------------
+    // Pass 2 — draw visible edges only.
+    // Depth writes are off so edge fragments don't corrupt depth.
+    // GL_LEQUAL lets edges at their true (unbiased) depth pass reliably
+    // against the biased depth values written by Pass 1.
+    // ------------------------------------------------------------------
+    glDepthMask(GL_FALSE);
+    glDepthFunc(GL_LEQUAL);
+
+    glBindVertexArray(g_lineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_lineVBO);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(pending.wireLineVerts.size() * sizeof(GlLineVertex)),
+                 pending.wireLineVerts.data(), GL_STREAM_DRAW);
+
+    glUseProgram(g_lineProgram);
+    glUniformMatrix4fv(glGetUniformLocation(g_lineProgram, "uMVP"),
+                       1, GL_FALSE, glm::value_ptr(vp));
+    glDrawArrays(GL_LINES, 0,
+                 static_cast<GLsizei>(pending.wireLineVerts.size()));
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+
+    // Restore depth state.
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+    glDisable(GL_DEPTH_TEST);
+}
+
+
 
 void renderWorldLinesGLPass(const PendingGlRender &pending, int w, int h,
                              const glm::mat4 &vp)

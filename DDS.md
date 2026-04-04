@@ -191,22 +191,30 @@ wxbgi_set_legacy_gl_render(1);   // 1 = legacy GL_POINTS, 0 = texture quad (defa
 
 ## 3D Solid Shading Modes and Lighting API
 
-3D solid primitives support two draw modes and a Phong-style lighting model.
+3D solid primitives support three draw modes and a GPU Phong-style lighting model.
 
 ### Draw Mode Constants
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `WXBGI_SOLID_WIREFRAME` | 0 | Edges only, current line colour |
-| `WXBGI_SOLID_SOLID` | 1 | Filled faces, current face colour |
-| `WXBGI_SOLID_FLAT` | 1 | Alias for `WXBGI_SOLID_SOLID` -- flat-shaded Phong pass (future GL-5) |
-| `WXBGI_SOLID_SMOOTH` | 2 | Smooth (Gouraud-interpolated) Phong shading per vertex (future GL-5) |
+| `WXBGI_SOLID_WIREFRAME` | 0 | Edges only; current line colour; software painter's algorithm |
+| `WXBGI_SOLID_SOLID` | 1 | Backward-compat alias for `WXBGI_SOLID_FLAT` |
+| `WXBGI_SOLID_FLAT` | 1 | GL Phong flat shading with GPU depth buffer — per-face normals, sharp silhouette |
+| `WXBGI_SOLID_SMOOTH` | 2 | GL Phong smooth (Gouraud) shading — per-vertex normals averaged from adjacent faces |
+
+`WXBGI_SOLID_FLAT` and `WXBGI_SOLID_SMOOTH` use the full GPU pipeline:
+- Triangle data is tessellated in world-space and collected into a `PendingGlRender` buffer.
+- `wxbgi_render_dds()` / `wxbgi_wx_render_page_gl()` submits the buffer to the GPU as a VBO.
+- **Layer 0**: 2D page buffer uploaded as an RGBA texture (fullscreen quad).
+- **Layer 1**: Solid triangles drawn with GLSL Phong shading + `GL_DEPTH_TEST`.
+- **Layer 2**: World-space line segments drawn depth-tested (if any present).
+- Wireframe solids fall back to the software painter's algorithm (fast, no depth buffer).
 
 ### Lighting API (`wx_bgi_dds.h`)
 
 These functions configure the Phong lighting model used when `WXBGI_SOLID_FLAT`
-or `WXBGI_SOLID_SMOOTH` is active.  The parameters are stored in `BgiState` and
-will be applied by the GPU solid-render pass (GL-5 phase, pending).
+or `WXBGI_SOLID_SMOOTH` is active.  Parameters are stored in `BgiState::lightState`
+and applied each frame by the GPU solid render pass.
 
 | Function | Description |
 |----------|-------------|
@@ -216,8 +224,21 @@ will be applied by the GPU solid-render pass (GL-5 phase, pending).
 | `wxbgi_solid_set_ambient(a)` | Ambient light intensity `[0..1]`. |
 | `wxbgi_solid_set_diffuse(d)` | Diffuse reflection coefficient `[0..1]`. |
 | `wxbgi_solid_set_specular(s, shininess)` | Specular intensity and Phong shininess exponent. |
+| `wxbgi_set_legacy_gl_render(enable)` | `1` = revert to the old per-pixel `GL_POINTS` path (diagnostics only). |
 
 Default lighting:
-- Key light: `(1, 1, 2)` world-space (upper-right-forward).
-- Fill light: `(-1, 0.5, 0.5)` at strength `0.3`.
-- Ambient `0.2`, diffuse `0.7`, specular `0.4` / shininess `32`.
+- Key light: `(-0.577, 0.577, 0.577)` world-space (upper-left-front).
+- Fill light: `(0, -1, 0)` at strength `0.3`.
+- Ambient `0.2`, diffuse `0.7`, specular `0.3` / shininess `32`.
+
+### Smooth-Shading Vertex Normal Algorithm
+
+`WXBGI_SOLID_SMOOTH` computes per-vertex normals using an accumulate-and-normalise
+approach over the tessellated triangle list:
+1. Compute the face normal for every triangle.
+2. For each vertex, sum the face normals of all triangles that share that position
+   (quantised to 1/1000-world-unit grid to handle float precision).
+3. Normalise each accumulated normal.
+
+This produces smooth curvature on spheres and cylinders while preserving hard edges
+on box corners where the shared-vertex map has no neighbours.

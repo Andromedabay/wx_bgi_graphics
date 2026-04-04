@@ -2,6 +2,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "bgi_camera.h"
+#include "bgi_dds.h"
 #include "bgi_draw.h"
 #include "bgi_gl.h"
 #include "bgi_overlay.h"
@@ -11,6 +13,9 @@
 #include <cmath>
 #include <cstddef>
 #include <numbers>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace bgi
 {
@@ -355,6 +360,35 @@ namespace bgi
         glfwPollEvents();
 
         renderPageToCurrentGLContext(gState.width, gState.height);
+
+        // GL solid / line passes — only run if there is pending GL geometry.
+        if (!gState.legacyGlRender && gState.pendingGl.hasPending())
+        {
+            // Build VP matrix from the active camera.
+            auto camIt = gState.cameras.find(gState.activeCamera);
+            if (camIt != gState.cameras.end())
+            {
+                const Camera3D &cam = camIt->second->camera;
+                const float ar = (gState.height > 0)
+                    ? static_cast<float>(gState.width) / static_cast<float>(gState.height)
+                    : 1.f;
+                const glm::mat4 view = cameraViewMatrix(cam);
+                const glm::mat4 proj = cameraProjMatrix(cam, ar);
+                const glm::mat4 vp   = proj * view;
+                const glm::vec3 eye(cam.eyeX, cam.eyeY, cam.eyeZ);
+
+                if (gState.pendingGl.hasSolids())
+                    renderSolidsGLPass(gState.pendingGl, gState.width, gState.height,
+                                       gState.lightState, vp, eye);
+                if (gState.pendingGl.hasWireframe())
+                    renderWireframeGLPass(gState.pendingGl, gState.width, gState.height,
+                                          vp, eye);
+                if (gState.pendingGl.hasLines())
+                    renderWorldLinesGLPass(gState.pendingGl, gState.width, gState.height, vp);
+            }
+            gState.pendingGl.clear();
+        }
+
         glfwSwapBuffers(gState.window);
 
         gState.lastResult = grOk;

@@ -318,6 +318,9 @@ begin
   getimage(320, 40, 400, 120, @ImageBuffer[0]);
   putimage(430, 300, @ImageBuffer[0], XOR_PUT);
 
+  { Flush colorful primitives to screen so they are visible. }
+  wxbgi_poll_events;
+
   getlinesettings(@LineInfo);
   gettextsettings(@TextInfo);
   getviewsettings(@ViewInfo);
@@ -350,6 +353,9 @@ begin
   Require(getactivepage = 1, 'getactivepage mismatch');
   Require(getvisualpage = 0, 'getvisualpage mismatch');
   Require(swapbuffers = 0, 'swapbuffers failed');
+  { Reset both pages to 0 so subsequent drawing and display are consistent. }
+  setactivepage(0);
+  setvisualpage(0);
 
   clearviewport;
   setviewport(0, 0, getwindowwidth - 1, getwindowheight - 1, 1);
@@ -398,6 +404,6 @@ begin
 
   restorecrtmode;
   WriteLn('Pascal coverage completed');
-  wxbgi_wx_close_after_ms(500);
+  wxbgi_wx_close_after_ms(3000);
   wxbgi_wx_app_main_loop;
 end.

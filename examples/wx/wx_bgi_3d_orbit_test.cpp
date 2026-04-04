@@ -4,7 +4,7 @@
 // orbit over kDurationMs milliseconds (default 4500).
 //
 //   First half of orbit  : solids rendered WIREFRAME.
-//   Second half          : solids rendered SOLID fill.
+//   Second half          : solids rendered SMOOTH (GL Phong shading + depth buffer).
 //
 // Mode switch uses wxbgi_dds_set_solid_draw_mode() — fast in-place update,
 // no JSON round-trip, no camera state wipe.  Scene is built once at startup.
@@ -183,10 +183,10 @@ private:
         int frame = (int)((double)elap / (double)kDurationMs * (kTotalFrames - 1));
         frame = std::min(frame, kTotalFrames - 1);
 
-        // Switch to solid mode at half-way.
+        // Switch to smooth-shaded Phong mode at half-way.
         if (!m_solid && frame >= kHalfFrames) {
             m_solid = true;
-            wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_SOLID);
+            wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_SMOOTH);
         }
 
         renderFrame(frame);

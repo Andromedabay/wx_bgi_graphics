@@ -9,7 +9,10 @@
 
 #include "wx_bgi_ext.h"
 
+#include "bgi_camera.h"
+#include "bgi_dds.h"
 #include "bgi_draw.h"
+#include "bgi_gl.h"
 #include "bgi_overlay.h"
 #include "bgi_state.h"
 
@@ -18,6 +21,9 @@
 #include <cstddef>
 #include <cstring>
 #include <mutex>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace
 {
@@ -703,10 +709,9 @@ BGI_API int BGI_CALL wxbgi_begin_advanced_frame(float r, float g, float b, float
 
     if (bgi::gState.wxEmbedded)
     {
-        // In wx mode, the canvas manages GL context + swap. Just clear the BGI
-        // page buffer when clearColor is requested.
-        if (clearColor != 0)
-            bgi::clearActivePage(bgi::gState.bkColor);
+        // In wx mode the GL context belongs to WxBgiCanvas; there is no
+        // "advanced frame" concept.  Clearing the BGI pixel buffer here would
+        // destroy drawn content, so we do nothing at all.
         bgi::gState.lastResult = bgi::grOk;
         return 0;
     }
@@ -902,6 +907,33 @@ BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
     bgi::renderPageToCurrentGLContext(width, height);
+
+    // GL solid / wireframe / line passes — only run if there is pending GL
+    // geometry accumulated by a preceding wxbgi_render_dds() call.
+    if (!bgi::gState.legacyGlRender && bgi::gState.pendingGl.hasPending())
+    {
+        auto camIt = bgi::gState.cameras.find(bgi::gState.activeCamera);
+        if (camIt != bgi::gState.cameras.end())
+        {
+            const bgi::Camera3D &cam = camIt->second->camera;
+            const float ar = (height > 0)
+                ? static_cast<float>(width) / static_cast<float>(height)
+                : 1.f;
+            const glm::mat4 view = bgi::cameraViewMatrix(cam);
+            const glm::mat4 proj = bgi::cameraProjMatrix(cam, ar);
+            const glm::mat4 vp   = proj * view;
+            const glm::vec3 eye(cam.eyeX, cam.eyeY, cam.eyeZ);
+
+            if (bgi::gState.pendingGl.hasSolids())
+                bgi::renderSolidsGLPass(bgi::gState.pendingGl, width, height,
+                                        bgi::gState.lightState, vp, eye);
+            if (bgi::gState.pendingGl.hasWireframe())
+                bgi::renderWireframeGLPass(bgi::gState.pendingGl, width, height, vp, eye);
+            if (bgi::gState.pendingGl.hasLines())
+                bgi::renderWorldLinesGLPass(bgi::gState.pendingGl, width, height, vp);
+        }
+        bgi::gState.pendingGl.clear();
+    }
 }
 
 BGI_API void BGI_CALL wxbgi_wx_resize(int width, int height)

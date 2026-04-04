@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -48,7 +49,68 @@ struct Triangle
     glm::vec3 v[3];   ///< world-space vertices
     int       faceColor;
     int       edgeColor;
+    glm::vec3 vn[3];  ///< per-vertex normals (computed by computeVertexNormals for smooth mode)
 };
+
+// ---------------------------------------------------------------------------
+// Vertex normal computation (smooth shading)
+// ---------------------------------------------------------------------------
+
+/** For each triangle, compute per-vertex normals by accumulating face normals
+ *  from all triangles that share the same vertex position, then normalising.
+ *  This produces smooth (Gouraud) shading normals for tessellated primitives. */
+void computeVertexNormals(std::vector<Triangle> &tris)
+{
+    // Accumulate face normals indexed by quantised position (1/1000-unit grid)
+    // so that shared vertices from parametric tessellators round to the same key.
+    struct Vec3Key
+    {
+        int32_t x, y, z;
+        bool operator==(const Vec3Key &o) const
+        { return x == o.x && y == o.y && z == o.z; }
+    };
+    struct Vec3Hash
+    {
+        std::size_t operator()(const Vec3Key &k) const
+        {
+            std::size_t h = 2166136261u;
+            auto mix = [&](int32_t v){ h ^= static_cast<std::size_t>(v); h *= 16777619u; };
+            mix(k.x); mix(k.y); mix(k.z);
+            return h;
+        }
+    };
+    auto toKey = [](const glm::vec3 &p) -> Vec3Key {
+        return { static_cast<int32_t>(p.x * 1000.f),
+                 static_cast<int32_t>(p.y * 1000.f),
+                 static_cast<int32_t>(p.z * 1000.f) };
+    };
+
+    std::unordered_map<Vec3Key, glm::vec3, Vec3Hash> accum;
+    accum.reserve(tris.size() * 3);
+
+    for (const auto &t : tris)
+    {
+        glm::vec3 e1 = t.v[1] - t.v[0];
+        glm::vec3 e2 = t.v[2] - t.v[0];
+        glm::vec3 fn = glm::cross(e1, e2);
+        accum[toKey(t.v[0])] += fn;
+        accum[toKey(t.v[1])] += fn;
+        accum[toKey(t.v[2])] += fn;
+    }
+
+    for (auto &t : tris)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            auto it = accum.find(toKey(t.v[i]));
+            if (it != accum.end())
+            {
+                float len = glm::length(it->second);
+                t.vn[i] = (len > 1e-6f) ? (it->second / len) : glm::vec3(0.f, 0.f, 1.f);
+            }
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Projection helpers
@@ -539,6 +601,95 @@ void tessExtrusion(const bgi::DdsExtrusion &o, std::vector<Triangle> &tris)
 
 namespace bgi {
 
+/** Convert a BGI palette/extended color index to a normalised 0–1 RGB triple. */
+static void colorToRGBf(int ci, float &r, float &g, float &b)
+{
+    const ColorRGB c = colorToRGB(ci);
+    r = c.r / 255.f;
+    g = c.g / 255.f;
+    b = c.b / 255.f;
+}
+
+/** Push flat-shaded (face-normal) GlVertices from @p tris into @p out. */
+static void collectFlatVerts(const std::vector<Triangle> &tris,
+                              std::vector<GlVertex> &out)
+{
+    out.reserve(out.size() + tris.size() * 3);
+    for (const auto &t : tris)
+    {
+        glm::vec3 e1 = t.v[1] - t.v[0];
+        glm::vec3 e2 = t.v[2] - t.v[0];
+        glm::vec3 fn = glm::cross(e1, e2);
+        float len = glm::length(fn);
+        if (len < 1e-10f) continue;
+        fn /= len;
+
+        float r = 0.f, g = 0.f, b = 0.f;
+        const int fc = (gState.solidColorOverride >= 0)
+                           ? gState.solidColorOverride : t.faceColor;
+        colorToRGBf(fc, r, g, b);
+
+        for (int i = 0; i < 3; ++i)
+            out.push_back({t.v[i].x, t.v[i].y, t.v[i].z,
+                           fn.x, fn.y, fn.z, r, g, b});
+    }
+}
+
+/** Push wireframe geometry into @p triOut (depth-pass triangles) and
+ *  @p lineOut (visible edges).  Each triangle contributes 3 GlVertex entries
+ *  to triOut and 6 GlLineVertex entries (3 edges × 2 endpoints) to lineOut. */
+static void collectWireVerts(const std::vector<Triangle> &tris,
+                              std::vector<GlVertex> &triOut,
+                              std::vector<GlLineVertex> &lineOut)
+{
+    triOut.reserve(triOut.size() + tris.size() * 3);
+    lineOut.reserve(lineOut.size() + tris.size() * 6);
+    for (const auto &t : tris)
+    {
+        glm::vec3 e1 = t.v[1] - t.v[0];
+        glm::vec3 e2 = t.v[2] - t.v[0];
+        glm::vec3 fn = glm::cross(e1, e2);
+        const float len = glm::length(fn);
+        if (len < 1e-10f) continue;
+        fn /= len;
+
+        // Depth-pass triangles — colour is masked out, normals can be anything.
+        for (int i = 0; i < 3; ++i)
+            triOut.push_back({t.v[i].x, t.v[i].y, t.v[i].z,
+                              fn.x, fn.y, fn.z, 0.f, 0.f, 0.f});
+
+        // Visible edges — use edge colour.
+        float r = 0.f, g = 0.f, b = 0.f;
+        const int ec = (gState.solidColorOverride >= 0)
+                           ? gState.solidColorOverride : t.edgeColor;
+        colorToRGBf(ec, r, g, b);
+        for (int e = 0; e < 3; ++e)
+        {
+            const int i0 = e, i1 = (e + 1) % 3;
+            lineOut.push_back({t.v[i0].x, t.v[i0].y, t.v[i0].z, r, g, b});
+            lineOut.push_back({t.v[i1].x, t.v[i1].y, t.v[i1].z, r, g, b});
+        }
+    }
+}
+
+
+static void collectSmoothVerts(const std::vector<Triangle> &tris,
+                                std::vector<GlVertex> &out)
+{
+    out.reserve(out.size() + tris.size() * 3);
+    for (const auto &t : tris)
+    {
+        float r = 0.f, g = 0.f, b = 0.f;
+        const int fc = (gState.solidColorOverride >= 0)
+                           ? gState.solidColorOverride : t.faceColor;
+        colorToRGBf(fc, r, g, b);
+
+        for (int i = 0; i < 3; ++i)
+            out.push_back({t.v[i].x, t.v[i].y, t.v[i].z,
+                           t.vn[i].x, t.vn[i].y, t.vn[i].z, r, g, b});
+    }
+}
+
 void renderSolid3D(const Camera3D &cam, const DdsObject &baseObj)
 {
     std::vector<Triangle> tris;
@@ -574,6 +725,29 @@ void renderSolid3D(const Camera3D &cam, const DdsObject &baseObj)
         break;
     default:
         return;
+    }
+
+    // GL Phong / wireframe-HSR path: collect vertices into gState.pendingGl for
+    // the render pass.  In legacy (pre-GL3.3) mode fall through to the software
+    // painter's algorithm for all draw modes.
+    if (!gState.legacyGlRender)
+    {
+        if (mode == SolidDrawMode::Smooth)
+        {
+            computeVertexNormals(tris);
+            collectSmoothVerts(tris, gState.pendingGl.smoothVerts);
+        }
+        else if (mode == SolidDrawMode::Flat)
+        {
+            collectFlatVerts(tris, gState.pendingGl.solidVerts);
+        }
+        else // Wireframe — two-pass GL hidden-line removal
+        {
+            collectWireVerts(tris,
+                             gState.pendingGl.wireTriVerts,
+                             gState.pendingGl.wireLineVerts);
+        }
+        return;  // GL pass will render these — skip the software painter's algorithm
     }
 
     renderTriangles(cam, tris, mode);

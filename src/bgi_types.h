@@ -494,6 +494,47 @@ namespace bgi
     };
 
     // -------------------------------------------------------------------------
+    // GL pass geometry buffers (populated by wxbgi_render_dds; consumed by
+    // renderSolidsGLPass / renderWorldLinesGLPass with the GL context current).
+    // -------------------------------------------------------------------------
+
+    /** One vertex in a GL solid triangle batch (world-space, 9 floats). */
+    struct GlVertex
+    {
+        float px, py, pz;    ///< world-space position
+        float nx, ny, nz;    ///< world-space normal (face or smooth)
+        float r,  g,  b;     ///< linear RGB colour (0–1)
+    };
+
+    /** One vertex in a GL depth-tested line batch (world-space, 6 floats). */
+    struct GlLineVertex
+    {
+        float px, py, pz;    ///< world-space position
+        float r,  g,  b;     ///< linear RGB colour (0–1)
+    };
+
+    /** Geometry accumulated for a single wxbgi_render_dds() call. */
+    struct PendingGlRender
+    {
+        std::vector<GlVertex>     solidVerts;     ///< flat-mode triangles (face normals)
+        std::vector<GlVertex>     smoothVerts;    ///< smooth-mode triangles (vertex normals)
+        std::vector<GlVertex>     wireTriVerts;   ///< wireframe depth-pass triangles (positions only used)
+        std::vector<GlLineVertex> wireLineVerts;  ///< wireframe visible edges (per-edge colour)
+        std::vector<GlLineVertex> lineVerts;      ///< depth-tested world lines
+
+        bool hasSolids()    const { return !solidVerts.empty() || !smoothVerts.empty(); }
+        bool hasWireframe() const { return !wireTriVerts.empty(); }
+        bool hasLines()     const { return !lineVerts.empty(); }
+        bool hasPending()   const { return hasSolids() || hasWireframe() || hasLines(); }
+        void clear()
+        {
+            solidVerts.clear(); smoothVerts.clear();
+            wireTriVerts.clear(); wireLineVerts.clear();
+            lineVerts.clear();
+        }
+    };
+
+    // -------------------------------------------------------------------------
     // Forward declarations for DDS types (full definitions in bgi_dds.h).
     // These let BgiState hold shared_ptr<DdsCamera> and unique_ptr<DdsScene>
     // without creating a circular include between bgi_types.h and bgi_dds.h.
@@ -607,6 +648,7 @@ namespace bgi
         // --- GL rendering mode ---
         bool legacyGlRender{false}; ///< When true, uses the old GL_POINTS per-pixel path.
         LightState lightState;       ///< Lighting parameters for GL Phong shading passes.
+        PendingGlRender pendingGl;   ///< Geometry collected by wxbgi_render_dds() for the GL solid/line passes.
 
         // Explicitly declared(defined in bgi_state.cpp) so that the compiler
         // generates the destructor only where DdsScene is fully defined.

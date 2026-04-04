@@ -32,7 +32,17 @@ namespace wxbgi {
 // the entire context creation to fail if wglCreateContextAttribsARB returns NULL
 // on any driver.  Instead we let the driver provide its best compat context, then
 // check GLEW post-init for GL 3.3 features and fall back to legacy if needed.
-static const int kGLAttrs[] = { WX_GL_RGBA, WX_GL_DOUBLEBUFFER, 0 };
+//
+// WX_GL_DEPTH_SIZE 24 is required for correct hidden-surface removal: without an
+// explicit depth-buffer attachment the depth test trivially passes for all
+// fragments (draw order wins), producing completely wrong depth ordering for 3-D
+// solid and wireframe rendering.
+static const int kGLAttrs[] = {
+    WX_GL_RGBA,
+    WX_GL_DOUBLEBUFFER,
+    WX_GL_DEPTH_SIZE, 24,
+    0
+};
 
 wxBEGIN_EVENT_TABLE(WxBgiCanvas, wxGLCanvas)
     EVT_PAINT(WxBgiCanvas::OnPaint)
