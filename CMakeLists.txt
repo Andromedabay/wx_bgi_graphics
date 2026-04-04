@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 project(wx_bgigraphics_wrapper LANGUAGES C CXX)
 
+# wxWidgets on macOS uses Objective-C++ (.mm files) for the Cocoa backend.
+# CMake must have OBJCXX enabled before FetchContent builds wxWidgets, otherwise
+# CMAKE_OBJCXX_COMPILE_OBJECT is never set and the wx configure step fails.
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
+
 include(CTest)
 
 include(FetchContent)
