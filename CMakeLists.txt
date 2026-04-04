@@ -71,6 +71,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
+# Apple Clang 16 (Xcode 16.x) tightened C conformance in Objective-C translation
+# units (.m files) and now treats implicit void*→typed-pointer conversions as hard
+# errors (-Wincompatible-pointer-types). GLFW 3.4's cocoa_monitor.m has several
+# such casts (CFTypeRef→CFNumberRef, _glfw_calloc→CGDirectDisplayID* etc.) that
+# predate this stricter enforcement. Suppress for the glfw target only.
+if(APPLE)
+    target_compile_options(glfw PRIVATE -Wno-incompatible-pointer-types)
+endif()
+
 set_target_properties(glfw PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 message(STATUS "Fetching GLM...")
