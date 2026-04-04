@@ -194,6 +194,15 @@ function wxbgi_end_advanced_frame(swapBuf: LongInt): LongInt; cdecl; external Bg
 function wxbgi_read_pixels_rgba8(x, y, w, h: LongInt; outBuffer: PByte; outBufferSize: LongInt): LongInt; cdecl; external BgiLib;
 function wxbgi_write_pixels_rgba8(x, y, w, h: LongInt; inBuffer: PByte; inBufferSize: LongInt): LongInt; cdecl; external BgiLib;
 
+{ Standalone wx window API -- analogous to wxPython App/Frame/MainLoop }
+procedure wxbgi_wx_app_create; cdecl; external BgiLib;
+procedure wxbgi_wx_frame_create(width, height: LongInt; title: PChar); cdecl; external BgiLib;
+procedure wxbgi_wx_app_main_loop; cdecl; external BgiLib;
+procedure wxbgi_wx_close_frame; cdecl; external BgiLib;
+procedure wxbgi_wx_close_after_ms(ms: LongInt); cdecl; external BgiLib;
+procedure wxbgi_wx_set_frame_rate(fps: LongInt); cdecl; external BgiLib;
+procedure wxbgi_wx_refresh; cdecl; external BgiLib;
+
 procedure Require(Condition: Boolean; const Msg: string);
 begin
   if not Condition then
@@ -233,15 +242,17 @@ begin
   Require(registerbgifont(nil) = 0, 'registerbgifont mismatch');
 
   { Some CI runners may fail initgraph due to desktop/OpenGL session constraints.
-    Continue with initwindow coverage so the API surface is still validated. }
+    Continue with standalone wx window so the API surface is still validated. }
   initgraph(@gd, @gm, nil);
   InitGraphStatus := graphresult;
   if InitGraphStatus = 0 then
     closegraph;
 
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(640, 480, 'Pascal BGI Coverage');
   Require(
-    initwindow(640, 480, 'Pascal BGI Coverage', 80, 80, 1, 1) = 0,
-    'initwindow failed (initgraph status=' + IntToStr(InitGraphStatus) + ': ' + String(grapherrormsg(InitGraphStatus)) + ')'
+    graphresult = 0,
+    'wxbgi_wx_frame_create failed (initgraph status=' + IntToStr(InitGraphStatus) + ': ' + String(grapherrormsg(InitGraphStatus)) + ')'
   );
   setgraphmode(0);
   setbkcolor(BLUE);
@@ -307,6 +318,9 @@ begin
   getimage(320, 40, 400, 120, @ImageBuffer[0]);
   putimage(430, 300, @ImageBuffer[0], XOR_PUT);
 
+  { Flush colorful primitives to screen so they are visible. }
+  wxbgi_poll_events;
+
   getlinesettings(@LineInfo);
   gettextsettings(@TextInfo);
   getviewsettings(@ViewInfo);
@@ -333,13 +347,18 @@ begin
 
   setactivepage(1);
   setvisualpage(0);
+  delay(90);
   setwritemode(OR_PUT);
   putpixel(10, 10, GREEN);
   setwritemode(COPY_PUT);
   Require(getactivepage = 1, 'getactivepage mismatch');
   Require(getvisualpage = 0, 'getvisualpage mismatch');
   Require(swapbuffers = 0, 'swapbuffers failed');
-
+  { Reset both pages to 0 so subsequent drawing and display are consistent. }
+  setactivepage(0);
+  setvisualpage(0);
+  delay(90);
+  
   clearviewport;
   setviewport(0, 0, getwindowwidth - 1, getwindowheight - 1, 1);
   cleardevice;
@@ -387,4 +406,6 @@ begin
 
   restorecrtmode;
   WriteLn('Pascal coverage completed');
+  wxbgi_wx_close_after_ms(3000);
+  wxbgi_wx_app_main_loop;
 end.

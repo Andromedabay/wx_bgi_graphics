@@ -236,8 +236,16 @@ namespace bgi
 
     void clipPolyZPlanes(std::vector<glm::vec4> &poly)
     {
-        clipPolyByPlane(poly, glm::vec4(0.f, 0.f,  1.f, 1.f));   // near: Z+W>0
-        clipPolyByPlane(poly, glm::vec4(0.f, 0.f, -1.f, 1.f));   // far: -Z+W>0
+        // Full view-frustum clip (Sutherland-Hodgman, homogeneous clip space).
+        // Without XY clipping, vertices near the near-plane edge can have very
+        // large NDC X/Y values, projecting to pixels thousands of units off-screen
+        // and causing the scanline and line-draw loops to run for millions of steps.
+        clipPolyByPlane(poly, glm::vec4(0.f, 0.f,  1.f, 1.f));   // near:   Z+W>0
+        clipPolyByPlane(poly, glm::vec4(0.f, 0.f, -1.f, 1.f));   // far:   -Z+W>0
+        clipPolyByPlane(poly, glm::vec4( 1.f, 0.f, 0.f, 1.f));   // left:   X+W>0
+        clipPolyByPlane(poly, glm::vec4(-1.f, 0.f, 0.f, 1.f));   // right: -X+W>0
+        clipPolyByPlane(poly, glm::vec4(0.f,  1.f, 0.f, 1.f));   // bottom: Y+W>0
+        clipPolyByPlane(poly, glm::vec4(0.f, -1.f, 0.f, 1.f));   // top:   -Y+W>0
     }
 
     bool clipLineByPlane(glm::vec4 &A, glm::vec4 &B, const glm::vec4 &plane)
@@ -257,7 +265,11 @@ namespace bgi
     bool clipLineZPlanes(glm::vec4 &A, glm::vec4 &B)
     {
         if (!clipLineByPlane(A, B, glm::vec4(0.f, 0.f,  1.f, 1.f))) return false;
-        return clipLineByPlane(A, B, glm::vec4(0.f, 0.f, -1.f, 1.f));
+        if (!clipLineByPlane(A, B, glm::vec4(0.f, 0.f, -1.f, 1.f))) return false;
+        if (!clipLineByPlane(A, B, glm::vec4( 1.f, 0.f, 0.f, 1.f))) return false;
+        if (!clipLineByPlane(A, B, glm::vec4(-1.f, 0.f, 0.f, 1.f))) return false;
+        if (!clipLineByPlane(A, B, glm::vec4(0.f,  1.f, 0.f, 1.f))) return false;
+        return clipLineByPlane(A, B, glm::vec4(0.f, -1.f, 0.f, 1.f));
     }
 
     bool cameraClipToScreen(const Camera3D &cam, int winW, int winH,

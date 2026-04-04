@@ -19,6 +19,7 @@
 #include "wx_bgi.h"
 #include "wx_bgi_3d.h"
 #include "wx_bgi_dds.h"
+#include "wx_bgi_ext.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -49,9 +50,10 @@ void requireEq(int got, int expected, const char *context)
 int main()
 {
     constexpr int kW = 320, kH = 240;
-    initwindow(kW, kH, "test_dds_clear", 0, 0, 0, 0);
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_dds_clear");
     if (graphresult() != 0)
-        fail("initwindow failed");
+        fail("wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Baseline: 2 objects (default camera + world UCS).
@@ -146,7 +148,8 @@ int main()
     rectangle(10, 10, 50, 50);
     requireEq(wxbgi_dds_object_count(), 3, "count after draw following clear_all");
 
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_dds_clear]\n");
     return 0;
 }

@@ -39,6 +39,7 @@ namespace
         (void)scancode;
         (void)mods;
 
+        // keyDown[] always updated regardless of bypass flags (raw hardware state).
         if (key >= 0 && key < static_cast<int>(bgi::gState.keyDown.size()))
         {
             bgi::gState.keyDown[static_cast<std::size_t>(key)] = action != GLFW_RELEASE ? 1U : 0U;
@@ -46,92 +47,104 @@ namespace
 
         if (action != GLFW_PRESS && action != GLFW_REPEAT)
         {
+            if (bgi::gState.userKeyHook)
+            {
+                bgi::gState.userKeyHook(key, scancode, action, mods);
+            }
             return;
         }
 
-        switch (key)
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE)
         {
-        case GLFW_KEY_ESCAPE:
-            queueKeyCode(27);
-            break;
-        case GLFW_KEY_ENTER:
-        case GLFW_KEY_KP_ENTER:
-            queueKeyCode(13);
-            break;
-        case GLFW_KEY_TAB:
-            queueKeyCode(9);
-            break;
-        case GLFW_KEY_BACKSPACE:
-            queueKeyCode(8);
-            break;
-        case GLFW_KEY_UP:
-            queueExtendedKey(72);
-            break;
-        case GLFW_KEY_DOWN:
-            queueExtendedKey(80);
-            break;
-        case GLFW_KEY_LEFT:
-            queueExtendedKey(75);
-            break;
-        case GLFW_KEY_RIGHT:
-            queueExtendedKey(77);
-            break;
-        case GLFW_KEY_HOME:
-            queueExtendedKey(71);
-            break;
-        case GLFW_KEY_END:
-            queueExtendedKey(79);
-            break;
-        case GLFW_KEY_PAGE_UP:
-            queueExtendedKey(73);
-            break;
-        case GLFW_KEY_PAGE_DOWN:
-            queueExtendedKey(81);
-            break;
-        case GLFW_KEY_INSERT:
-            queueExtendedKey(82);
-            break;
-        case GLFW_KEY_DELETE:
-            queueExtendedKey(83);
-            break;
-        case GLFW_KEY_F1:
-            queueExtendedKey(59);
-            break;
-        case GLFW_KEY_F2:
-            queueExtendedKey(60);
-            break;
-        case GLFW_KEY_F3:
-            queueExtendedKey(61);
-            break;
-        case GLFW_KEY_F4:
-            queueExtendedKey(62);
-            break;
-        case GLFW_KEY_F5:
-            queueExtendedKey(63);
-            break;
-        case GLFW_KEY_F6:
-            queueExtendedKey(64);
-            break;
-        case GLFW_KEY_F7:
-            queueExtendedKey(65);
-            break;
-        case GLFW_KEY_F8:
-            queueExtendedKey(66);
-            break;
-        case GLFW_KEY_F9:
-            queueExtendedKey(67);
-            break;
-        case GLFW_KEY_F10:
-            queueExtendedKey(68);
-            break;
-        case GLFW_KEY_F11:
-            queueExtendedKey(133);
-            break;
-        case GLFW_KEY_F12:
-            queueExtendedKey(134);
-            break;
-        default:
-            break;
+            switch (key)
+            {
+            case GLFW_KEY_ESCAPE:
+                queueKeyCode(27);
+                break;
+            case GLFW_KEY_ENTER:
+            case GLFW_KEY_KP_ENTER:
+                queueKeyCode(13);
+                break;
+            case GLFW_KEY_TAB:
+                queueKeyCode(9);
+                break;
+            case GLFW_KEY_BACKSPACE:
+                queueKeyCode(8);
+                break;
+            case GLFW_KEY_UP:
+                queueExtendedKey(72);
+                break;
+            case GLFW_KEY_DOWN:
+                queueExtendedKey(80);
+                break;
+            case GLFW_KEY_LEFT:
+                queueExtendedKey(75);
+                break;
+            case GLFW_KEY_RIGHT:
+                queueExtendedKey(77);
+                break;
+            case GLFW_KEY_HOME:
+                queueExtendedKey(71);
+                break;
+            case GLFW_KEY_END:
+                queueExtendedKey(79);
+                break;
+            case GLFW_KEY_PAGE_UP:
+                queueExtendedKey(73);
+                break;
+            case GLFW_KEY_PAGE_DOWN:
+                queueExtendedKey(81);
+                break;
+            case GLFW_KEY_INSERT:
+                queueExtendedKey(82);
+                break;
+            case GLFW_KEY_DELETE:
+                queueExtendedKey(83);
+                break;
+            case GLFW_KEY_F1:
+                queueExtendedKey(59);
+                break;
+            case GLFW_KEY_F2:
+                queueExtendedKey(60);
+                break;
+            case GLFW_KEY_F3:
+                queueExtendedKey(61);
+                break;
+            case GLFW_KEY_F4:
+                queueExtendedKey(62);
+                break;
+            case GLFW_KEY_F5:
+                queueExtendedKey(63);
+                break;
+            case GLFW_KEY_F6:
+                queueExtendedKey(64);
+                break;
+            case GLFW_KEY_F7:
+                queueExtendedKey(65);
+                break;
+            case GLFW_KEY_F8:
+                queueExtendedKey(66);
+                break;
+            case GLFW_KEY_F9:
+                queueExtendedKey(67);
+                break;
+            case GLFW_KEY_F10:
+                queueExtendedKey(68);
+                break;
+            case GLFW_KEY_F11:
+                queueExtendedKey(133);
+                break;
+            case GLFW_KEY_F12:
+                queueExtendedKey(134);
+                break;
+            default:
+                break;
+            }
+        }
+
+        if (bgi::gState.userKeyHook)
+        {
+            bgi::gState.userKeyHook(key, scancode, action, mods);
         }
     }
 
@@ -148,21 +161,38 @@ namespace
             return;
         }
 
-        queueKeyCode(static_cast<int>(codepoint));
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_KEY_QUEUE)
+        {
+            queueKeyCode(static_cast<int>(codepoint));
+        }
+
+        if (bgi::gState.userCharHook)
+        {
+            bgi::gState.userCharHook(codepoint);
+        }
     }
 
     void cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
     {
         (void)window;
-        bgi::gState.mouseX     = static_cast<int>(xpos);
-        bgi::gState.mouseY     = static_cast<int>(ypos);
-        bgi::gState.mouseMoved = true;
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_CURSOR_TRACK)
+        {
+            bgi::gState.mouseX     = static_cast<int>(xpos);
+            bgi::gState.mouseY     = static_cast<int>(ypos);
+            bgi::gState.mouseMoved = true;
+        }
+
+        if (bgi::gState.userCursorPosHook)
+        {
+            bgi::gState.userCursorPosHook(static_cast<int>(xpos), static_cast<int>(ypos));
+        }
     }
 
     void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
     {
         (void)window;
-        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        if ((bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_MOUSE_PICK) &&
+            button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
         {
             const bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
             // NOTE: Do NOT acquire gMutex here.  All GLFW callbacks fire
@@ -171,6 +201,26 @@ namespace
             // Re-acquiring a non-recursive std::mutex on the same thread calls
             // abort() in MSVC debug builds.
             bgi::overlayPerformPick(bgi::gState.mouseX, bgi::gState.mouseY, ctrl);
+        }
+
+        if (bgi::gState.userMouseButtonHook)
+        {
+            bgi::gState.userMouseButtonHook(button, action, mods);
+        }
+    }
+
+    void scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
+    {
+        (void)window;
+        if (bgi::gState.inputDefaultFlags & WXBGI_DEFAULT_SCROLL_ACCUM)
+        {
+            bgi::gState.scrollDeltaX += xoffset;
+            bgi::gState.scrollDeltaY += yoffset;
+        }
+
+        if (bgi::gState.userScrollHook)
+        {
+            bgi::gState.userScrollHook(xoffset, yoffset);
         }
     }
 
@@ -192,7 +242,7 @@ namespace
             bgi::gState.glfwInitialized = true;
         }
 
-        bgi::destroyWindowIfNeeded();
+        bgi::destroyWindowIfNeeded(true);
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
@@ -225,6 +275,7 @@ namespace
         glfwSetCharCallback(bgi::gState.window, charCallback);
         glfwSetCursorPosCallback(bgi::gState.window, cursorPosCallback);
         glfwSetMouseButtonCallback(bgi::gState.window, mouseButtonCallback);
+        glfwSetScrollCallback(bgi::gState.window, scrollCallback);
         bgi::gState.lastResult = bgi::grOk;
         bgi::flushToScreen();
         return true;
@@ -488,7 +539,7 @@ BGI_API void BGI_CALL clearviewport(void)
 BGI_API void BGI_CALL closegraph(void)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::destroyWindowIfNeeded();
+    bgi::destroyWindowIfNeeded(true);  // reset GL state: handles become stale when context is destroyed
     bgi::gState.pageBuffers.clear();
     if (bgi::gState.glfwInitialized)
     {
@@ -880,16 +931,17 @@ BGI_API int BGI_CALL gety(void)
 
 BGI_API void BGI_CALL graphdefaults(void)
 {
+    // Classic BGI graphdefaults resets drawing *settings* only — it does NOT
+    // clear the screen, the DDS, or the camera/UCS registries.  Calling
+    // resetStateForWindow() here was a bug: it wiped the page buffer and
+    // re-initialised cameras, destroying state that the programmer did not ask
+    // to destroy.
     std::lock_guard<std::mutex> lock(bgi::gMutex);
     if (!requireReady())
     {
         return;
     }
-
-    const int width = bgi::gState.width;
-    const int height = bgi::gState.height;
-    const bool doubleBuffered = bgi::gState.doubleBuffered;
-    bgi::resetStateForWindow(width, height, doubleBuffered);
+    bgi::resetDrawingState();
     flushIfVisible();
 }
 
@@ -1190,7 +1242,10 @@ BGI_API int BGI_CALL registerbgifont(void (*font)(void))
 
 BGI_API void BGI_CALL restorecrtmode(void)
 {
-    closegraph();
+    // Keep the window open so keyboard events keep flowing; just flag "crt mode".
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.inCrtMode = true;
+    bgi::gState.lastResult = bgi::grOk;
 }
 
 BGI_API void BGI_CALL sector(int x, int y, int stangle, int endangle, int xradius, int yradius)
@@ -1299,7 +1354,16 @@ BGI_API unsigned BGI_CALL setgraphbufsize(unsigned bufsize)
 BGI_API void BGI_CALL setgraphmode(int mode)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::gState.graphMode = mode;
+    bgi::gState.graphMode  = mode;
+    bgi::gState.inCrtMode  = false;
+    // Clear the screen so the program gets a clean graphics surface.
+    if (bgi::isReady())
+    {
+        bgi::clearActivePage(bgi::gState.bkColor);
+        bgi::gState.currentX = 0;
+        bgi::gState.currentY = 0;
+        bgi::flushToScreen();
+    }
     bgi::gState.lastResult = bgi::grOk;
 }
 

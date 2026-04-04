@@ -48,8 +48,9 @@ bool contains(const std::string &haystack, const std::string &needle)
 int main()
 {
     constexpr int kW = 640, kH = 480;
-    initwindow(kW, kH, "test_solids", 0, 0, 0, 0);
-    require(graphresult() == 0, "initwindow failed");
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_solids");
+    require(graphresult() == 0, "wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Set up a perspective camera looking at the scene from (150,150,120).
@@ -177,7 +178,8 @@ int main()
     cleardevice();
     wxbgi_render_dds("cam3d");
 
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_solids]\n");
     return 0;
 }

@@ -16,5 +16,6 @@ namespace bgi
     std::vector<std::uint8_t> &activePageBuffer();
     const std::vector<std::uint8_t> &visualPageBuffer();
     void syncPagesIfNeeded();
+    void initForWxCanvas(int width, int height);
 
 } // namespace bgi

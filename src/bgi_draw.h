@@ -25,7 +25,8 @@ namespace bgi
     void clearViewportRegion(int color);
 
     void flushToScreen();
-    void destroyWindowIfNeeded();
+    void renderPageToCurrentGLContext(int w, int h);
+    void destroyWindowIfNeeded(bool resetGlState = false);
 
     void drawLineInternal(int x1, int y1, int x2, int y2, int color);
     void drawCircleInternal(int cx, int cy, int radius, int color);

@@ -1,4 +1,4 @@
-# Visual Aids
+﻿# Visual Aids
 
 The Visual Aids system provides non-DDS overlays for camera/UCS workflows.
 These overlays are designed for orientation, scale awareness, and interactive
@@ -27,12 +27,12 @@ BGI viewport clipping applies so only the portion inside each panel is drawn.
 - Enable/disable and query:
   - `wxbgi_overlay_grid_enable()`
   - `wxbgi_overlay_grid_disable()`
-  - `wxbgi_overlay_grid_is_enabled()` → `1` / `0`
+  - `wxbgi_overlay_grid_is_enabled()` -> `1` / `0`
 - Configuration:
-  - `wxbgi_overlay_grid_set_spacing(worldUnits)` — distance between lines (> 0)
-  - `wxbgi_overlay_grid_set_extent(halfExtentInLines)` — lines each side of origin (≥ 1)
+  - `wxbgi_overlay_grid_set_spacing(worldUnits)` -- distance between lines (> 0)
+  - `wxbgi_overlay_grid_set_extent(halfExtentInLines)` -- lines each side of origin (>= 1)
   - `wxbgi_overlay_grid_set_colors(xAxisColor, yAxisColor, gridColor)`
-  - `wxbgi_overlay_grid_set_ucs(ucsName)` — `NULL`/`""` = active UCS
+  - `wxbgi_overlay_grid_set_ucs(ucsName)` -- `NULL`/`""` = active UCS
 
 Defaults:
 
@@ -56,11 +56,11 @@ shown simultaneously.
 - Enable/disable and query:
   - `wxbgi_overlay_ucs_axes_enable()`
   - `wxbgi_overlay_ucs_axes_disable()`
-  - `wxbgi_overlay_ucs_axes_is_enabled()` → `1` / `0`
+  - `wxbgi_overlay_ucs_axes_is_enabled()` -> `1` / `0`
 - Configuration:
-  - `wxbgi_overlay_ucs_axes_show_world(show)` — show world-origin axes
-  - `wxbgi_overlay_ucs_axes_show_active(show)` — show active-UCS axes
-  - `wxbgi_overlay_ucs_axes_set_length(worldUnits)` — arm length (> 0)
+  - `wxbgi_overlay_ucs_axes_show_world(show)` -- show world-origin axes
+  - `wxbgi_overlay_ucs_axes_show_active(show)` -- show active-UCS axes
+  - `wxbgi_overlay_ucs_axes_set_length(worldUnits)` -- arm length (> 0)
 
 Defaults:
 
@@ -82,11 +82,11 @@ providing immediate scale feedback.
 - 3D cameras: crosshair is fixed (upward on screen).
 
 - Enable/disable and query:
-  - `wxbgi_overlay_concentric_enable(camName)` — `NULL`/`""` = active camera
+  - `wxbgi_overlay_concentric_enable(camName)` -- `NULL`/`""` = active camera
   - `wxbgi_overlay_concentric_disable(camName)`
-  - `wxbgi_overlay_concentric_is_enabled(camName)` → `1` / `0`
+  - `wxbgi_overlay_concentric_is_enabled(camName)` -> `1` / `0`
 - Configuration:
-  - `wxbgi_overlay_concentric_set_count(camName, count)` — clamped to `1..8`
+  - `wxbgi_overlay_concentric_set_count(camName, count)` -- clamped to `1..8`
   - `wxbgi_overlay_concentric_set_radii(camName, innerRadius, outerRadius)`
 
 Defaults:
@@ -111,11 +111,11 @@ visible on top of scene content.
 - Selection is triggered by a left-click anywhere inside the camera viewport.
 
 - Enable/disable and query:
-  - `wxbgi_overlay_cursor_enable(camName)` — also activates click-to-select
+  - `wxbgi_overlay_cursor_enable(camName)` -- also activates click-to-select
   - `wxbgi_overlay_cursor_disable(camName)`
-  - `wxbgi_overlay_cursor_is_enabled(camName)` → `1` / `0`
+  - `wxbgi_overlay_cursor_is_enabled(camName)` -> `1` / `0`
 - Configuration:
-  - `wxbgi_overlay_cursor_set_size(camName, sizePx)` — clamped to `2..16`
+  - `wxbgi_overlay_cursor_set_size(camName, sizePx)` -- clamped to `2..16`
   - `wxbgi_overlay_cursor_set_color(camName, colorScheme)`
 
 Default size: `8` px
@@ -149,7 +149,7 @@ supported:
 - 2D primitives: line, circle, arc, rectangle, ellipse, text
 - 3D world/UCS draw functions: world line, world circle, world arc, world rectangle, world ellipse
 - 3D solids: sphere, cylinder, cone, torus (Sutherland-Hodgman projected outline)
-- Parametric surfaces: sphere, cylinder, torus, saddle, Möbius (formula-aware probe points)
+- Parametric surfaces: sphere, cylinder, torus, saddle, Mobius (formula-aware probe points)
 
 ### Flash Visual Feedback
 
@@ -242,7 +242,7 @@ struct OverlayGridState
 {
     bool        enabled    {false};
     float       spacing    {25.f};      // world units between adjacent lines
-    int         halfExtent {4};         // grid spans ±(halfExtent×spacing)
+    int         halfExtent {4};         // grid spans +/-(halfExtentxspacing)
     int         xAxisColor {RED};
     int         yAxisColor {GREEN};
     int         gridColor  {DARKGRAY};
@@ -254,7 +254,7 @@ struct OverlayUcsAxesState
     bool  enabled    {false};
     bool  showWorld  {true};            // draw world UCS at (0,0,0)
     bool  showActive {true};            // draw active UCS at its origin
-    float axisLength {80.f};            // world units origin→tip
+    float axisLength {80.f};            // world units origin->tip
 } overlayUcsAxes;
 
 // ---- Selection state -------------------------------------------------------
@@ -269,7 +269,7 @@ int solidColorOverride{-1};   // if >= 0, overrides tri.faceColor/edgeColor
 ### Per-camera overlay state (anonymous structs inside `Camera3D`)
 
 ```cpp
-// Inside Camera3D (src/bgi_types.h) — not serialised to DDS/DDJ
+// Inside Camera3D (src/bgi_types.h) -- not serialised to DDS/DDJ
 
 struct {
     bool  enabled     {false};
@@ -287,21 +287,21 @@ struct {
 
 **Ownership:** Both overlay structs are value members of `Camera3D`, which is a
 value member of `DdsCamera`.  They live and die with the camera.  They are
-**not** serialized — the scene file does not store overlay state.
+**not** serialized -- the scene file does not store overlay state.
 
 ---
 
 ## 2. Drawing layer -- `src/bgi_overlay.cpp`
 
 Pure drawing routines; no public API symbols.  All functions operate under
-`gMutex` (the mutex is held by the caller — do not re-acquire inside).
+`gMutex` (the mutex is held by the caller -- do not re-acquire inside).
 
 ### Internal drawing functions (anonymous namespace)
 
 | Function | What it draws |
 |---|---|
 | `drawGridOverlay(cam)` | One grid-line pass for a camera.  Iterates rows and columns; each line passes through `cameraWorldToScreen` and `drawLineInternal`. |
-| `drawUcsAxesOverlay(cam)` | Six axis arms (±X, ±Y, ±Z) for world UCS and/or active UCS.  Text labels placed at the positive tip via `bgi::drawText`. |
+| `drawUcsAxesOverlay(cam)` | Six axis arms (+/-X, +/-Y, +/-Z) for world UCS and/or active UCS.  Text labels placed at the positive tip via `bgi::drawText`. |
 | `drawConcentricOverlay(camName, cam)` | Up to 8 concentric circles and a crosshair.  Radius stepping: `innerRadius + i * (outerRadius - innerRadius) / (count - 1)`.  Each circle drawn with `circle()` in projected pixel coordinates. |
 
 ### Selection cursor GL pass
@@ -310,7 +310,7 @@ Pure drawing routines; no public API symbols.  All functions operate under
 void drawSelectionCursorsGL();
 ```
 
-Called from `flushToScreen()` in the **OpenGL pass** — after the BGI pixel
+Called from `flushToScreen()` in the **OpenGL pass** -- after the BGI pixel
 buffer is uploaded but before `glFlush()`.  Uses immediate-mode `GL_LINE_LOOP`
 so the square renders on top of everything.  Does not acquire `gMutex` (caller
 holds it).
@@ -334,7 +334,7 @@ Called from `mouseButtonCallback` in `bgi_api.cpp`.  Logic:
 2. Update `selectedObjectIds` according to the toggle rules:
 
 ```
-wasSelected = nearestId ∈ selectedObjectIds
+wasSelected = nearestId in selectedObjectIds
 
 if NOT multiSelect:
     selectedObjectIds.clear()
@@ -343,10 +343,10 @@ if NOT wasSelected:
     selectedObjectIds.push_back(nearestId)   // select
 else if multiSelect:
     selectedObjectIds.erase(nearestId)       // CTRL+click toggle off
-// plain click on already-selected: cleared above → deselected
+// plain click on already-selected: cleared above -> deselected
 ```
 
-3. Break — first matching camera viewport wins.
+3. Break -- first matching camera viewport wins.
 
 ### Distance probing -- `screenDistToObject()`
 
@@ -374,7 +374,7 @@ front).  Per-type logic:
 ```
 for each camera:
     render DDS scene objects
-    drawOverlaysForCamera(camName, cam)   ← grid, UCS axes, concentric circles
+    drawOverlaysForCamera(camName, cam)   <- grid, UCS axes, concentric circles
     flushToScreen()
         +-- drawSelectionCursorsGL()      <- selection cursor (OpenGL pass)
 ```
@@ -414,7 +414,7 @@ struct, then releases the mutex.
 | `wxbgi_overlay_grid_disable()` | `overlayGrid.enabled = false` |
 | `wxbgi_overlay_grid_is_enabled()` | Returns `overlayGrid.enabled` |
 | `wxbgi_overlay_grid_set_spacing(f)` | Sets `overlayGrid.spacing` (> 0 only) |
-| `wxbgi_overlay_grid_set_extent(n)` | Sets `overlayGrid.halfExtent` (≥ 1) |
+| `wxbgi_overlay_grid_set_extent(n)` | Sets `overlayGrid.halfExtent` (>= 1) |
 | `wxbgi_overlay_grid_set_colors(x,y,g)` | Sets X/Y/grid colors |
 | `wxbgi_overlay_grid_set_ucs(name)` | Sets `overlayGrid.ucsName` |
 
@@ -429,7 +429,7 @@ struct, then releases the mutex.
 | `wxbgi_overlay_ucs_axes_show_active(n)` | Sets `overlayUcsAxes.showActive` |
 | `wxbgi_overlay_ucs_axes_set_length(f)` | Sets `overlayUcsAxes.axisLength` (> 0) |
 
-### Concentric Circles (per-camera, `camName` = `NULL`/`""` → active camera)
+### Concentric Circles (per-camera, `camName` = `NULL`/`""` -> active camera)
 
 | Function | Description |
 |---|---|
@@ -465,7 +465,7 @@ struct, then releases the mutex.
 ## 5. File dependency diagram
 
 ```
-wx_bgi_overlay.h        (public declarations — include in user code)
+wx_bgi_overlay.h        (public declarations -- include in user code)
      |
      v
 bgi_overlay_api.cpp     (public C API implementation: lock gMutex, mutate gState)
@@ -482,14 +482,14 @@ bgi_overlay_api.cpp     (public C API implementation: lock gMutex, mutate gState
                           BgiState::selectedObjectIds / selectionFlashScheme / selectionPickRadiusPx)
 
 bgi_dds_render.cpp  (calls drawOverlaysForCamera + renderObject flash logic)
-bgi_api.cpp         (mouseButtonCallback → overlayPerformPick)
-bgi_draw.cpp        (flushToScreen → drawSelectionCursorsGL)
+bgi_api.cpp         (mouseButtonCallback -> overlayPerformPick)
+bgi_draw.cpp        (flushToScreen -> drawSelectionCursorsGL)
 ```
 
 ---
 
 ## See also
 
-- [Camera3D_Map.md](Camera3D_Map.md) — camera data, math, and API
-- [Camera2D_Map.md](Camera2D_Map.md) — 2D camera convenience layer
-- [DDS.md](DDS.md) — DDS / CHDOP / DDJ / DDY scene graph documentation
+- [Camera3D_Map.md](Camera3D_Map.md) -- camera data, math, and API
+- [Camera2D_Map.md](Camera2D_Map.md) -- 2D camera convenience layer
+- [DDS.md](DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation

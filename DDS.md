@@ -1,11 +1,11 @@
-# Drawing Description Data Structure (DDS)
+﻿# Drawing Description Data Structure (DDS)
 
 ## Acronym Glossary
 
 | Acronym | Expanded Form | Meaning |
 |---------|--------------|---------|
 | **DDS** | Drawing Description Data Structure | The in-memory retained-mode scene graph that holds every drawing object created during a session. |
-| **DDDS** | Drawing Description Data Structure (alternative form) | Interchangeable with DDS — used in early design notes; the shorter form **DDS** is preferred in code and API names. |
+| **DDDS** | Drawing Description Data Structure (alternative form) | Interchangeable with DDS -- used in early design notes; the shorter form **DDS** is preferred in code and API names. |
 | **CHDOP** | Class Hierarchy of Drawing Object Primitives | The C++ class/struct hierarchy that represents individual objects stored inside the DDS (points, lines, circles, cameras, UCS frames, 3D solids, etc.). |
 | **DDJ** | Drawing Data JSON | A JSON-format serialisation of the full DDS scene, produced by `wxbgi_dds_to_json()` and consumed by `wxbgi_dds_from_json()`. |
 | **DDY** | Drawing Data YAML | A YAML-format serialisation of the full DDS scene, produced by `wxbgi_dds_to_yaml()` and consumed by `wxbgi_dds_from_yaml()`. |
@@ -22,7 +22,7 @@ Cameras (`wxbgi_cam_*` / `wxbgi_cam2d_*`), User Coordinate Systems (`wxbgi_ucs_*
 
 Key design choices:
 
-- **Collection:** `std::unordered_map` (O(1) direct access by string ID) combined with a `std::vector` insertion-order index — giving both quick direct access and sequential traversal.
+- **Collection:** `std::unordered_map` (O(1) direct access by string ID) combined with a `std::vector` insertion-order index -- giving both quick direct access and sequential traversal.
 - **Default scene:** A default camera named `"default"` and a world UCS named `"world"` are created automatically on `initwindow()` / `initgraph()`.
 - **Retained-mode render:** Call `wxbgi_render_dds(camName)` to replay the full scene through any camera. All three panels of the camera demo use this to show the same DDS from different viewpoints simultaneously.
 - **Serialisation:** The scene can be exported to DDJ or DDY at any time and re-imported to restore or share it.
@@ -67,7 +67,7 @@ Key design choices:
 |----------|-------------|
 | `wxbgi_render_dds(camName)` | Traverse the full DDS and render every visible object through the named camera into the active BGI pixel buffer. Pass `NULL` to use the active camera. |
 
-### Serialisation — DDJ (JSON)
+### Serialisation -- DDJ (JSON)
 
 | Function | Description |
 |----------|-------------|
@@ -76,7 +76,7 @@ Key design choices:
 | `wxbgi_dds_save_json(filePath)` | Save DDJ to a file. Returns 0 on success. |
 | `wxbgi_dds_load_json(filePath)` | Load DDJ from a file. Returns 0 on success. |
 
-### Serialisation — DDY (YAML)
+### Serialisation -- DDY (YAML)
 
 | Function | Description |
 |----------|-------------|
@@ -131,7 +131,7 @@ The following constants identify the concrete CHDOP sub-type of each DDS entry:
 
 initwindow(800, 600, "DDS Demo", 0, 0, 1, 1);
 
-// Classic BGI calls — each one also writes a CHDOP entry to the DDS.
+// Classic BGI calls -- each one also writes a CHDOP entry to the DDS.
 setcolor(WHITE);
 circle(400, 300, 80);
 rectangle(200, 150, 600, 450);
@@ -150,3 +150,95 @@ printf("Objects in DDS: %d\n", wxbgi_dds_object_count());
 wxbgi_dds_clear();
 wxbgi_dds_load_json("scene.ddj");
 ```
+
+---
+
+## GL Rendering Pipeline (wx Mode)
+
+When using `wx_bgi_wx`, the BGI pixel buffer is composited to the screen via an
+OpenGL texture quad pass rather than the legacy per-pixel `GL_POINTS` path.
+The modern path is selected automatically when the driver supports **OpenGL 3.3**
+(virtually all hardware since 2010).  On older drivers the library falls back
+silently to the legacy path.
+
+### Explicit GL Cleanup
+
+When the application destroys its `wxGLContext`, call `wxbgi_gl_pass_destroy()`
+**with the context still current** to release all internal GL objects (textures,
+VAOs, shader programs).  Omitting this can cause GPU driver crashes during
+process shutdown on some Windows configurations.
+
+The `WxBgiCanvas` destructor handles this automatically, so user code only needs
+this call when managing a custom `wxGLContext` lifecycle:
+
+```cpp
+// Custom GL context teardown -- make context current first.
+canvas->SetCurrent(*myGlContext);
+wxbgi_gl_pass_destroy();   // release VAOs, VBOs, textures, programs
+delete myGlContext;
+```
+
+### Diagnostic: Legacy GL Fallback
+
+Force the legacy `GL_POINTS` rendering path at runtime (useful for comparing
+output or isolating GL driver issues):
+
+```c
+wxbgi_set_legacy_gl_render(1);   // 1 = legacy GL_POINTS, 0 = texture quad (default)
+```
+
+---
+
+## 3D Solid Shading Modes and Lighting API
+
+3D solid primitives support three draw modes and a GPU Phong-style lighting model.
+
+### Draw Mode Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `WXBGI_SOLID_WIREFRAME` | 0 | Edges only; current line colour; software painter's algorithm |
+| `WXBGI_SOLID_SOLID` | 1 | Backward-compat alias for `WXBGI_SOLID_FLAT` |
+| `WXBGI_SOLID_FLAT` | 1 | GL Phong flat shading with GPU depth buffer — per-face normals, sharp silhouette |
+| `WXBGI_SOLID_SMOOTH` | 2 | GL Phong smooth (Gouraud) shading — per-vertex normals averaged from adjacent faces |
+
+`WXBGI_SOLID_FLAT` and `WXBGI_SOLID_SMOOTH` use the full GPU pipeline:
+- Triangle data is tessellated in world-space and collected into a `PendingGlRender` buffer.
+- `wxbgi_render_dds()` / `wxbgi_wx_render_page_gl()` submits the buffer to the GPU as a VBO.
+- **Layer 0**: 2D page buffer uploaded as an RGBA texture (fullscreen quad).
+- **Layer 1**: Solid triangles drawn with GLSL Phong shading + `GL_DEPTH_TEST`.
+- **Layer 2**: World-space line segments drawn depth-tested (if any present).
+- Wireframe solids fall back to the software painter's algorithm (fast, no depth buffer).
+
+### Lighting API (`wx_bgi_dds.h`)
+
+These functions configure the Phong lighting model used when `WXBGI_SOLID_FLAT`
+or `WXBGI_SOLID_SMOOTH` is active.  Parameters are stored in `BgiState::lightState`
+and applied each frame by the GPU solid render pass.
+
+| Function | Description |
+|----------|-------------|
+| `wxbgi_solid_set_light_dir(x, y, z)` | Primary (key) light direction vector (will be normalised). |
+| `wxbgi_solid_set_light_space(worldSpace)` | `1` = light direction in world space; `0` = view/eye space. |
+| `wxbgi_solid_set_fill_light(x, y, z, strength)` | Secondary fill light direction + intensity scalar. |
+| `wxbgi_solid_set_ambient(a)` | Ambient light intensity `[0..1]`. |
+| `wxbgi_solid_set_diffuse(d)` | Diffuse reflection coefficient `[0..1]`. |
+| `wxbgi_solid_set_specular(s, shininess)` | Specular intensity and Phong shininess exponent. |
+| `wxbgi_set_legacy_gl_render(enable)` | `1` = revert to the old per-pixel `GL_POINTS` path (diagnostics only). |
+
+Default lighting:
+- Key light: `(-0.577, 0.577, 0.577)` world-space (upper-left-front).
+- Fill light: `(0, -1, 0)` at strength `0.3`.
+- Ambient `0.2`, diffuse `0.7`, specular `0.3` / shininess `32`.
+
+### Smooth-Shading Vertex Normal Algorithm
+
+`WXBGI_SOLID_SMOOTH` computes per-vertex normals using an accumulate-and-normalise
+approach over the tessellated triangle list:
+1. Compute the face normal for every triangle.
+2. For each vertex, sum the face normals of all triangles that share that position
+   (quantised to 1/1000-world-unit grid to handle float precision).
+3. Normalise each accumulated normal.
+
+This produces smooth curvature on spheres and cylinders while preserving hard edges
+on box corners where the shared-vertex map has no neighbours.

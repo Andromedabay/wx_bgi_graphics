@@ -32,11 +32,19 @@ const
 
 function initwindow(width, height: LongInt; title: PChar; left, top, dbflag, closeflag: LongInt): LongInt; cdecl; external BgiLib;
 procedure closegraph; cdecl; external BgiLib;
+procedure wxbgi_wx_app_create; cdecl; external BgiLib;
+procedure wxbgi_wx_frame_create(width, height: LongInt; title: PChar); cdecl; external BgiLib;
+procedure wxbgi_wx_app_main_loop; cdecl; external BgiLib;
+procedure wxbgi_wx_close_frame; cdecl; external BgiLib;
+procedure wxbgi_wx_set_idle_callback(fn: Pointer); cdecl; external BgiLib;
+procedure wxbgi_wx_set_frame_rate(fps: LongInt); cdecl; external BgiLib;
 procedure setbkcolor(color: LongInt); cdecl; external BgiLib;
 procedure setcolor(color: LongInt); cdecl; external BgiLib;
 procedure settextstyle(font, direction, charsize: LongInt); cdecl; external BgiLib;
 procedure outtextxy(x, y: LongInt; textstring: PChar); cdecl; external BgiLib;
 procedure rectangle(left, top, right, bottom: LongInt); cdecl; external BgiLib;
+procedure cleardevice; cdecl; external BgiLib;
+function swapbuffers: LongInt; cdecl; external BgiLib;
 function wxbgi_key_pressed: LongInt; cdecl; external BgiLib;
 function wxbgi_read_key: LongInt; cdecl; external BgiLib;
 function wxbgi_is_key_down(key: LongInt): LongInt; cdecl; external BgiLib;
@@ -72,14 +80,61 @@ begin
   outtextxy(X, Y, PChar(AnsiString(S)));
 end;
 
+{ ----------- Idle callback (called each timer tick from wx) ----------- }
+
 var
-  KeyCode: LongInt;
   LastKeyCode: LongInt;
   LastExtendedCode: LongInt;
   WaitingForExtendedCode: Boolean;
+
+procedure DrawFrame; cdecl;
+var
+  KeyCode: LongInt;
 begin
-  if initwindow(900, 320, 'wx_BGI Pascal keyboard queue demo', 110, 110, 1, 1) <> 0 then
-    Halt(1);
+  while wxbgi_key_pressed <> 0 do
+  begin
+    KeyCode := wxbgi_read_key;
+    if KeyCode < 0 then
+      Break;
+
+    if WaitingForExtendedCode then
+    begin
+      LastExtendedCode := KeyCode;
+      WriteLn('extended scan: ', LastExtendedCode);
+      WaitingForExtendedCode := False;
+    end
+    else
+    begin
+      LastKeyCode := KeyCode;
+      WriteLn('queued key: ', LastKeyCode);
+      if KeyCode = 0 then
+        WaitingForExtendedCode := True
+      else if KeyCode = 27 then
+        wxbgi_wx_close_frame;
+    end;
+  end;
+
+  cleardevice;
+
+  setcolor(LIGHTGREEN);
+  DrawTextLine(20, 20, 'Keyboard queue demo');
+  setcolor(WHITE);
+  DrawTextLine(20, 50, 'Press normal keys, arrow keys, or Esc to close.');
+  DrawTextLine(20, 70, 'Extended keys emit 0 first, then a DOS-style scan code.');
+  DrawTextLine(20, 120, 'Last queued key: ' + DescribeKeyCode(LastKeyCode));
+  DrawTextLine(20, 145, 'Last extended scan: ' + DescribeKeyCode(LastExtendedCode));
+  DrawTextLine(20, 170, 'Esc currently down: ' + BoolText(wxbgi_is_key_down(GLFW_KEY_ESCAPE) = 1));
+  DrawTextLine(20, 195, 'Left arrow down: ' + BoolText(wxbgi_is_key_down(GLFW_KEY_LEFT) = 1));
+
+  setcolor(YELLOW);
+  rectangle(12, 12, 880, 235);
+
+  swapbuffers;
+end;
+
+begin
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(900, 320, 'wx_BGI Pascal keyboard queue demo');
 
   setbkcolor(BLACK);
   settextstyle(DEFAULT_FONT, HORIZ_DIR, 1);
@@ -88,49 +143,7 @@ begin
   LastExtendedCode := -1;
   WaitingForExtendedCode := False;
 
-  while wxbgi_should_close = 0 do
-  begin
-    while wxbgi_key_pressed <> 0 do
-    begin
-      KeyCode := wxbgi_read_key;
-      if KeyCode < 0 then
-        Break;
-
-      if WaitingForExtendedCode then
-      begin
-        LastExtendedCode := KeyCode;
-        WriteLn('extended scan: ', LastExtendedCode);
-        WaitingForExtendedCode := False;
-      end
-      else
-      begin
-        LastKeyCode := KeyCode;
-          WriteLn('queued key: ', LastKeyCode);
-        if KeyCode = 0 then
-          WaitingForExtendedCode := True
-        else if KeyCode = 27 then
-          wxbgi_request_close;
-      end;
-    end;
-
-    wxbgi_begin_advanced_frame(0.02, 0.04, 0.08, 1.0, 1, 0);
-
-    setcolor(LIGHTGREEN);
-    DrawTextLine(20, 20, 'Keyboard queue demo');
-    setcolor(WHITE);
-    DrawTextLine(20, 50, 'Press normal keys, arrow keys, or Esc to close.');
-    DrawTextLine(20, 70, 'Extended keys emit 0 first, then a DOS-style scan code.');
-    DrawTextLine(20, 120, 'Last queued key: ' + DescribeKeyCode(LastKeyCode));
-    DrawTextLine(20, 145, 'Last extended scan: ' + DescribeKeyCode(LastExtendedCode));
-    DrawTextLine(20, 170, 'Esc currently down: ' + BoolText(wxbgi_is_key_down(GLFW_KEY_ESCAPE) = 1));
-    DrawTextLine(20, 195, 'Left arrow down: ' + BoolText(wxbgi_is_key_down(GLFW_KEY_LEFT) = 1));
-
-    setcolor(YELLOW);
-    rectangle(12, 12, 880, 235);
-
-    wxbgi_end_advanced_frame(1);
-    Sleep(16);
-  end;
-
-  closegraph;
+  wxbgi_wx_set_idle_callback(@DrawFrame);
+  wxbgi_wx_set_frame_rate(60);
+  wxbgi_wx_app_main_loop;
 end.

@@ -241,7 +241,7 @@ int main()
     require(registerbgifont(&dummyDriver) == 0, "registerbgifont failed");
 
     // Some CI runners may fail initgraph due to desktop/OpenGL session constraints.
-    // Continue with initwindow coverage so the API surface is still validated.
+    // Continue with standalone wx window so the API surface is still validated.
     initgraph(&driver, &mode, nullptr);
     const int initgraphStatus = graphresult();
     if (initgraphStatus == bgi::grOk)
@@ -249,15 +249,16 @@ int main()
         closegraph();
     }
 
-    require(
-        initwindow(640, 480, "BGI Coverage", 80, 80, 1, 1) == 0,
-        std::string("initwindow failed (initgraph status=") + std::to_string(initgraphStatus) +
-            ": " + grapherrormsg(initgraphStatus) + ")");
-    require(graphresult() == bgi::grOk, std::string("initwindow graphresult: ") + grapherrormsg(graphresult()));
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(640, 480, "BGI Coverage");
+    require(graphresult() == bgi::grOk,
+            std::string("wxbgi_wx_frame_create failed: ") + grapherrormsg(graphresult()));
 
     drawCoverageScene();
     restorecrtmode();
 
     std::cout << "C++ coverage completed" << std::endl;
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     return 0;
 }

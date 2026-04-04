@@ -2,7 +2,10 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "bgi_camera.h"
+#include "bgi_dds.h"
 #include "bgi_draw.h"
+#include "bgi_gl.h"
 #include "bgi_overlay.h"
 #include "bgi_state.h"
 
@@ -10,6 +13,9 @@
 #include <cmath>
 #include <cstddef>
 #include <numbers>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace bgi
 {
@@ -196,12 +202,12 @@ namespace bgi
 
     bool isReady()
     {
-        if (gState.window == nullptr)
+        if (gState.window == nullptr && !gState.wxEmbedded)
         {
             gState.lastResult = grNoInitGraph;
             return false;
         }
-        if (glfwWindowShouldClose(gState.window) != 0)
+        if (gState.window != nullptr && glfwWindowShouldClose(gState.window) != 0)
         {
             gState.lastResult = grWindowClosed;
             return false;
@@ -289,25 +295,26 @@ namespace bgi
         }
     }
 
-    void flushToScreen()
+    void renderPageToCurrentGLContext(int w, int h)
     {
-        if (!isReady())
+        // GL texture-quad path (default — requires GL 3.3 compat context).
+        // Legacy GL_POINTS path is selected by wxbgi_set_legacy_gl_render(1).
+        if (!gState.legacyGlRender)
         {
+            bgi::renderPageAsTexture(w, h);
             return;
         }
 
-        glfwMakeContextCurrent(gState.window);
-        glfwPollEvents();
-
+        // --- Legacy GL_POINTS path ---
         const ColorRGB background = colorToRGB(gState.bkColor);
 
-        glViewport(0, 0, gState.width, gState.height);
+        glViewport(0, 0, w, h);
         glClearColor(background.r / 255.0f, background.g / 255.0f, background.b / 255.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(0.0, static_cast<double>(gState.width), static_cast<double>(gState.height), 0.0, -1.0, 1.0);
+        glOrtho(0.0, static_cast<double>(w), static_cast<double>(h), 0.0, -1.0, 1.0);
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
@@ -317,18 +324,15 @@ namespace bgi
 
         const auto &buffer = visualPageBuffer();
         glBegin(GL_POINTS);
-        for (int y = 0; y < gState.height; ++y)
+        for (int y = 0; y < h; ++y)
         {
-            for (int x = 0; x < gState.width; ++x)
+            for (int x = 0; x < w; ++x)
             {
-                const std::size_t index = static_cast<std::size_t>(y) * static_cast<std::size_t>(gState.width) +
+                const std::size_t index = static_cast<std::size_t>(y) * static_cast<std::size_t>(w) +
                                           static_cast<std::size_t>(x);
                 const int colorIndex = buffer[index];
                 if (colorIndex == normalizeColor(gState.bkColor))
-                {
                     continue;
-                }
-
                 const ColorRGB color = colorToRGB(colorIndex);
                 glColor3ub(color.r, color.g, color.b);
                 glVertex2i(x, y);
@@ -336,22 +340,68 @@ namespace bgi
         }
         glEnd();
 
-        // Draw selection cursor squares for cameras that have the cursor enabled.
-        // These are GL primitives painted on top of the page-buffer pixels.
         bgi::drawSelectionCursorsGL();
-
         glFlush();
+    }
+
+    void flushToScreen()
+    {
+        if (!isReady())
+            return;
+
+        // In wx-embedded mode the GL context is managed by WxBgiCanvas::Render().
+        if (gState.wxEmbedded)
+        {
+            gState.lastResult = grOk;
+            return;
+        }
+
+        glfwMakeContextCurrent(gState.window);
+        glfwPollEvents();
+
+        renderPageToCurrentGLContext(gState.width, gState.height);
+
+        // GL solid / line passes — only run if there is pending GL geometry.
+        if (!gState.legacyGlRender && gState.pendingGl.hasPending())
+        {
+            // Build VP matrix from the active camera.
+            auto camIt = gState.cameras.find(gState.activeCamera);
+            if (camIt != gState.cameras.end())
+            {
+                const Camera3D &cam = camIt->second->camera;
+                const float ar = (gState.height > 0)
+                    ? static_cast<float>(gState.width) / static_cast<float>(gState.height)
+                    : 1.f;
+                const glm::mat4 view = cameraViewMatrix(cam);
+                const glm::mat4 proj = cameraProjMatrix(cam, ar);
+                const glm::mat4 vp   = proj * view;
+                const glm::vec3 eye(cam.eyeX, cam.eyeY, cam.eyeZ);
+
+                if (gState.pendingGl.hasSolids())
+                    renderSolidsGLPass(gState.pendingGl, gState.width, gState.height,
+                                       gState.lightState, vp, eye);
+                if (gState.pendingGl.hasWireframe())
+                    renderWireframeGLPass(gState.pendingGl, gState.width, gState.height,
+                                          vp, eye);
+                if (gState.pendingGl.hasLines())
+                    renderWorldLinesGLPass(gState.pendingGl, gState.width, gState.height, vp);
+            }
+            gState.pendingGl.clear();
+        }
+
         glfwSwapBuffers(gState.window);
 
         gState.lastResult = grOk;
     }
 
-    void destroyWindowIfNeeded()
+    void destroyWindowIfNeeded(bool resetGlState)
     {
         if (gState.window != nullptr)
         {
             glfwDestroyWindow(gState.window);
             gState.window = nullptr;
+            if (resetGlState)
+                glPassResetState();  // handle goes stale when context is destroyed
         }
     }
 

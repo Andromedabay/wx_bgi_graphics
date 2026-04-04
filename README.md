@@ -1,11 +1,11 @@
-# wx_BGI_Graphics
+﻿# wx_BGI_Graphics
 
 wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatible API (Borland Graphics Interface) on top of OpenGL, GLFW and GLEW. The goal is to keep old Pascal/C/C++ graphics programs usable with minimal source changes while staying cross-platform on Windows, Linux, and macOS.
 
 ## Objectives
 1. Strive to be as simple and beginner complete as the original BGI library.
 1. Provide a portable graphics backend with a familiar BGI programming model, and some advanced user OpenGL capability.
-1. Provide a staticaly packaged single binary with no other runtime dependency.
+1. Provide a statically packaged single binary with no other runtime dependency.
 1. Easy to use Graphics Library tool for Python, Pascal, C/C++, etc. and other language users.
 1. Hide away OpenGL complexities, behind simple interface for Programmers/Developers.
 
@@ -21,6 +21,21 @@ wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatib
 
 The download URLs above always point to the newest tagged GitHub Release asset with the matching filename.
 
+## Documentation
+
+| Document | Contents |
+|----------|----------|
+| **[Building.md](./Building.md)** | Dependencies, compile requirements, CMake flags, build commands for Windows / Linux / macOS, running examples |
+| **[Tests.md](./Tests.md)** | All 22 CTest targets, how to run them, test categories, test seam security policy, CI integration |
+| **[Tutorial.md](./Tutorial.md)** | BGI double-buffering deep dive: page buffers, `setactivepage`, `swapbuffers`, animation loops |
+| **[WxWidgets.md](./WxWidgets.md)** | wxWidgets embedded canvas guide: `WxBgiCanvas`, standalone wx API, event routing, 3D in wx mode |
+| **[DDS.md](./DDS.md)** | Drawing Description Data Structure: scene graph, CHDOP hierarchy, `wxbgi_dds_*` API, JSON/YAML serialization |
+| **[Camera3D_Map.md](./Camera3D_Map.md)** | 3-D camera code map: `Camera3D` struct, GLM math, `wxbgi_cam_*` API |
+| **[Camera2D_Map.md](./Camera2D_Map.md)** | 2-D overhead camera: pan/zoom/rotation, `wxbgi_cam2d_*` API |
+| **[InputsProcessing.md](./InputsProcessing.md)** | Keyboard and mouse event handling, keyboard queue, DOS-style extended keys, input hooks |
+| **[VisualAids.md](./VisualAids.md)** | Visual overlay system: reference grid, UCS axes, crosshair, selection cursor |
+| **[ScreenShots.md](./ScreenShots.md)** | Annotated screenshots of example programs |
+
 ## Current Compatibility
 
 The library now includes classic BGI-style support for:
@@ -34,13 +49,16 @@ The library now includes classic BGI-style support for:
 - double-buffer style page selection via `setactivepage`, `setvisualpage`, `getactivepage`, `getvisualpage`, `swapbuffers`
 - additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
 - retained-mode scene graph (DDS / DDDS) with JSON and YAML serialisation via `wxbgi_dds_*`
+- 3D solid primitives (box, sphere, cylinder, cone, torus) with wireframe and filled draw modes via `wxbgi_solid_*`
+- Phong lighting model (key + fill lights, ambient/diffuse/specular) configured via `wxbgi_solid_set_light_*`
+- wxWidgets embedded canvas (`wx_bgi_wx`) with OpenGL 3.3 texture-quad compositing and automatic legacy fallback
 
 Public API declarations are available in:
 
 - `src/wx_bgi.h` (classic BGI API)
 - `src/wx_bgi_ext.h` (modern extension helpers)
 - `src/wx_bgi_3d.h` (camera, UCS, world-coordinate extension API)
-- `src/wx_bgi_dds.h` (Drawing Description Data Structure — DDS/CHDOP/DDJ/DDY)
+- `src/wx_bgi_dds.h` (Drawing Description Data Structure -- DDS/CHDOP/DDJ/DDY)
 
 See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP object hierarchy, all `wxbgi_dds_*` functions, and usage examples.
 
@@ -54,6 +72,10 @@ The library provides two camera modes, both built on the `Camera3D` struct:
 ## Visual Aids Reference
 
 - **[VisualAids.md](./VisualAids.md)** -- visual overlays for camera/UCS workflows: reference grid, UCS axes, concentric circles + crosshair, and per-camera selection cursor.
+
+## Input Processing Reference
+
+- **[InputsProcessing.md](./InputsProcessing.md)** -- complete guide to keyboard and mouse event handling: wx and GLFW backends, DOS-style extended key codes, keyboard queue, mouse position tracking, click-to-pick pipeline, user hook (callback chaining) system, thread safety rules, and full code map.
 
 ## Screenshots
 
@@ -101,8 +123,10 @@ Minimal camera setup example:
 ```c
 #include "wx_bgi.h"
 #include "wx_bgi_3d.h"
+#include "wx_bgi_ext.h"
 
-initwindow(1024, 720, "Camera Demo", 0, 0, 1, 1);
+wxbgi_wx_app_create();
+wxbgi_wx_frame_create(1024, 720, "Camera Demo");
 
 wxbgi_cam2d_create("plan");
 wxbgi_cam_set_active("plan");
@@ -112,6 +136,9 @@ wxbgi_cam2d_set_zoom("plan", 1.5f);
 setcolor(WHITE);
 wxbgi_world_line(-100.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f);
 wxbgi_world_circle(0.0f, 0.0f, 0.0f, 50.0f);
+
+wxbgi_wx_close_after_ms(5000);
+wxbgi_wx_app_main_loop();
 ```
 
 ### Keyboard Queue Helpers
@@ -130,68 +157,49 @@ Input is captured from the graphics window through GLFW callbacks.
 
 This makes it practical to port old Pascal and BGI programs that used `KeyPressed` and `ReadKey` style control flow without falling back to `Crt`.
 
-### Internal Test Seam Security Policy
-
-The project uses two distinct mechanisms to support deterministic CI testing without a live GUI.
-
-#### Keyboard injection test seams (`WXBGI_ENABLE_TEST_SEAMS`)
-
-The following APIs allow CI to inject synthetic key events into the keyboard queue:
-
-- `wxbgi_test_clear_key_queue()`
-- `wxbgi_test_inject_key_code()`
-- `wxbgi_test_inject_extended_scan()`
-
-Security policy:
-
-- These APIs are compiled only when `WXBGI_ENABLE_TEST_SEAMS=ON`.
-- Default is `OFF` so release/public binaries do not expose synthetic input injection.
-- CI/system tests can enable them explicitly for deterministic keyboard queue checks.
-- Exercised in `examples/cpp/bgi_api_coverage.cpp` under the `#ifdef WXBGI_ENABLE_TEST_SEAMS` guard.
-
-Example test-only configure:
-
-```powershell
-cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
-```
-
-Do not enable this option for production distribution artifacts.
-
-#### Camera demo headless mode (`--test` flag)
-
-The camera demo (`wxbgi_camera_demo_cpp`) uses a different, always-available mechanism: passing `--test` on the command line causes it to draw exactly one frame and exit cleanly. This approach requires **no** compile-time option and exposes no synthetic input surface.
-
-```powershell
-# Run manually in headless test mode:
-.\build\Debug\wxbgi_camera_demo_cpp.exe --test
-```
-
-CTest invokes this automatically — see the `wxbgi_camera_demo_cpp` test entry in `CMakeLists.txt`.
+For the complete keyboard input reference, test seam security policy, and CI integration details see **[Tests.md](./Tests.md)**.
 
 ### Advanced API Usage Example
 
-The snippet below shows a minimal frame loop that mixes classic BGI drawing with the extension API:
+The snippet below shows a minimal frame loop using the wx standalone API (default mode):
 
 ```c
 #include "wx_bgi.h"
 #include "wx_bgi_ext.h"
 
-/* open a double-buffered window the normal BGI way */
+static int g_frame = 0;
+
+void drawFrame(void) {
+    cleardevice();
+    setcolor(WHITE);
+    circle(320, 240, 50 + (g_frame++ % 100));
+    outtextxy(10, 10, "wx_BGI standalone loop");
+    swapbuffers();
+}
+
+int main(void) {
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(640, 480, "My Window");
+    wxbgi_set_vsync(1);
+    setbkcolor(0);   /* BLACK */
+    wxbgi_wx_set_idle_callback(drawFrame);
+    wxbgi_wx_set_frame_rate(60);
+    wxbgi_wx_app_main_loop();
+    return 0;
+}
+```
+
+**GLFW-mode** (with `WXBGI_ENABLE_WX=OFF`) uses the classic `initwindow` / frame loop pattern:
+
+```c
 initwindow(640, 480, "My Window", 0, 0, 1, 1);
 wxbgi_set_vsync(1);
-wxbgi_set_window_title("Running");
-
 while (wxbgi_should_close() == 0) {
-    /* pump OS events and clear to a dark background */
-    wxbgi_begin_advanced_frame(0.05f, 0.05f, 0.10f, 1.0f, /*clearColor=*/1, /*clearDepth=*/0);
-
-    /* classic BGI drawing */
+    wxbgi_begin_advanced_frame(0.05f, 0.05f, 0.10f, 1.0f, 1, 0);
     setcolor(WHITE);
     circle(320, 240, 100);
     outtextxy(10, 10, "Hello BGI");
-
-    /* flush OpenGL and swap buffers */
-    wxbgi_end_advanced_frame(/*swapBuffers=*/1);
+    wxbgi_end_advanced_frame(1);
 }
 closegraph();
 ```
@@ -208,6 +216,116 @@ wxbgi_get_framebuffer_size(&w, &h);
 printf("Framebuffer: %d x %d\n", w, h);
 ```
 
+## wxWidgets Embedded Canvas (Default Backend)
+
+wxWidgets is the **default** rendering backend.  The DLL is built with wx support
+automatically — no extra CMake flag needed:
+
+```sh
+cmake -S . -B build
+cmake --build build -j
+```
+
+The library ships two wx integration options:
+
+### 1. Standalone wx API (Python / Pascal / C / simple C++)
+
+Open a wx window using only the C API — no wx C++ required:
+
+```c
+wxbgi_wx_app_create();
+wxbgi_wx_frame_create(640, 480, "My BGI App");
+setbkcolor(BLACK);
+setcolor(YELLOW);
+circle(320, 240, 100);
+wxbgi_wx_close_after_ms(5000);
+wxbgi_wx_app_main_loop();   // blocks until window closes
+```
+
+This is how the Python (`bgi_api_coverage.py`) and FreePascal programs work.
+
+### 2. Embedded Canvas (C++ with wxFrame)
+
+For C++ apps that need menus, status bars, or custom wx controls alongside the BGI surface,
+use `wx_bgi_wx.lib` + `WxBgiCanvas`:
+
+```cpp
+#include <wx/wx.h>
+#include "wx_bgi_wx.h"   // WxBgiCanvas
+#include "wx_bgi.h"      // Classic BGI API
+
+class MyFrame : public wxFrame {
+public:
+    MyFrame() : wxFrame(nullptr, wxID_ANY, "My App", wxDefaultPosition, wxSize(800,600)) {
+        auto* canvas = new wxbgi::WxBgiCanvas(this);
+        canvas->SetAutoRefreshHz(60);
+        setcolor(YELLOW);
+        circle(400, 300, 100);
+    }
+};
+```
+
+To build **without** wxWidgets (GLFW-only):
+```sh
+cmake -S . -B build -DWXBGI_ENABLE_WX=OFF
+```
+
+See **[WxWidgets.md](./WxWidgets.md)** for the full integration guide, standalone API reference,
+event routing table, 3D camera setup in wx mode, and automated tests.
+
+## 3D Solid Primitives and Shading
+
+The `wx_bgi_dds.h` header exposes retained-mode 3D solid primitives that are
+stored in the DDS scene graph and rendered through any `Camera3D` via
+`wxbgi_render_dds()`.
+
+### Draw Modes
+
+| Constant | Description |
+|----------|-------------|
+| `WXBGI_SOLID_WIREFRAME` | Edge-only rendering using the current line colour. |
+| `WXBGI_SOLID_SOLID` / `WXBGI_SOLID_FLAT` | Filled faces; flat Phong shading via GPU depth pass (pending GL-5). |
+| `WXBGI_SOLID_SMOOTH` | Smooth per-vertex Gouraud/Phong shading (pending GL-5). |
+
+```c
+wxbgi_solid_set_draw_mode(WXBGI_SOLID_SOLID);
+wxbgi_solid_set_face_color(CYAN);
+wxbgi_solid_sphere(0.f, 0.f, 0.f, 2.f, 32, 16);
+wxbgi_solid_box(-3.f, -1.f, -1.f, 3.f, 1.f, 1.f);
+```
+
+### Phong Lighting API
+
+Configure the key and fill lights plus material properties:
+
+```c
+#include "wx_bgi_dds.h"
+
+wxbgi_solid_set_light_dir(1.f, 1.f, 2.f);            // key light direction
+wxbgi_solid_set_light_space(1);                        // 1=world-space, 0=eye-space
+wxbgi_solid_set_fill_light(-1.f, 0.5f, 0.5f, 0.3f);  // fill direction + strength
+wxbgi_solid_set_ambient(0.2f);
+wxbgi_solid_set_diffuse(0.7f);
+wxbgi_solid_set_specular(0.4f, 32.f);
+```
+
+> **Note:** Phong-shaded GPU solid rendering (depth buffer, correct
+> occlusion) is infrastructure-complete (shaders in `bgi_gl_shaders.h`,
+> `LightState` in `BgiState`) but the wiring to the draw pipeline (GL-5
+> through GL-8) is pending.  Current solid rendering uses the CPU-side
+> projected-triangle path; depth-ordering artefacts may be visible.
+
+### GL Rendering Path (wx Mode)
+
+In wx mode the BGI pixel buffer is composited via an OpenGL 3.3 texture quad.
+The library detects the available GL version at runtime and falls back to the
+legacy `GL_POINTS` path automatically on older hardware.  To force the legacy
+path explicitly:
+
+```c
+wxbgi_set_legacy_gl_render(1);  // 1 = legacy, 0 = texture quad (default)
+```
+
 ## Text Rendering
 
 The text renderer now uses a scalable stroke-font implementation rather than the earlier fixed 5x7 bitmap glyphs. That change improves compatibility in a few important ways:
@@ -219,247 +337,91 @@ The text renderer now uses a scalable stroke-font implementation rather than the
 
 The current stroke-font implementation is still lightweight, but it is materially closer to classic BGI behavior than the old bitmap-only path.
   
-The library has one shared glyph dataset used by all 5 font profiles (DEFAULT_FONT, TRIPLEX_FONT, SMALL_FONT, SANS_SERIF_FONT, GOTHIC_FONT). The profiles apply different scale, thickness, and slant on top of the same strokes — so adding glyphs once covers all fonts. All printable ASCII Glyphs are included now with Release v1.1.0.
+The library has one shared glyph dataset used by all 5 font profiles (DEFAULT_FONT, TRIPLEX_FONT, SMALL_FONT, SANS_SERIF_FONT, GOTHIC_FONT). The profiles apply different scale, thickness, and slant on top of the same strokes -- so adding glyphs once covers all fonts. All printable ASCII Glyphs are included now with Release v1.1.0.
 
 ## BGI Double Buffering Tutorial
-Please read more about this at [./Tutorial.md](./Tutorial.md)
+Please read more about this at **[Tutorial.md](./Tutorial.md)**.
 
 ## Usage Examples
-The examples are under the ./examples/ folder.
 
-### Running Examples Interactively
-
-Commands to launch each example in an interactive session after a Debug build.
-
-#### Windows
-
-```powershell
-# C++ API coverage (opens a window, draws, then closes automatically)
-.\build\Debug\bgi_api_coverage_cpp.exe
-
-# Keyboard queue demo (interactive — press keys, close window to exit)
-.\build\Debug\wxbgi_keyboard_queue_cpp.exe
-
-# Camera demo (interactive — W/A/S/D pan, +/- zoom, arrow keys orbit, Esc to exit)
-.\build\Debug\wxbgi_camera_demo_cpp.exe
-
-# Pascal BGI demo (interactive — requires FreePascal build step first)
-.\build\bgidemo_pascal\bgidemo.exe
-
-# Pascal keyboard queue demo (interactive — requires FreePascal build step first)
-.\build\keyboard_queue_pascal\demo_wxbgi_keyboard_queue.exe
-
-# Python API coverage (exits automatically; pass DLL path as argument)
-python examples\python\bgi_api_coverage.py build\Debug\wx_bgi_opengl.dll
-```
-
-#### Linux / macOS
-
-```bash
-# Export LD Path for the Shared_LIB_Library file.
-export LD_LIBRARY_PATH="$HOME/source/wx_bgi_graphics/build/bgidemo_pascal:$LD_LIBRARY_PATH"
-
-# C++ API coverage
-./build/bgi_api_coverage_cpp
-
-# Keyboard queue demo
-./build/wxbgi_keyboard_queue_cpp
-
-# Camera demo
-./build/wxbgi_camera_demo_cpp
-
-# Pascal BGI demo
-./build/bgidemo_pascal/bgidemo
-
-# Pascal keyboard queue demo
-./build/keyboard_queue_pascal/demo_wxbgi_keyboard_queue
-
-# Python API coverage
-python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so
-```
-
-> **Note:** The camera demo also accepts a `--test` flag (`wxbgi_camera_demo_cpp --test`) which draws one frame and exits immediately — this is the mode used by CTest.
-
-### Example - demoFreePascal
-
-- `examples/demoFreePascal/demo_bgi_wrapper_gui.pas`
-- `examples/demoFreePascal/demo_bgi_wrapper.pas`
-- `examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas`
-
-### Example - direct keyboard queue
-
-- `examples/cpp/wxbgi_keyboard_queue.cpp`
-- `examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas`
-
-### Example - camera and world-coordinate API
-
-- `examples/cpp/wxbgi_camera_demo.cpp`
+The examples are under the `./examples/` folder.
 
 ### Coverage Examples
 
-- `examples/cpp/bgi_api_coverage.cpp`
-- `examples/python/bgi_api_coverage.py`
-- `examples/demoFreePascal/demo_bgi_api_coverage.pas`
+| Source | Language | What it exercises |
+|--------|----------|-------------------|
+| `examples/cpp/bgi_api_coverage.cpp` | C++ | Classic BGI API (standalone GLFW/wx) |
+| `examples/python/bgi_api_coverage.py` | Python | ctypes BGI API coverage |
+| `examples/demoFreePascal/demo_bgi_api_coverage.pas` | FreePascal | BGI API — GLFW → wx-standalone path |
+| `examples/demoFreePascal/demo_bgi_canvas_coverage.pas` | FreePascal | BGI API — wx-only path (no GLFW) |
+| `examples/wx/wx_bgi_canvas_coverage_test.cpp` | C++ / wx | BGI API — embedded `WxBgiCanvas` (timer-based phases) |
+
+### Other Examples
+
+| Source | Language | Description |
+|--------|----------|-------------|
+| `examples/cpp/wxbgi_camera_demo.cpp` | C++ | Camera/UCS/world-coordinate interactive demo |
+| `examples/cpp/wxbgi_keyboard_queue.cpp` | C++ | DOS-style keyboard queue |
+| `examples/demoFreePascal/demo_bgi_wrapper.pas` | FreePascal | Minimal BGI wrapper demo |
+| `examples/demoFreePascal/demo_bgi_wrapper_gui.pas` | FreePascal | GUI subsystem BGI demo |
+| `examples/demoFreePascal/demo_wxbgi_keyboard_queue.pas` | FreePascal | Keyboard queue from Pascal |
+| `examples/wx/wx_bgi_3d_orbit_test.cpp` | C++ / wx | 3-D orbit animation in embedded canvas |
+| `examples/wx/wx_bgi_solids_test.cpp` | C++ / wx | 3-D solids in embedded canvas |
+| `examples/wx/wx_bgi_app.cpp` | C++ / wx | Interactive 2-D mouse/keyboard demo |
+| `examples/wx/wx_bgi_3d_app.cpp` | C++ / wx | Interactive 3-D orbiting camera with solids |
+
+### Running Examples and Tests
+
+See **[Building.md](./Building.md)** for interactive run commands on every platform.  
+See **[Tests.md](./Tests.md)** for CTest commands, test categories, and CI details.
 
 ## Compile-time Dependencies
-   - GLFW
-   - GLEW
-   - GLM
-   - OpenGL
-   - CMake
-   - Doxygen (for API documentation generation)
 
-## Compilation Requirements
+See **[Building.md](./Building.md)** for full dependency details.
 
-To build this project yourself, ensure you have the following tools and libraries:
-
-- **CMake (Version 3.14 or later):** Essential for building and managing the project files.
-- **C++20 Compiler:** Compatible with Clang, GCC, or MSVC.
-- **OpenGL-capable system libraries:** Required by GLFW/GLEW on all supported platforms.
-
-Dependency note:
-
-- GLFW 3.4, GLEW 2.2.0, and GLM 1.0.1 are fetched automatically by CMake `FetchContent`; no manual dependency installation is required.
+- GLFW 3.4, GLEW 2.2.0, GLM 1.0.1, wxWidgets 3.2.5, nlohmann/json, yaml-cpp — all auto-fetched by CMake `FetchContent`.
+- Optional: Doxygen (API docs), LaTeX / MiKTeX (PDF docs), FreePascal (Pascal examples), Python 3 (Python test).
 
 ## Building the Project
 
-- Updated FreePascal demo instructions are in examples/demoFreePascal/README.md.
-- Pascal BGIDemo port instructions are in examples/bgidemo-pascal/README.md.
+See **[Building.md](./Building.md)** for full build and test instructions.
 
-## Build, Test, and Docs on Windows/Linux/macOS
-
-Use the command sets below to run a complete local pipeline: configure, build, test, and generate Doxygen docs.
-
-### Windows (MSVC, multi-config)
-
-Debug pipeline:
+Quick start (Windows):
 
 ```powershell
 cmake -S . -B build
 cmake --build build -j --config Debug
 ctest --test-dir build -C Debug --output-on-failure
-cmake --build build --target api_docs -j --config Debug
-cmake --build build --target api_docs_pdf -j --config Debug
 ```
 
-Release pipeline:
-
-```powershell
-cmake -S . -B build
-cmake --build build -j --config Release
-ctest --test-dir build -C Release --output-on-failure
-cmake --build build --target api_docs -j --config Release
-cmake --build build --target api_docs_pdf -j --config Release
-```
-
-### Linux (single-config)
-
-Debug pipeline:
+Quick start (Linux / macOS):
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
-cmake --build build --target api_docs -j
-cmake --build build --target api_docs_pdf -j
 ```
 
-Release pipeline:
+## CI and Releases
 
-```bash
-cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
-cmake --build build-rel -j
-ctest --test-dir build-rel --output-on-failure
-cmake --build build-rel --target api_docs -j
-cmake --build build-rel --target api_docs_pdf -j
-```
-
-### macOS (single-config)
-
-Debug pipeline:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j
-ctest --test-dir build --output-on-failure
-cmake --build build --target api_docs -j
-cmake --build build --target api_docs_pdf -j
-```
-
-Release pipeline:
-
-```bash
-cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
-cmake --build build-rel -j
-ctest --test-dir build-rel --output-on-failure
-cmake --build build-rel --target api_docs -j
-cmake --build build-rel --target api_docs_pdf -j
-```
-
-Generated API documentation output:
-
-- `build/doxygen/html/index.html` (debug tree)
-- `build-rel/doxygen/html/index.html` (release tree on Linux/macOS)
-- `build/doxygen/latex/refman.pdf` (debug tree PDF)
-- `build-rel/doxygen/latex/refman.pdf` (release tree PDF on Linux/macOS)
-
-Shared library output name is `wx_bgi_opengl` with platform-specific extension:
-
-- `build/Debug/wx_bgi_opengl.dll` on Windows Debug
-- `build/Release/wx_bgi_opengl.dll` on Windows Release
-- `build/libwx_bgi_opengl.so` on Linux
-- `build/libwx_bgi_opengl.dylib` on macOS
-
-In the current Windows environment, the C++ and Python coverage examples are exercised automatically. The FreePascal coverage source is included as an example as well, and automated execution is enabled when a matching FreePascal compiler is available for the built DLL architecture.
-
-## CI Example (GitHub Actions)
-
-  Actual repository workflow file:
-
-  - `.github/workflows/CI.yml`
-
-  Release behavior in that workflow (free-tier friendly):
-
-  1. Normal `push`/`pull_request` runs matrix CI in Debug mode on Windows, Linux, and macOS.
-  2. Tag pushes like `v1.2.3` run Release builds, tests, docs generation, and packaging.
-  3. Release artifacts uploaded to GitHub Release:
-    - Windows binary zip
-    - Linux binary tar.gz
-    - macOS binary tar.gz
-    - API docs zip
-    - API docs tar.gz
-  4. The generated Doxygen HTML docs are published to GitHub Pages.
-  5. Release notes are generated from git commit messages between the previous tag and current tag.
-
-  To enable GitHub Pages deployment for the first time:
-
-  1. Open repository Settings -> Pages.
-  2. Under Build and deployment, set Source to GitHub Actions.
-  3. Open repository Settings -> Environments -> github-pages.
-  4. If deployment protection rules are enabled there, allow deployments from release tags such as `v*`, or remove the branch/tag restriction for the `github-pages` environment.
-
-  To create a release from CI:
-
-  ```bash
-  git tag v1.2.3
-  git push origin v1.2.3
-  ```
+See **[Tests.md — CI Integration](./Tests.md#ci-integration)** for the full CI setup, release tagging instructions, and GitHub Pages deployment guide.
 
 ## License
 
 This code is Open Source and Free to use with no warranties or claims.
   
-This repository is based on Open-Source Code from 7 different source:  
+This repository is based on Open-Source Code from 8 different sources:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
          - Techniques mentioned at URL [https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html](https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html).  
     2. CMake Template, from lszl84, MIT License  
-    3. glfw Library, from Marcus Geelnard & Camilla Löwy, Zlib license  
+    3. glfw Library, from Marcus Geelnard & Camilla Lowy, Zlib license  
     4. glew Library, from https://github.com/nigels-com/glew, Custom License  
     5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
     6. JSON Library, from citation.APA="Lohmann, N. (2025). JSON for Modern C++ (Version 3.12.0) [Computer software]. https://github.com/nlohmann", MIT License  
     7. YAML Library, from https://github.com/jbeder/yaml-cpp , MIT License  
-  
+    8. wxWidgets, from https://github.com/wxWidgets/wxWidgets, wxWindows Library Licence, Version 3.1  
+
 Depends on C/C++ Template created by Luke of devmindscapetutorilas:
  - [www.onlyfastcode.com](https://www.onlyfastcode.com)
  - [https://devmindscape.com/](https://devmindscape.com/)

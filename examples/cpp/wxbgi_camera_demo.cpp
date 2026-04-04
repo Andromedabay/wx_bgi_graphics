@@ -28,8 +28,7 @@
 #include "wx_bgi_ext.h"
 #include "wx_bgi_overlay.h"
 #include "wx_bgi_solid.h"
-
-#include <GLFW/glfw3.h>
+#include "bgi_types.h"
 
 #include <array>
 #include <cmath>
@@ -164,6 +163,177 @@ static void buildDdsScene(std::array<int, kGradSteps> &gradColors, bool testMode
 }
 
 // ---------------------------------------------------------------------------
+// File-scope interactive state (shared between main and doRenderFrame)
+// ---------------------------------------------------------------------------
+static int   panelW          = 0;
+static int   panelH          = 0;
+static int   s_kW            = 0;
+static int   s_kH            = 0;
+static float azimuth3d       = 45.f;
+static float elevation3d     = 30.f;
+static float azimuthIso      = 225.f;
+static float elevationIso    = 22.f;
+static bool  redrawRequested = true;
+static double lastFlashRedraw = 0.0;
+
+static constexpr float orbitR = 350.f;
+
+static void updateOrbit3d()
+{
+    const float az = azimuth3d   * 3.14159265f / 180.f;
+    const float el = elevation3d * 3.14159265f / 180.f;
+    wxbgi_cam_set_eye("cam3d",
+        orbitR * std::cos(el) * std::cos(az),
+        orbitR * std::cos(el) * std::sin(az),
+        orbitR * std::sin(el));
+    wxbgi_cam_set_target("cam3d", 0.f, 0.f, 0.f);
+    wxbgi_cam_set_up("cam3d", 0.f, 0.f, 1.f);
+}
+
+static void updateOrbitIso()
+{
+    const float az = azimuthIso   * 3.14159265f / 180.f;
+    const float el = elevationIso * 3.14159265f / 180.f;
+    wxbgi_cam_set_eye("cam_iso",
+        orbitR * std::cos(el) * std::cos(az),
+        orbitR * std::cos(el) * std::sin(az),
+        orbitR * std::sin(el));
+    wxbgi_cam_set_target("cam_iso", 0.f, 0.f, 0.f);
+    wxbgi_cam_set_up("cam_iso", 0.f, 0.f, 1.f);
+}
+
+// ---------------------------------------------------------------------------
+// doRenderFrame — idle callback for interactive (wx) mode
+// ---------------------------------------------------------------------------
+static void BGI_CALL doRenderFrame()
+{
+    wxbgi_poll_events();
+
+    if (wxbgi_is_key_down(WXBGI_KEY_ESCAPE))
+    {
+        wxbgi_wx_close_frame();
+        return;
+    }
+
+    bool changed = false;
+
+    // Delete key: remove all selected DDS objects.
+    if (wxbgi_is_key_down(WXBGI_KEY_DELETE))
+    {
+        wxbgi_selection_delete_selected();
+        changed = true;
+    }
+
+    // Top-right cam2d: pan / zoom / rotate.
+    if (wxbgi_is_key_down(87)) { wxbgi_cam2d_pan_by("cam2d",  0.f,  5.f); changed = true; }
+    if (wxbgi_is_key_down(83)) { wxbgi_cam2d_pan_by("cam2d",  0.f, -5.f); changed = true; }
+    if (wxbgi_is_key_down(65)) { wxbgi_cam2d_pan_by("cam2d", -5.f,  0.f); changed = true; }
+    if (wxbgi_is_key_down(68)) { wxbgi_cam2d_pan_by("cam2d",  5.f,  0.f); changed = true; }
+    if (wxbgi_is_key_down(WXBGI_KEY_EQUAL) || wxbgi_is_key_down(334))
+    { wxbgi_cam2d_zoom_at("cam2d", 1.02f, 0.f, 0.f); changed = true; }
+    if (wxbgi_is_key_down(WXBGI_KEY_MINUS) || wxbgi_is_key_down(335))
+    { wxbgi_cam2d_zoom_at("cam2d", 0.98f, 0.f, 0.f); changed = true; }
+    if (wxbgi_is_key_down(81))
+    {
+        float r = 0.f;
+        wxbgi_cam2d_get_rotation("cam2d", &r);
+        wxbgi_cam2d_set_rotation("cam2d", r + 1.f);
+        changed = true;
+    }
+    if (wxbgi_is_key_down(69))
+    {
+        float r = 0.f;
+        wxbgi_cam2d_get_rotation("cam2d", &r);
+        wxbgi_cam2d_set_rotation("cam2d", r - 1.f);
+        changed = true;
+    }
+
+    // Bottom-left cam3d: orbit with arrow keys.
+    if (wxbgi_is_key_down(WXBGI_KEY_LEFT))  { azimuth3d   -= 1.f; updateOrbit3d(); changed = true; }
+    if (wxbgi_is_key_down(WXBGI_KEY_RIGHT)) { azimuth3d   += 1.f; updateOrbit3d(); changed = true; }
+    if (wxbgi_is_key_down(WXBGI_KEY_UP))
+    { elevation3d = std::min(89.f, elevation3d + 1.f); updateOrbit3d(); changed = true; }
+    if (wxbgi_is_key_down(WXBGI_KEY_DOWN))
+    { elevation3d = std::max(-89.f, elevation3d - 1.f); updateOrbit3d(); changed = true; }
+
+    // Bottom-right cam_iso: orbit with I/K/J/L.
+    if (wxbgi_is_key_down(74)) { azimuthIso   -= 1.f; updateOrbitIso(); changed = true; }
+    if (wxbgi_is_key_down(76)) { azimuthIso   += 1.f; updateOrbitIso(); changed = true; }
+    if (wxbgi_is_key_down(73))
+    { elevationIso = std::min(89.f, elevationIso + 1.f); updateOrbitIso(); changed = true; }
+    if (wxbgi_is_key_down(75))
+    { elevationIso = std::max(-89.f, elevationIso - 1.f); updateOrbitIso(); changed = true; }
+
+    redrawRequested = redrawRequested || changed;
+
+    if (wxbgi_mouse_moved())
+        redrawRequested = true;
+
+    // Periodic redraw for flash animations (~20 fps idle).
+    const double now = wxbgi_get_time_seconds();
+    if (now - lastFlashRedraw >= 0.05)
+    {
+        lastFlashRedraw = now;
+        redrawRequested = true;
+    }
+
+    if (!redrawRequested)
+        return;
+
+    // ---- Render -----------------------------------------------------
+    cleardevice();
+
+    setcolor(8);
+    line(panelW - 1, 0,          panelW - 1, s_kH - 1);
+    line(0,          panelH - 1, s_kW - 1,   panelH - 1);
+
+    renderPanel("cam_left", 0,      0,      panelW - 1, panelH - 1, s_kW, s_kH);
+    renderPanel("cam2d",    panelW, 0,      s_kW - 1,   panelH - 1, s_kW, s_kH);
+    renderPanel("cam3d",    0,      panelH, panelW - 1, s_kH - 1,   s_kW, s_kH);
+    renderPanel("cam_iso",  panelW, panelH, s_kW - 1,   s_kH - 1,   s_kW, s_kH);
+
+    drawLabel(6, 6, "cam_left: fixed 2D ortho (read-only)", 15);
+
+    {
+        float panX = 0.f, panY = 0.f, zoom = 1.f;
+        wxbgi_cam2d_get_pan("cam2d", &panX, &panY);
+        wxbgi_cam2d_get_zoom("cam2d", &zoom);
+        char buf[80];
+        std::snprintf(buf, sizeof(buf), "pan=(%.0f,%.0f)  zoom=%.2f  WASD/+−/Q/E", panX, panY, zoom);
+        drawLabel(panelW + 6, 6,  "cam2d: interactive 2D", 15);
+        drawLabel(panelW + 6, 20, buf, 8);
+    }
+    {
+        char buf[80];
+        std::snprintf(buf, sizeof(buf),
+            "az=%.0f  el=%.0f  (Arrow keys)", azimuth3d, elevation3d);
+        drawLabel(6, panelH + 6,  "cam3d: 3D perspective orbit", 15);
+        drawLabel(6, panelH + 20, buf, 8);
+    }
+    {
+        char buf[80];
+        std::snprintf(buf, sizeof(buf),
+            "az=%.0f  el=%.0f  (J/L/I/K)", azimuthIso, elevationIso);
+        drawLabel(panelW + 6, panelH + 6,  "cam_iso: alt 3D perspective orbit", 15);
+        drawLabel(panelW + 6, panelH + 20, buf, 8);
+    }
+    {
+        const int selCount = wxbgi_selection_count();
+        char selBuf[80];
+        if (selCount > 0)
+            std::snprintf(selBuf, sizeof(selBuf),
+                "Selected: %d  (Del=delete  Ctrl+click=multi-select)", selCount);
+        else
+            std::snprintf(selBuf, sizeof(selBuf),
+                "Click any DDS object to select  |  Ctrl+click to multi-select");
+        drawLabel(6, panelH + 34, selBuf, selCount > 0 ? 14 : 8);
+    }
+
+    wxbgi_swap_window_buffers();
+    redrawRequested = false;
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 int main(int argc, char *argv[])
@@ -174,12 +344,10 @@ int main(int argc, char *argv[])
     // renderer finishes in well under the ctest timeout (even in Debug builds).
     const int kW = testMode ? 480 : 1440;
     const int kH = testMode ? 320 : 960;
-    initwindow(kW, kH, "wx_bgi 4-View Demo — Click objects to select, Del to delete", 30, 30, 0, 0);
-    if (graphresult() != 0)
-        return 1;
-
-    const int panelW = kW / 2;
-    const int panelH = kH / 2;
+    panelW = kW / 2;
+    panelH = kH / 2;
+    s_kW = kW;
+    s_kH = kH;
 
     // ------------------------------------------------------------------
     // Camera setup — 2×2 grid
@@ -201,43 +369,12 @@ int main(int argc, char *argv[])
     wxbgi_cam_create("cam3d", WXBGI_CAM_PERSPECTIVE);
     wxbgi_cam_set_perspective("cam3d", 55.f, 0.5f, 5000.f);
     wxbgi_cam_set_screen_viewport("cam3d", 0, panelH, panelW, panelH);
-
-    float azimuth3d   = 45.f;
-    float elevation3d = 30.f;
-    const float orbitR = 350.f;
-
-    auto updateOrbit3d = [&]()
-    {
-        const float az = azimuth3d   * 3.14159265f / 180.f;
-        const float el = elevation3d * 3.14159265f / 180.f;
-        wxbgi_cam_set_eye("cam3d",
-            orbitR * std::cos(el) * std::cos(az),
-            orbitR * std::cos(el) * std::sin(az),
-            orbitR * std::sin(el));
-        wxbgi_cam_set_target("cam3d", 0.f, 0.f, 0.f);
-        wxbgi_cam_set_up("cam3d", 0.f, 0.f, 1.f);
-    };
     updateOrbit3d();
 
     // Bottom-right: second 3D perspective (iso-style, I/K/J/L keys).
     wxbgi_cam_create("cam_iso", WXBGI_CAM_PERSPECTIVE);
     wxbgi_cam_set_perspective("cam_iso", 45.f, 0.5f, 5000.f);
     wxbgi_cam_set_screen_viewport("cam_iso", panelW, panelH, panelW, panelH);
-
-    float azimuthIso   = 225.f;
-    float elevationIso = 22.f;
-
-    auto updateOrbitIso = [&]()
-    {
-        const float az = azimuthIso   * 3.14159265f / 180.f;
-        const float el = elevationIso * 3.14159265f / 180.f;
-        wxbgi_cam_set_eye("cam_iso",
-            orbitR * std::cos(el) * std::cos(az),
-            orbitR * std::cos(el) * std::sin(az),
-            orbitR * std::sin(el));
-        wxbgi_cam_set_target("cam_iso", 0.f, 0.f, 0.f);
-        wxbgi_cam_set_up("cam_iso", 0.f, 0.f, 1.f);
-    };
     updateOrbitIso();
 
     // ------------------------------------------------------------------
@@ -276,9 +413,44 @@ int main(int argc, char *argv[])
     wxbgi_overlay_cursor_set_size("cam_iso", 14);
     wxbgi_overlay_cursor_set_color("cam_iso", 2);  // red
 
+    if (testMode)
+    {
+        wxbgi_wx_app_create();
+        wxbgi_wx_frame_create(kW, kH, "wx_bgi test");
+        if (graphresult() != 0)
+            return 1;
+
+        wxbgi_cam_set_active("cam_left");
+        cleardevice();
+
+        std::array<int, kGradSteps> gradColors{};
+        buildDdsScene(gradColors, testMode);
+
+        cleardevice();
+
+        // In test mode render only the fast 2D panel to keep debug builds quick.
+        setcolor(8);
+        line(panelW - 1, 0,          panelW - 1, kH - 1);
+        line(0,          panelH - 1, kW - 1,     panelH - 1);
+
+        renderPanel("cam_left", 0, 0, panelW - 1, panelH - 1, kW, kH);
+
+        drawLabel(6, 6, "cam_left: fixed 2D ortho (read-only)", 15);
+
+        wxbgi_wx_close_after_ms(500);
+        wxbgi_wx_app_main_loop();
+        return 0;
+    }
+
     // ------------------------------------------------------------------
-    // Build DDS scene
+    // Interactive (wx standalone) mode
     // ------------------------------------------------------------------
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH,
+        "wx_bgi 4-View Demo \xe2\x80\x94 Click objects to select, Del to delete");
+    if (graphresult() != 0)
+        return 1;
+
     wxbgi_cam_set_active("cam_left");
     cleardevice();
 
@@ -287,156 +459,9 @@ int main(int argc, char *argv[])
 
     cleardevice();
 
-    // ------------------------------------------------------------------
-    // Main render loop
-    // ------------------------------------------------------------------
-    bool redrawRequested = true;
-
-    do
-    {
-        if (!testMode)
-        {
-            wxbgi_poll_events();
-
-            if (wxbgi_is_key_down(GLFW_KEY_ESCAPE))
-                break;
-
-            bool changed = false;
-
-            // Delete key: remove all selected DDS objects.
-            if (wxbgi_is_key_down(GLFW_KEY_DELETE))
-            {
-                wxbgi_selection_delete_selected();
-                changed = true;
-            }
-
-            // Top-right cam2d: pan / zoom / rotate.
-            if (wxbgi_is_key_down(GLFW_KEY_W)) { wxbgi_cam2d_pan_by("cam2d",  0.f,  5.f); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_S)) { wxbgi_cam2d_pan_by("cam2d",  0.f, -5.f); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_A)) { wxbgi_cam2d_pan_by("cam2d", -5.f,  0.f); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_D)) { wxbgi_cam2d_pan_by("cam2d",  5.f,  0.f); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_EQUAL) || wxbgi_is_key_down(GLFW_KEY_KP_ADD))
-            { wxbgi_cam2d_zoom_at("cam2d", 1.02f, 0.f, 0.f); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_MINUS) || wxbgi_is_key_down(GLFW_KEY_KP_SUBTRACT))
-            { wxbgi_cam2d_zoom_at("cam2d", 0.98f, 0.f, 0.f); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_Q))
-            {
-                float r = 0.f;
-                wxbgi_cam2d_get_rotation("cam2d", &r);
-                wxbgi_cam2d_set_rotation("cam2d", r + 1.f);
-                changed = true;
-            }
-            if (wxbgi_is_key_down(GLFW_KEY_E))
-            {
-                float r = 0.f;
-                wxbgi_cam2d_get_rotation("cam2d", &r);
-                wxbgi_cam2d_set_rotation("cam2d", r - 1.f);
-                changed = true;
-            }
-
-            // Bottom-left cam3d: orbit with arrow keys.
-            if (wxbgi_is_key_down(GLFW_KEY_LEFT))  { azimuth3d   -= 1.f; updateOrbit3d(); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_RIGHT))  { azimuth3d   += 1.f; updateOrbit3d(); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_UP))
-            { elevation3d = std::min(89.f, elevation3d + 1.f); updateOrbit3d(); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_DOWN))
-            { elevation3d = std::max(-89.f, elevation3d - 1.f); updateOrbit3d(); changed = true; }
-
-            // Bottom-right cam_iso: orbit with I/K/J/L.
-            if (wxbgi_is_key_down(GLFW_KEY_J))      { azimuthIso   -= 1.f; updateOrbitIso(); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_L))      { azimuthIso   += 1.f; updateOrbitIso(); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_I))
-            { elevationIso = std::min(89.f, elevationIso + 1.f); updateOrbitIso(); changed = true; }
-            if (wxbgi_is_key_down(GLFW_KEY_K))
-            { elevationIso = std::max(-89.f, elevationIso - 1.f); updateOrbitIso(); changed = true; }
-
-            redrawRequested = redrawRequested || changed;
-
-            if (wxbgi_mouse_moved())
-                redrawRequested = true;
-
-            // Periodic redraw for flash animations (~20 fps idle).
-            static double lastFlashRedraw = 0.0;
-            const double now = glfwGetTime();
-            if (now - lastFlashRedraw >= 0.05)
-            {
-                lastFlashRedraw = now;
-                redrawRequested = true;
-            }
-
-            if (!redrawRequested) { delay(8); continue; }
-        }
-
-        // ---- Render -------------------------------------------------
-        cleardevice();
-
-        // Panel dividers
-        setcolor(8);
-        line(panelW - 1, 0,       panelW - 1, kH - 1);
-        line(0,          panelH - 1, kW - 1,  panelH - 1);
-
-        if (testMode)
-        {
-            // In test mode render only the fast 2D panel to keep debug builds quick.
-            renderPanel("cam_left", 0, 0, panelW - 1, panelH - 1, kW, kH);
-        }
-        else
-        {
-            renderPanel("cam_left", 0,       0,       panelW - 1, panelH - 1, kW, kH);
-            renderPanel("cam2d",    panelW,  0,       kW - 1,     panelH - 1, kW, kH);
-            renderPanel("cam3d",    0,       panelH,  panelW - 1, kH - 1,     kW, kH);
-            renderPanel("cam_iso",  panelW,  panelH,  kW - 1,     kH - 1,     kW, kH);
-        }
-
-        // Panel labels
-        drawLabel(6, 6,  "cam_left: fixed 2D ortho (read-only)", 15);
-
-        {
-            float panX = 0.f, panY = 0.f, zoom = 1.f;
-            wxbgi_cam2d_get_pan("cam2d", &panX, &panY);
-            wxbgi_cam2d_get_zoom("cam2d", &zoom);
-            char buf[80];
-            std::snprintf(buf, sizeof(buf), "pan=(%.0f,%.0f)  zoom=%.2f  WASD/+−/Q/E", panX, panY, zoom);
-            drawLabel(panelW + 6, 6,  "cam2d: interactive 2D", 15);
-            drawLabel(panelW + 6, 20, buf, 8);
-        }
-        {
-            char buf[80];
-            std::snprintf(buf, sizeof(buf),
-                "az=%.0f  el=%.0f  (Arrow keys)", azimuth3d, elevation3d);
-            drawLabel(6, panelH + 6,  "cam3d: 3D perspective orbit", 15);
-            drawLabel(6, panelH + 20, buf, 8);
-        }
-        {
-            char buf[80];
-            std::snprintf(buf, sizeof(buf),
-                "az=%.0f  el=%.0f  (J/L/I/K)", azimuthIso, elevationIso);
-            drawLabel(panelW + 6, panelH + 6,  "cam_iso: alt 3D perspective orbit", 15);
-            drawLabel(panelW + 6, panelH + 20, buf, 8);
-        }
-
-        {
-            const int selCount = wxbgi_selection_count();
-            char selBuf[80];
-            if (selCount > 0)
-                std::snprintf(selBuf, sizeof(selBuf),
-                    "Selected: %d  (Del=delete  Ctrl+click=multi-select)", selCount);
-            else
-                std::snprintf(selBuf, sizeof(selBuf),
-                    "Click any DDS object to select  |  Ctrl+click to multi-select");
-            drawLabel(6, panelH + 34, selBuf, selCount > 0 ? 14 : 8);
-        }
-
-        wxbgi_swap_window_buffers();
-
-        if (testMode)
-            break;
-
-        redrawRequested = false;
-    }
-    while (!testMode && !wxbgi_should_close());
-
-    closegraph();
+    wxbgi_wx_set_idle_callback(doRenderFrame);
+    wxbgi_wx_set_frame_rate(60);
+    wxbgi_wx_app_main_loop();
     return 0;
 }
 

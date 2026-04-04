@@ -9,10 +9,12 @@
 
 #include "wx_bgi_dds.h"
 
+#include <cmath>
 #include <mutex>
 #include <string>
 
 #include "bgi_dds.h"
+#include "bgi_gl.h"
 #include "bgi_state.h"
 
 // ---------------------------------------------------------------------------
@@ -330,3 +332,66 @@ BGI_API void BGI_CALL wxbgi_dds_clear_all(void)
 // =============================================================================
 // The BGI_API definition lives in bgi_dds_render.cpp; do not define a stub
 // here to avoid a duplicate-symbol linker error.
+
+// =============================================================================
+// GL rendering mode + lighting API
+// =============================================================================
+
+BGI_API void BGI_CALL wxbgi_set_legacy_gl_render(int enable)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.legacyGlRender = (enable != 0);
+}
+
+BGI_API void BGI_CALL wxbgi_gl_pass_destroy(void)
+{
+    // Must be called with the GL context current and bgi::gMutex NOT held
+    // (called from WxBgiCanvas destructor, outside any BGI API call).
+    bgi::glPassDestroy();
+}
+
+BGI_API void BGI_CALL wxbgi_solid_set_light_dir(float x, float y, float z)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    float len = std::sqrt(x * x + y * y + z * z);
+    if (len > 1e-6f) { x /= len; y /= len; z /= len; }
+    bgi::gState.lightState.dirX = x;
+    bgi::gState.lightState.dirY = y;
+    bgi::gState.lightState.dirZ = z;
+}
+
+BGI_API void BGI_CALL wxbgi_solid_set_light_space(int worldSpace)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.lightState.worldSpace = (worldSpace != 0);
+}
+
+BGI_API void BGI_CALL wxbgi_solid_set_fill_light(float x, float y, float z, float strength)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    float len = std::sqrt(x * x + y * y + z * z);
+    if (len > 1e-6f) { x /= len; y /= len; z /= len; }
+    bgi::gState.lightState.fillX       = x;
+    bgi::gState.lightState.fillY       = y;
+    bgi::gState.lightState.fillZ       = z;
+    bgi::gState.lightState.fillStrength = strength;
+}
+
+BGI_API void BGI_CALL wxbgi_solid_set_ambient(float a)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.lightState.ambient = a;
+}
+
+BGI_API void BGI_CALL wxbgi_solid_set_diffuse(float d)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.lightState.diffuse = d;
+}
+
+BGI_API void BGI_CALL wxbgi_solid_set_specular(float s, float shininess)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.lightState.specular  = s;
+    bgi::gState.lightState.shininess = shininess;
+}

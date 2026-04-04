@@ -86,6 +86,9 @@ namespace bgi
         gState.mouseX     = 0;
         gState.mouseY     = 0;
         gState.mouseMoved = false;
+        gState.scrollDeltaX = 0.0;
+        gState.scrollDeltaY = 0.0;
+        gState.inputDefaultFlags = WXBGI_DEFAULT_ALL;
         gState.selectedObjectIds.clear();
         gState.selectionFlashScheme  = 0;
         gState.selectionPickRadiusPx = 16;
@@ -173,6 +176,13 @@ namespace bgi
         }
 
         gState.pageBuffers[static_cast<std::size_t>(gState.visualPage)] = gState.pageBuffers[static_cast<std::size_t>(gState.activePage)];
+    }
+
+    void initForWxCanvas(int width, int height)
+    {
+        gState.wxEmbedded = true;
+        resetStateForWindow(std::max(1, width), std::max(1, height), true);
+        gState.lastResult = grOk;
     }
 
 } // namespace bgi

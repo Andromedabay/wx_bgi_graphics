@@ -50,7 +50,7 @@ BGI_API int BGI_CALL wxbgi_cam_create(const char *name, int type)
 
     std::lock_guard<std::mutex> lock(bgi::gMutex);
 
-    if (bgi::gState.window == nullptr)
+    if (bgi::gState.window == nullptr && !bgi::gState.wxEmbedded)
         return -1;
 
     // "default" is a system-reserved camera created by initwindow().
@@ -321,7 +321,7 @@ BGI_API int BGI_CALL wxbgi_cam_world_to_screen(const char *name,
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
 
-    if (bgi::gState.window == nullptr)
+    if (bgi::gState.window == nullptr && !bgi::gState.wxEmbedded)
         return -1;
 
     const auto *cam = findCamera(resolveName(name));
@@ -374,7 +374,7 @@ BGI_API int BGI_CALL wxbgi_cam2d_create(const char *name)
 
     std::lock_guard<std::mutex> lock(bgi::gMutex);
 
-    if (bgi::gState.window == nullptr)
+    if (bgi::gState.window == nullptr && !bgi::gState.wxEmbedded)
         return -1;
 
     // "default" is a system-reserved camera created by initwindow().

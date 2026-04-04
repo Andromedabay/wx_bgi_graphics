@@ -45,9 +45,10 @@ void fail(const char *msg)
 int main()
 {
     constexpr int kW = 800, kH = 600;
-    initwindow(kW, kH, "test_dds_cam3d_persp", 0, 0, 0, 0);
+    wxbgi_wx_app_create();
+    wxbgi_wx_frame_create(kW, kH, "test_dds_cam3d_persp");
     if (graphresult() != 0)
-        fail("initwindow failed");
+        fail("wxbgi_wx_frame_create failed");
 
     // -----------------------------------------------------------------------
     // Create the perspective camera.
@@ -117,7 +118,8 @@ int main()
     // Pump one event cycle (harmless in headless).
     wxbgi_poll_events();
 
-    closegraph();
+    wxbgi_wx_close_after_ms(500);
+    wxbgi_wx_app_main_loop();
     std::printf("PASS [test_dds_cam3d_persp]\n");
     return 0;
 }

@@ -38,6 +38,7 @@
 #include "bgi_dds.h"
 #include "bgi_draw.h"
 #include "bgi_font.h"
+#include "bgi_gl.h"
 #include "bgi_image.h"
 #include "bgi_overlay.h"
 #include "bgi_solid_render.h"
@@ -813,6 +814,10 @@ BGI_API void BGI_CALL wxbgi_render_dds(const char *camName)
         return;
 
     const bgi::Camera3D &cam = camIt->second->camera;
+
+    // Clear accumulated GL geometry from the previous frame so solids don't
+    // pile up across calls.  renderSolid3D() will repopulate this.
+    bgi::gState.pendingGl.clear();
 
     // Save draw state (restored after render so immediate-mode state is unchanged).
     const auto savedStyle = saveStyle();
