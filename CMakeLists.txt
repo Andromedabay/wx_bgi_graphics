@@ -574,6 +574,63 @@ if(BUILD_TESTING)
         )
 
         # -------------------------------------------------------------------
+        # wx-canvas BGI coverage Pascal test (no GLFW — wx-only path)
+        # -------------------------------------------------------------------
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_canvas_coverage)
+
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/pascal_canvas_coverage/demo_bgi_canvas_coverage${CMAKE_EXECUTABLE_SUFFIX}
+            COMMAND ${FPC_COMPILER}
+                    -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
+                    -FE${CMAKE_BINARY_DIR}/pascal_canvas_coverage
+                    -FU${CMAKE_BINARY_DIR}/pascal_canvas_coverage
+                    ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_canvas_coverage.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_canvas_coverage.pas
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            VERBATIM
+        )
+
+        add_custom_target(
+            bgi_canvas_coverage_pascal_build
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/pascal_canvas_coverage
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_BINARY_DIR}/pascal_canvas_coverage/demo_bgi_canvas_coverage${CMAKE_EXECUTABLE_SUFFIX}
+        )
+
+        add_test(
+            NAME bgi_canvas_coverage_pascal_build
+            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG> --target bgi_canvas_coverage_pascal_build
+        )
+        set_tests_properties(bgi_canvas_coverage_pascal_build PROPERTIES TIMEOUT 120)
+
+        if(UNIX AND NOT APPLE)
+            add_test(
+                NAME bgi_canvas_coverage_pascal_run
+                COMMAND ${CMAKE_COMMAND} -E env
+                        "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/pascal_canvas_coverage:$<TARGET_FILE_DIR:wx_bgi_opengl>:$ENV{LD_LIBRARY_PATH}"
+                        ${CMAKE_BINARY_DIR}/pascal_canvas_coverage/demo_bgi_canvas_coverage${CMAKE_EXECUTABLE_SUFFIX}
+            )
+        else()
+            add_test(
+                NAME bgi_canvas_coverage_pascal_run
+                COMMAND ${CMAKE_BINARY_DIR}/pascal_canvas_coverage/demo_bgi_canvas_coverage${CMAKE_EXECUTABLE_SUFFIX}
+            )
+        endif()
+        set_tests_properties(
+            bgi_canvas_coverage_pascal_run
+            PROPERTIES
+            DEPENDS bgi_canvas_coverage_pascal_build
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_canvas_coverage
+            TIMEOUT 20
+        )
+
+        # -------------------------------------------------------------------
         # Input hook Pascal test
         # -------------------------------------------------------------------
         file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_input_hooks)
