@@ -275,11 +275,22 @@ void glPassDestroy()
         deleteGlObjects();
 }
 
+void glPassResetState()
+{
+    // Zero out all handles WITHOUT calling GL — safe when the context is gone.
+    g_pageTex     = 0; g_pageVAO    = 0; g_pageVBO     = 0; g_pageProgram = 0;
+    g_solidVAO    = 0; g_solidVBO   = 0;
+    g_flatProgram = 0; g_smoothProgram = 0;
+    g_lineVAO     = 0; g_lineVBO    = 0; g_lineProgram = 0;
+    g_texW = 0; g_texH = 0;
+    g_inited = false;
+}
+
 // ---------------------------------------------------------------------------
 // renderPageAsTexture
 // ---------------------------------------------------------------------------
 
-void renderPageAsTexture(int w, int h)
+void renderPageAsTexture(int w, int h, int vpW, int vpH)
 {
     if (!g_inited)
         glPassInit(w, h);
@@ -311,8 +322,11 @@ void renderPageAsTexture(int w, int h)
                     GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    // Clear colour + depth.
-    glViewport(0, 0, w, h);
+    // Clear colour + depth using the physical viewport dimensions (may differ
+    // from page dimensions on high-DPI displays).
+    const int finalVpW = (vpW > 0) ? vpW : w;
+    const int finalVpH = (vpH > 0) ? vpH : h;
+    glViewport(0, 0, finalVpW, finalVpH);
     glClearColor(bg.r / 255.f, bg.g / 255.f, bg.b / 255.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

@@ -905,8 +905,15 @@ BGI_API void BGI_CALL wxbgi_wx_set_poll_callback(void (*fn)())
 
 BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height)
 {
+    wxbgi_wx_render_page_gl_vp(width, height, width, height);
+}
+
+BGI_API void BGI_CALL wxbgi_wx_render_page_gl_vp(int pageW, int pageH, int vpW, int vpH)
+{
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::renderPageToCurrentGLContext(width, height);
+    // Pass physical viewport dimensions so glViewport fills the full canvas on
+    // high-DPI displays, while the page texture uses logical page dimensions.
+    bgi::renderPageAsTexture(pageW, pageH, vpW, vpH);
 
     // GL solid / wireframe / line passes — only run if there is pending GL
     // geometry accumulated by a preceding wxbgi_render_dds() call.
@@ -916,8 +923,8 @@ BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height)
         if (camIt != bgi::gState.cameras.end())
         {
             const bgi::Camera3D &cam = camIt->second->camera;
-            const float ar = (height > 0)
-                ? static_cast<float>(width) / static_cast<float>(height)
+            const float ar = (pageH > 0)
+                ? static_cast<float>(pageW) / static_cast<float>(pageH)
                 : 1.f;
             const glm::mat4 view = bgi::cameraViewMatrix(cam);
             const glm::mat4 proj = bgi::cameraProjMatrix(cam, ar);
@@ -925,12 +932,12 @@ BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height)
             const glm::vec3 eye(cam.eyeX, cam.eyeY, cam.eyeZ);
 
             if (bgi::gState.pendingGl.hasSolids())
-                bgi::renderSolidsGLPass(bgi::gState.pendingGl, width, height,
+                bgi::renderSolidsGLPass(bgi::gState.pendingGl, vpW, vpH,
                                         bgi::gState.lightState, vp, eye);
             if (bgi::gState.pendingGl.hasWireframe())
-                bgi::renderWireframeGLPass(bgi::gState.pendingGl, width, height, vp, eye);
+                bgi::renderWireframeGLPass(bgi::gState.pendingGl, vpW, vpH, vp, eye);
             if (bgi::gState.pendingGl.hasLines())
-                bgi::renderWorldLinesGLPass(bgi::gState.pendingGl, width, height, vp);
+                bgi::renderWorldLinesGLPass(bgi::gState.pendingGl, vpW, vpH, vp);
         }
         bgi::gState.pendingGl.clear();
     }

@@ -690,6 +690,15 @@ BGI_API void BGI_CALL wxbgi_wx_init_for_canvas(int width, int height);
 BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height);
 
 /**
+ * @brief Render with separate page-buffer and physical-viewport dimensions.
+ *
+ * Like @c wxbgi_wx_render_page_gl but passes @p vpW × @p vpH to @c glViewport
+ * so the output fills the full physical framebuffer on high-DPI displays, while
+ * the page texture is still read at the logical @p pageW × @p pageH size.
+ */
+BGI_API void BGI_CALL wxbgi_wx_render_page_gl_vp(int pageW, int pageH, int vpW, int vpH);
+
+/**
  * @brief Notify BGI that the canvas has been resized.
  *
  * Call from @c EVT_SIZE.  Reallocates page buffers for the new dimensions.

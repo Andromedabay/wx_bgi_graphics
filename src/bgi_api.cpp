@@ -242,7 +242,7 @@ namespace
             bgi::gState.glfwInitialized = true;
         }
 
-        bgi::destroyWindowIfNeeded();
+        bgi::destroyWindowIfNeeded(true);
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
@@ -539,7 +539,7 @@ BGI_API void BGI_CALL clearviewport(void)
 BGI_API void BGI_CALL closegraph(void)
 {
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::destroyWindowIfNeeded();
+    bgi::destroyWindowIfNeeded(true);  // reset GL state: handles become stale when context is destroyed
     bgi::gState.pageBuffers.clear();
     if (bgi::gState.glfwInitialized)
     {
@@ -931,16 +931,17 @@ BGI_API int BGI_CALL gety(void)
 
 BGI_API void BGI_CALL graphdefaults(void)
 {
+    // Classic BGI graphdefaults resets drawing *settings* only — it does NOT
+    // clear the screen, the DDS, or the camera/UCS registries.  Calling
+    // resetStateForWindow() here was a bug: it wiped the page buffer and
+    // re-initialised cameras, destroying state that the programmer did not ask
+    // to destroy.
     std::lock_guard<std::mutex> lock(bgi::gMutex);
     if (!requireReady())
     {
         return;
     }
-
-    const int width = bgi::gState.width;
-    const int height = bgi::gState.height;
-    const bool doubleBuffered = bgi::gState.doubleBuffered;
-    bgi::resetStateForWindow(width, height, doubleBuffered);
+    bgi::resetDrawingState();
     flushIfVisible();
 }
 

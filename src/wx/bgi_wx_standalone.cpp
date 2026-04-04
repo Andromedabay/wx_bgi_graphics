@@ -65,6 +65,10 @@ public:
         Bind(wxEVT_TIMER, &BgiStandaloneFrame::OnRefreshTimer, this, ID_REFRESH);
         Bind(wxEVT_TIMER, &BgiStandaloneFrame::OnCloseTimer,   this, ID_CLOSE);
         Bind(wxEVT_CLOSE_WINDOW, &BgiStandaloneFrame::OnClose, this);
+        // Start a default 30 fps refresh timer so sequential programs (Python,
+        // Pascal) that call wxbgi_wx_app_main_loop() without setting an idle
+        // callback still see the current page buffer repainted periodically.
+        m_refreshTimer->Start(33);
     }
 
     void SetFrameRate(int fps) {
@@ -159,12 +163,11 @@ BGI_API void BGI_CALL wxbgi_wx_frame_create(int width, int height, const char* t
 {
     wxString wtitle = (title && *title) ? wxString::FromUTF8(title) : wxString("BGI");
     s_frame = new BgiStandaloneFrame(width, height, wtitle);
-    // Use the actual canvas client size for the BGI pixel buffer — the outer
-    // window is larger than requested due to titlebar and borders.
-    wxSize clientSz = s_frame->GetClientSize();
-    int bw = std::max(1, clientSz.GetWidth());
-    int bh = std::max(1, clientSz.GetHeight());
-    wxbgi_wx_init_for_canvas(bw, bh);
+    // The constructor already called SetClientSize(width, height), so the BGI
+    // pixel buffer should match exactly the requested logical size.  Calling
+    // GetClientSize() here (before Show) returns physical pixels on high-DPI
+    // Windows, causing a size mismatch — so we use width/height directly.
+    wxbgi_wx_init_for_canvas(std::max(1, width), std::max(1, height));
     wxbgi_wx_set_poll_callback(&StandaloneYield);
     if (wxTheApp) wxTheApp->SetTopWindow(s_frame);
     s_frame->Show(true);

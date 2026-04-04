@@ -105,10 +105,8 @@ void WxBgiCanvas::Render()
         m_glContext = new wxGLContext(this);
 
     if (!m_glContext->IsOK())
-    {
-        // Context creation failed (driver limitation).  Nothing to render.
         return;
-    }
+
     SetCurrent(*m_glContext);
 
     // One-time GLEW + BGI initialisation, executed with a valid GL context.
@@ -137,10 +135,18 @@ void WxBgiCanvas::Render()
         SetFocus();
     }
 
-    int w = 0, h = 0;
-    wxbgi_wx_get_size(&w, &h);
-    if (w > 0 && h > 0)
-        wxbgi_wx_render_page_gl(w, h);
+    int pageW = 0, pageH = 0;
+    wxbgi_wx_get_size(&pageW, &pageH);
+    if (pageW > 0 && pageH > 0)
+    {
+        // Compute physical pixel size for glViewport — on high-DPI displays
+        // the framebuffer is larger than the logical (DIP) canvas size.
+        const wxSize logSz    = GetClientSize();
+        const double dpiScale = GetDPIScaleFactor();
+        const int vpW = std::max(pageW, (int)(logSz.GetWidth()  * dpiScale));
+        const int vpH = std::max(pageH, (int)(logSz.GetHeight() * dpiScale));
+        wxbgi_wx_render_page_gl_vp(pageW, pageH, vpW, vpH);
+    }
 
     SwapBuffers();
 }
@@ -157,7 +163,15 @@ void WxBgiCanvas::OnSize(wxSizeEvent& evt)
     {
         const wxSize sz = evt.GetSize();
         if (sz.GetWidth() > 0 && sz.GetHeight() > 0)
-            wxbgi_wx_resize(sz.GetWidth(), sz.GetHeight());
+        {
+            // Only resize the BGI pixel buffer if the size actually changed.
+            // On Windows, multiple WM_SIZE events fire for the same size during
+            // Show() + sizer layout, which would unnecessarily clear the page.
+            int curW = 0, curH = 0;
+            wxbgi_wx_get_size(&curW, &curH);
+            if (sz.GetWidth() != curW || sz.GetHeight() != curH)
+                wxbgi_wx_resize(sz.GetWidth(), sz.GetHeight());
+        }
     }
     Refresh();
     evt.Skip();

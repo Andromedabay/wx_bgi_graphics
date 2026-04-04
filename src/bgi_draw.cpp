@@ -394,12 +394,14 @@ namespace bgi
         gState.lastResult = grOk;
     }
 
-    void destroyWindowIfNeeded()
+    void destroyWindowIfNeeded(bool resetGlState)
     {
         if (gState.window != nullptr)
         {
             glfwDestroyWindow(gState.window);
             gState.window = nullptr;
+            if (resetGlState)
+                glPassResetState();  // handle goes stale when context is destroyed
         }
     }
 

@@ -723,6 +723,65 @@ if(BUILD_TESTING)
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_input_hooks
             TIMEOUT 20
         )
+
+        # -------------------------------------------------------------------
+        # demo_bgi_wrapper — GLFW-mode BGI wrapper demo (build target only)
+        # -------------------------------------------------------------------
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pascal_demos)
+
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/pascal_demos/demo_bgi_wrapper${CMAKE_EXECUTABLE_SUFFIX}
+            COMMAND ${FPC_COMPILER}
+                    -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
+                    -FE${CMAKE_BINARY_DIR}/pascal_demos
+                    -FU${CMAKE_BINARY_DIR}/pascal_demos
+                    ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_wrapper.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_wrapper.pas
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            VERBATIM
+        )
+
+        add_custom_target(
+            demo_bgi_wrapper_pascal_build
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/pascal_demos
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_BINARY_DIR}/pascal_demos/demo_bgi_wrapper${CMAKE_EXECUTABLE_SUFFIX}
+        )
+
+        # -------------------------------------------------------------------
+        # demo_bgi_wrapper_gui — wx-mode BGI wrapper GUI demo (build target only)
+        # -------------------------------------------------------------------
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/pascal_demos/demo_bgi_wrapper_gui${CMAKE_EXECUTABLE_SUFFIX}
+            COMMAND ${FPC_COMPILER}
+                    -Fu${CMAKE_SOURCE_DIR}/examples/demoFreePascal
+                    -Fl$<TARGET_FILE_DIR:wx_bgi_opengl>
+                    -FE${CMAKE_BINARY_DIR}/pascal_demos
+                    -FU${CMAKE_BINARY_DIR}/pascal_demos
+                    ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_wrapper_gui.pas
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_SOURCE_DIR}/examples/demoFreePascal/demo_bgi_wrapper_gui.pas
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            VERBATIM
+        )
+
+        add_custom_target(
+            demo_bgi_wrapper_gui_pascal_build
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/pascal_demos
+            DEPENDS
+                wx_bgi_opengl
+                ${CMAKE_BINARY_DIR}/pascal_demos/demo_bgi_wrapper_gui${CMAKE_EXECUTABLE_SUFFIX}
+        )
+
     endif()
 endif()
 
