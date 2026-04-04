@@ -57,30 +57,49 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glew)
 
-message(STATUS "Fetching GLFW...")
+# ---------------------------------------------------------------------------
+# GLFW — FetchContent build or system install
+#
+# WXBGI_SYSTEM_GLFW=ON: use find_package(glfw3) instead of building from
+# source. Required on macOS CI where GLFW 3.4 fails to compile with
+# Xcode 16 (Apple Clang 16 rejects implicit CF type casts in .m files even
+# with -Wno-incompatible-pointer-types). Install via: brew install glfw
+# ---------------------------------------------------------------------------
+option(WXBGI_SYSTEM_GLFW
+    "Use system-installed GLFW (find_package) instead of FetchContent. \
+Enable for CI on macOS to avoid Xcode 16 build errors with GLFW 3.4."
+    OFF)
 
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+if(WXBGI_SYSTEM_GLFW)
+    message(STATUS "Using system GLFW (WXBGI_SYSTEM_GLFW=ON)")
+    find_package(glfw3 REQUIRED)
+    # glfw3 CMake config exports an imported target named "glfw" — the same
+    # name used in target_link_libraries throughout this file.
+else()
+    message(STATUS "Fetching GLFW...")
 
-FetchContent_Declare(
-   glfw
-    URL https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-FetchContent_MakeAvailable(glfw)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 
-# Apple Clang 16 (Xcode 16.x) tightened C conformance in Objective-C translation
-# units (.m files) and now treats implicit void*→typed-pointer conversions as hard
-# errors (-Wincompatible-pointer-types). GLFW 3.4's cocoa_monitor.m has several
-# such casts (CFTypeRef→CFNumberRef, _glfw_calloc→CGDirectDisplayID* etc.) that
-# predate this stricter enforcement. Suppress for the glfw target only.
-if(APPLE)
-    target_compile_options(glfw PRIVATE -Wno-incompatible-pointer-types)
+    FetchContent_Declare(
+       glfw
+        URL https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_MakeAvailable(glfw)
+
+    # Apple Clang 16 (Xcode 16.x) tightened C conformance in Objective-C
+    # translation units (.m files) and now treats implicit void*→typed-pointer
+    # conversions as hard errors. GLFW 3.4's cocoa_monitor.m has several such
+    # casts that predate this stricter enforcement. Suppress for glfw only.
+    if(APPLE)
+        target_compile_options(glfw PRIVATE -Wno-incompatible-pointer-types)
+    endif()
+
+    set_target_properties(glfw PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
-
-set_target_properties(glfw PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 message(STATUS "Fetching GLM...")
 

@@ -26,6 +26,7 @@
 
 #include <cstdlib>
 #include <algorithm>
+#include <chrono>
 
 // ---------------------------------------------------------------------------
 // Internal classes
@@ -121,12 +122,13 @@ static BgiStandaloneApp*   s_app   = nullptr;
 } // anonymous namespace
 
 /// Callback invoked by wxbgi_poll_events() (WITHOUT gMutex held).
-/// Drains the Win32 message queue so that keyboard/mouse events reach the
-/// canvas AND Windows doesn't mark the process as "Not Responding" during
-/// synchronous polling loops.  Canvas repaints are rate-limited to ~60 fps
-/// to avoid hammering the GPU on every spin of "repeat until KeyPressed".
+/// Drains the platform message queue so that keyboard/mouse events reach the
+/// canvas AND the process doesn't appear "Not Responding" during synchronous
+/// polling loops.  Canvas repaints are rate-limited to ~60 fps to avoid
+/// hammering the GPU on every spin of "repeat until KeyPressed".
 static void StandaloneYield()
 {
+#ifdef _WIN32
     // Drain ALL pending Win32 messages (non-blocking).  This is the same
     // mechanism as wxbgi_wx_app_main_loop but without blocking on GetMessage.
     MSG msg;
@@ -140,8 +142,23 @@ static void StandaloneYield()
     if (g_canvas && (now - s_lastPaint) >= 16u) {
         s_lastPaint = now;
         g_canvas->Refresh(false);
-        g_canvas->Update();   // UpdateWindow: immediate WM_PAINT if region dirty
+        g_canvas->Update();
     }
+#else
+    // On Linux/macOS let wxWidgets dispatch pending events non-blocking.
+    if (wxTheApp)
+        wxTheApp->ProcessPendingEvents();
+    // Rate-limited canvas refresh (~60 fps) using portable chrono.
+    using Clock = std::chrono::steady_clock;
+    static Clock::time_point s_lastPaint = Clock::now() - std::chrono::milliseconds(16);
+    auto now = Clock::now();
+    if (g_canvas &&
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - s_lastPaint).count() >= 16) {
+        s_lastPaint = now;
+        g_canvas->Refresh(false);
+        g_canvas->Update();
+    }
+#endif
 }
 
 // ---------------------------------------------------------------------------

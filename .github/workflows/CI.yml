@@ -47,7 +47,7 @@ jobs:
 
       - name: Install Doxygen (macOS)
         if: runner.os == 'macOS'
-        run: brew install doxygen wxwidgets
+        run: brew install doxygen wxwidgets glfw
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -101,7 +101,7 @@ jobs:
       - name: Configure (macOS Debug)
         if: runner.os == 'macOS'
         # Debug CI enables deterministic keyboard seam checks (test-only surface).
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWXBGI_ENABLE_TEST_SEAMS=ON -DWXBGI_SYSTEM_WX=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWXBGI_ENABLE_TEST_SEAMS=ON -DWXBGI_SYSTEM_WX=ON -DWXBGI_SYSTEM_GLFW=ON
 
       - name: Build (Linux/macOS Debug)
         if: runner.os != 'Windows'
@@ -156,7 +156,7 @@ jobs:
 
       - name: Install Doxygen (macOS)
         if: runner.os == 'macOS'
-        run: brew install doxygen wxwidgets
+        run: brew install doxygen wxwidgets glfw
 
       - name: Configure (Windows Release)
         if: runner.os == 'Windows'
@@ -217,7 +217,7 @@ jobs:
       - name: Configure (macOS Release)
         if: runner.os == 'macOS'
         # Release artifacts must not expose test seam injection APIs.
-        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DWXBGI_ENABLE_TEST_SEAMS=OFF -DWXBGI_SYSTEM_WX=ON
+        run: cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release -DWXBGI_ENABLE_TEST_SEAMS=OFF -DWXBGI_SYSTEM_WX=ON -DWXBGI_SYSTEM_GLFW=ON
 
       - name: Build (Linux/macOS Release)
         if: runner.os != 'Windows'
