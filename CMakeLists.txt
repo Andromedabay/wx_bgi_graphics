@@ -854,6 +854,36 @@ if(WXBGI_ENABLE_WX)
         set_tests_properties(wx_bgi_3d_orbit_test PROPERTIES TIMEOUT 60)
     endif()
 
+    # Automated CTest: BGI API coverage using WxBgiCanvas inside a wxFrame (C++ mirror of Pascal demo)
+    if(WIN32)
+        add_executable(wx_bgi_canvas_coverage_test WIN32
+            examples/wx/wx_bgi_canvas_coverage_test.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wx_bgi_canvas_coverage_test MACOSX_BUNDLE
+            examples/wx/wx_bgi_canvas_coverage_test.cpp)
+        set_target_properties(wx_bgi_canvas_coverage_test PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wx_bgi_canvas_coverage_test
+            examples/wx/wx_bgi_canvas_coverage_test.cpp)
+    endif()
+    target_link_libraries(wx_bgi_canvas_coverage_test PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wx_bgi_canvas_coverage_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wx_bgi_canvas_coverage_test>
+    )
+    if(BUILD_TESTING)
+        add_test(NAME wx_bgi_canvas_coverage_test
+                 COMMAND $<TARGET_FILE:wx_bgi_canvas_coverage_test>)
+        # 3 s colorful + 3 s final message + generous build/launch headroom
+        set_tests_properties(wx_bgi_canvas_coverage_test PROPERTIES TIMEOUT 30)
+    endif()
+
     # Interactive demo (WIN32/MACOSX_BUNDLE — not a CTest target)
     if(WIN32)
         add_executable(wx_bgi_app WIN32
