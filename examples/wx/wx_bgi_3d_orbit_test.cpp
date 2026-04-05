@@ -233,9 +233,10 @@ private:
     void OnClose(wxCloseEvent&)
     {
         // wxWidgets/GLX teardown crashes on Linux when the GL context is
-        // destroyed after the X11 surface is gone. Use std::exit() to skip
-        // teardown, matching the approach used by bgi_wx_standalone.
-        std::exit(0);
+        // destroyed after the X11 surface is gone. _Exit() terminates the
+        // process immediately without running atexit handlers or destructors,
+        // avoiding the crash. Matching the approach used by bgi_wx_standalone.
+        _Exit(0);
     }
 
     wxDECLARE_EVENT_TABLE();

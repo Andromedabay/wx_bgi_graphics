@@ -99,8 +99,9 @@ private:
         wxbgi_wx_set_poll_callback(nullptr);
         g_canvas = nullptr;
         s_frame  = nullptr;  // signal pump loop to exit
-        // Skip cleanup and exit cleanly — wx teardown crashes in DLL context.
-        std::exit(0);
+        // _Exit() terminates immediately without running atexit handlers or
+        // destructors — wx/GLX teardown crashes on Linux and in DLL context.
+        _Exit(0);
     }
 
     wxbgi::WxBgiCanvas* m_canvas        = nullptr;
