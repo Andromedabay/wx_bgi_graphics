@@ -19,7 +19,7 @@ program BGIDemo;
 *)
 
 uses
-  SysUtils,
+  SysUtils, Math,
   Graph;
 
 
@@ -1377,6 +1377,11 @@ begin
 end; { SayGoodbye }
 
 begin { program body }
+  { Mask FPU exceptions before GTK/wx init — required on Linux/macOS.
+    GTK's librsvg performs NaN/denormal operations that raise SIGFPE under
+    FreePascal's default strict x87 exception mask. }
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
   Initialize;
   ReportStatus;
 

@@ -192,7 +192,7 @@ private:
         }
 
         renderFrame(frame);
-        m_canvas->Refresh(false);
+        m_canvas->Render();
 
         // Done when elapsed time >= total duration.
         if (elap >= kDurationMs) {
@@ -221,7 +221,7 @@ private:
                 buildScene();
 
                 renderFrame(0);
-                m_canvas->Refresh(false);
+                m_canvas->Render();
 
                 m_startMs = wxGetLocalTimeMillis().GetValue();
                 Bind(wxEVT_TIMER, &OrbitFrame::OnTimer, this);

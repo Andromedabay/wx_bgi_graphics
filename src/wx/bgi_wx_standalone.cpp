@@ -146,10 +146,13 @@ static void StandaloneYield()
         g_canvas->Update();
     }
 #else
-    // On Linux/macOS let wxWidgets dispatch pending events non-blocking.
-    if (wxTheApp)
-        wxTheApp->ProcessPendingEvents();
-    // Rate-limited canvas refresh (~60 fps) using portable chrono.
+    // On Linux/macOS: queue a rate-limited repaint, then pump the full
+    // GTK main context via Yield().  ProcessPendingEvents() alone only
+    // drains the wx event queue and does NOT run GTK's native main context
+    // (g_main_context_iteration), so wxGLCanvas repaints are never delivered
+    // through OnPaint on GTK3/Wayland.  Yield(true) runs the full GTK loop
+    // (non-blocking, processes only pending events) so the compositor frame
+    // sync and the OpenGL draw pipeline are exercised correctly.
     using Clock = std::chrono::steady_clock;
     static Clock::time_point s_lastPaint = Clock::now() - std::chrono::milliseconds(16);
     auto now = Clock::now();
@@ -157,8 +160,9 @@ static void StandaloneYield()
         std::chrono::duration_cast<std::chrono::milliseconds>(now - s_lastPaint).count() >= 16) {
         s_lastPaint = now;
         g_canvas->Refresh(false);
-        g_canvas->Update();
     }
+    if (wxTheApp)
+        wxTheApp->Yield(true);
 #endif
 }
 
@@ -193,11 +197,14 @@ BGI_API void BGI_CALL wxbgi_wx_frame_create(int width, int height, const char* t
 #ifndef _WIN32
     // On Linux/macOS, the window needs the GTK/Cocoa event loop to process
     // the initial map/show event before IsShownOnScreen() returns true.
+    // Raise() requests the window manager to bring the window to the front
+    // (counters focus-stealing prevention on GNOME/KDE).
     // Yielding here ensures the window is fully realized and the first
     // WxBgiCanvas::Render() call (which initializes the DLL-local GLEW
     // function pointer table) succeeds.  Without this, callers that invoke
     // GL-dependent extension functions (e.g. wxbgi_write_pixels_rgba8) before
     // wxbgi_wx_app_main_loop will crash on a null function pointer.
+    s_frame->Raise();
     if (wxTheApp)
         wxTheApp->Yield(true);
     if (g_canvas)

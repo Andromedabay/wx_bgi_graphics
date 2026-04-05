@@ -105,7 +105,7 @@ public:
                 break;
             default: redraw = false; e.Skip(); break;
             }
-            if (redraw) { m_cam.clamp(); renderScene(); m_canvas->Refresh(false); }
+            if (redraw) { m_cam.clamp(); renderScene(); m_canvas->Render(); }
             updateStatus();
         });
 
@@ -132,7 +132,7 @@ public:
                 m_cam.elevDeg = m_dragElev0 + delta.y * 0.3f;
                 m_cam.clamp();
                 renderScene();
-                m_canvas->Refresh(false);
+                m_canvas->Render();
                 updateStatus();
             }
             e.Skip();
@@ -145,7 +145,7 @@ public:
             m_cam.dist *= factor;
             m_cam.clamp();
             renderScene();
-            m_canvas->Refresh(false);
+            m_canvas->Render();
             updateStatus();
             e.Skip();
         });
@@ -272,7 +272,7 @@ private:
                 buildScene();
                 renderScene();
                 m_canvas->SetAutoRefreshHz(0);  // repaint on demand
-                m_canvas->Refresh(false);
+                m_canvas->Render();
             });
         }
     }
