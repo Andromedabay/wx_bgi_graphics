@@ -1,6 +1,6 @@
 ﻿# wx_BGI_Graphics
 
-wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatible API (Borland Graphics Interface) on top of OpenGL, GLFW and GLEW. The goal is to keep old Pascal/C/C++ graphics programs usable with minimal source changes while staying cross-platform on Windows, Linux, and macOS.
+wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatible API (Borland Graphics Interface) on top of OpenGL, GLFW, GLEW and wxWidgets. The goal is to keep old Pascal/C/C++ graphics programs usable with minimal source changes while staying cross-platform on Windows, Linux, and macOS.
 
 ## Objectives
 1. Strive to be as simple and beginner complete as the original BGI library.
@@ -8,6 +8,7 @@ wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatib
 1. Provide a statically packaged single binary with no other runtime dependency.
 1. Easy to use Graphics Library tool for Python, Pascal, C/C++, etc. and other language users.
 1. Hide away OpenGL complexities, behind simple interface for Programmers/Developers.
+1. C/C++ Developers can choose light weight GLEW or Full Windowing wxWidgets framework.
 
 ## Latest Downloads
 
