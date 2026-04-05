@@ -388,15 +388,17 @@ add_custom_command(
 )
 
 # Input hook automated test (Phase 2 requires WXBGI_ENABLE_TEST_SEAMS)
-add_executable(test_input_hooks examples/cpp/test_input_hooks.cpp)
-target_link_libraries(test_input_hooks PRIVATE wx_bgi_opengl)
-target_compile_definitions(test_input_hooks PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
-add_custom_command(
-    TARGET test_input_hooks POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:wx_bgi_opengl>
-            $<TARGET_FILE_DIR:test_input_hooks>
-)
+if(WXBGI_ENABLE_TEST_SEAMS)
+    add_executable(test_input_hooks examples/cpp/test_input_hooks.cpp)
+    target_link_libraries(test_input_hooks PRIVATE wx_bgi_opengl)
+    target_compile_definitions(test_input_hooks PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
+    add_custom_command(
+        TARGET test_input_hooks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:test_input_hooks>
+    )
+endif()
 
 # Input hook interactive demo
 add_executable(wxbgi_input_hooks_cpp examples/cpp/wxbgi_input_hooks.cpp)
@@ -409,15 +411,17 @@ add_custom_command(
 )
 
 # Scroll + bypass + hk_dds automated test (requires WXBGI_ENABLE_TEST_SEAMS)
-add_executable(test_input_bypass examples/cpp/test_input_bypass.cpp)
-target_link_libraries(test_input_bypass PRIVATE wx_bgi_opengl)
-target_compile_definitions(test_input_bypass PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
-add_custom_command(
-    TARGET test_input_bypass POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:wx_bgi_opengl>
-            $<TARGET_FILE_DIR:test_input_bypass>
-)
+if(WXBGI_ENABLE_TEST_SEAMS)
+    add_executable(test_input_bypass examples/cpp/test_input_bypass.cpp)
+    target_link_libraries(test_input_bypass PRIVATE wx_bgi_opengl)
+    target_compile_definitions(test_input_bypass PRIVATE WXBGI_ENABLE_TEST_SEAMS=1)
+    add_custom_command(
+        TARGET test_input_bypass POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:test_input_bypass>
+    )
+endif()
 
 find_package(Python3 COMPONENTS Interpreter)
 
@@ -580,11 +584,13 @@ if(BUILD_TESTING)
     add_test(NAME test_solids            COMMAND $<TARGET_FILE:test_solids>)
     set_tests_properties(test_solids            PROPERTIES TIMEOUT 30)
 
-    add_test(NAME test_input_hooks       COMMAND $<TARGET_FILE:test_input_hooks>)
-    set_tests_properties(test_input_hooks       PROPERTIES TIMEOUT 20)
+    if(WXBGI_ENABLE_TEST_SEAMS)
+        add_test(NAME test_input_hooks   COMMAND $<TARGET_FILE:test_input_hooks>)
+        set_tests_properties(test_input_hooks   PROPERTIES TIMEOUT 20)
 
-    add_test(NAME test_input_bypass      COMMAND $<TARGET_FILE:test_input_bypass>)
-    set_tests_properties(test_input_bypass      PROPERTIES TIMEOUT 20)
+        add_test(NAME test_input_bypass  COMMAND $<TARGET_FILE:test_input_bypass>)
+        set_tests_properties(test_input_bypass  PROPERTIES TIMEOUT 20)
+    endif()
 
     if(Python3_Interpreter_FOUND)
         add_test(
