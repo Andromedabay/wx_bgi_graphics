@@ -82,7 +82,7 @@ void renderWorldLinesGLPass(const PendingGlRender &pending, int w, int h,
                              const glm::mat4 &vp);
 
 /** Legacy per-pixel GL_POINTS path (kept for backward compat / diagnostics). */
-void renderPageLegacyPoints(int w, int h);
+void renderPageLegacyPoints(int w, int h, int vpW = -1, int vpH = -1);
 
 } // namespace bgi
 

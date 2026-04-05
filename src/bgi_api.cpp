@@ -244,8 +244,21 @@ namespace
 
         bgi::destroyWindowIfNeeded(true);
 
+        // On macOS, a legacy compatibility context caps at GL 2.1 which does not
+        // support GLSL 330 shaders or VAOs.  We must explicitly request a Core
+        // Profile to get GL 3.3+ (up to 4.1 on Apple silicon).
+        // GLFW_OPENGL_FORWARD_COMPAT is required by macOS for core profiles.
+        // On other platforms keep the original GL 2.1 compatibility request so
+        // existing drivers without GL 3.3 still fall back to legacy rendering.
+#ifdef __APPLE__
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#else
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+#endif
         glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
 
         bgi::gState.windowTitle = (title != nullptr && *title != '\0') ? title : "BGI OpenGL Wrapper";
@@ -260,7 +273,6 @@ namespace
         glfwSwapInterval(1);
         glfwSetWindowPos(bgi::gState.window, left, top);
 
-#if !defined(__APPLE__)
         glewExperimental = GL_TRUE;
         if (glewInit() != GLEW_OK)
         {
@@ -268,7 +280,6 @@ namespace
             bgi::gState.lastResult = bgi::grInitFailed;
             return false;
         }
-#endif
 
         bgi::resetStateForWindow(width, height, doubleBuffered);
         glfwSetKeyCallback(bgi::gState.window, keyCallback);

@@ -27,22 +27,39 @@
 
 namespace wxbgi {
 
-// Keep pixel-format attributes minimal: don't request a specific GL version here.
-// Requesting WX_GL_MAJOR_VERSION sets needsARB=true in wxWidgets which causes
-// the entire context creation to fail if wglCreateContextAttribsARB returns NULL
-// on any driver.  Instead we let the driver provide its best compat context, then
-// check GLEW post-init for GL 3.3 features and fall back to legacy if needed.
+// On platforms other than macOS, keep pixel-format attributes minimal: don't
+// request a specific GL version.  Requesting WX_GL_MAJOR_VERSION sets
+// needsARB=true in wxWidgets which causes context creation to fail if
+// wglCreateContextAttribsARB returns NULL on any driver.  Instead we let the
+// driver provide its best compat context, then check GLEW post-init for GL 3.3
+// features and fall back to legacy rendering if needed.
 //
-// WX_GL_DEPTH_SIZE 24 is required for correct hidden-surface removal: without an
-// explicit depth-buffer attachment the depth test trivially passes for all
-// fragments (draw order wins), producing completely wrong depth ordering for 3-D
-// solid and wireframe rendering.
+// On macOS, a legacy compatibility context caps at GL 2.1 which does NOT
+// support GLSL 330 shaders or VAOs.  We must explicitly request a Core Profile
+// to get GL 4.1 (the maximum on Apple silicon).  The wglCreateContextAttribsARB
+// concern does not apply to macOS (which uses NSOpenGLPixelFormat instead).
+//
+// WX_GL_DEPTH_SIZE 24 is required for correct hidden-surface removal: without
+// an explicit depth-buffer the depth test trivially passes for all fragments
+// (draw order wins), producing wrong depth ordering for 3-D solid rendering.
+#ifdef __APPLE__
+static const int kGLAttrs[] = {
+    WX_GL_RGBA,
+    WX_GL_DOUBLEBUFFER,
+    WX_GL_DEPTH_SIZE, 24,
+    WX_GL_MAJOR_VERSION, 4,
+    WX_GL_MINOR_VERSION, 1,
+    WX_GL_CORE_PROFILE,
+    0
+};
+#else
 static const int kGLAttrs[] = {
     WX_GL_RGBA,
     WX_GL_DOUBLEBUFFER,
     WX_GL_DEPTH_SIZE, 24,
     0
 };
+#endif
 
 wxBEGIN_EVENT_TABLE(WxBgiCanvas, wxGLCanvas)
     EVT_PAINT(WxBgiCanvas::OnPaint)
@@ -144,12 +161,15 @@ void WxBgiCanvas::Render()
     wxbgi_wx_get_size(&pageW, &pageH);
     if (pageW > 0 && pageH > 0)
     {
-        // Compute physical pixel size for glViewport — on high-DPI displays
-        // the framebuffer is larger than the logical (DIP) canvas size.
-        const wxSize logSz    = GetClientSize();
-        const double dpiScale = GetDPIScaleFactor();
-        const int vpW = std::max(pageW, (int)(logSz.GetWidth()  * dpiScale));
-        const int vpH = std::max(pageH, (int)(logSz.GetHeight() * dpiScale));
+        // Compute physical framebuffer dimensions for glViewport.
+        // On HiDPI/Retina displays the framebuffer is larger than the logical
+        // canvas size.  GetContentScaleFactor() returns the OS backing-store
+        // scale (e.g. 2.0 on standard Retina) and is the correct API on macOS.
+        // GetDPIScaleFactor() is Windows-centric and may return 1.0 on macOS.
+        const wxSize   logSz = GetClientSize();
+        const double   scale = GetContentScaleFactor();
+        const int vpW = std::max(1, (int)std::round(logSz.GetWidth()  * scale));
+        const int vpH = std::max(1, (int)std::round(logSz.GetHeight() * scale));
         wxbgi_wx_render_page_gl_vp(pageW, pageH, vpW, vpH);
     }
 

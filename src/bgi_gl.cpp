@@ -297,7 +297,7 @@ void renderPageAsTexture(int w, int h, int vpW, int vpH)
 
     if (!g_pageTex || !g_pageProgram)
     {
-        renderPageLegacyPoints(w, h);
+        renderPageLegacyPoints(w, h, vpW, vpH);
         return;
     }
 
@@ -543,11 +543,15 @@ void renderWorldLinesGLPass(const PendingGlRender &pending, int w, int h,
 // renderPageLegacyPoints — the old per-pixel GL_POINTS path
 // ---------------------------------------------------------------------------
 
-void renderPageLegacyPoints(int w, int h)
+void renderPageLegacyPoints(int w, int h, int vpW, int vpH)
 {
     const ColorRGB background = colorToRGB(gState.bkColor);
 
-    glViewport(0, 0, w, h);
+    // Use physical framebuffer size for the GL viewport so the content fills
+    // the whole surface on HiDPI/Retina displays.
+    const int fvW = (vpW > 0) ? vpW : w;
+    const int fvH = (vpH > 0) ? vpH : h;
+    glViewport(0, 0, fvW, fvH);
     glClearColor(background.r / 255.f, background.g / 255.f, background.b / 255.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

@@ -295,20 +295,24 @@ namespace bgi
         }
     }
 
-    void renderPageToCurrentGLContext(int w, int h)
+    // fbW/fbH are the physical framebuffer dimensions (may be larger than w/h on
+    // HiDPI/Retina displays).  Pass them so glViewport covers the full surface.
+    void renderPageToCurrentGLContext(int w, int h, int fbW, int fbH)
     {
         // GL texture-quad path (default — requires GL 3.3 compat context).
         // Legacy GL_POINTS path is selected by wxbgi_set_legacy_gl_render(1).
         if (!gState.legacyGlRender)
         {
-            bgi::renderPageAsTexture(w, h);
+            bgi::renderPageAsTexture(w, h, fbW, fbH);
             return;
         }
 
         // --- Legacy GL_POINTS path ---
         const ColorRGB background = colorToRGB(gState.bkColor);
 
-        glViewport(0, 0, w, h);
+        // Use physical framebuffer size for the GL viewport so the content fills
+        // the whole surface on HiDPI/Retina displays.
+        glViewport(0, 0, fbW, fbH);
         glClearColor(background.r / 255.0f, background.g / 255.0f, background.b / 255.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -359,12 +363,22 @@ namespace bgi
         glfwMakeContextCurrent(gState.window);
         glfwPollEvents();
 
-        renderPageToCurrentGLContext(gState.width, gState.height);
+        // Query actual framebuffer dimensions — these differ from the logical
+        // window/page size on HiDPI/Retina displays (typically 2× on macOS).
+        int fbW = gState.width, fbH = gState.height;
+        glfwGetFramebufferSize(gState.window, &fbW, &fbH);
+        if (fbW <= 0) fbW = gState.width;
+        if (fbH <= 0) fbH = gState.height;
+
+        renderPageToCurrentGLContext(gState.width, gState.height, fbW, fbH);
 
         // GL solid / line passes — only run if there is pending GL geometry.
         if (!gState.legacyGlRender && gState.pendingGl.hasPending())
         {
-            // Build VP matrix from the active camera.
+            // Build VP matrix from the active camera.  The aspect ratio uses
+            // logical page dimensions (the camera was configured in those units);
+            // the framebuffer dimensions are used only for the GL viewport inside
+            // each render pass.
             auto camIt = gState.cameras.find(gState.activeCamera);
             if (camIt != gState.cameras.end())
             {
@@ -378,13 +392,12 @@ namespace bgi
                 const glm::vec3 eye(cam.eyeX, cam.eyeY, cam.eyeZ);
 
                 if (gState.pendingGl.hasSolids())
-                    renderSolidsGLPass(gState.pendingGl, gState.width, gState.height,
+                    renderSolidsGLPass(gState.pendingGl, fbW, fbH,
                                        gState.lightState, vp, eye);
                 if (gState.pendingGl.hasWireframe())
-                    renderWireframeGLPass(gState.pendingGl, gState.width, gState.height,
-                                          vp, eye);
+                    renderWireframeGLPass(gState.pendingGl, fbW, fbH, vp, eye);
                 if (gState.pendingGl.hasLines())
-                    renderWorldLinesGLPass(gState.pendingGl, gState.width, gState.height, vp);
+                    renderWorldLinesGLPass(gState.pendingGl, fbW, fbH, vp);
             }
             gState.pendingGl.clear();
         }
