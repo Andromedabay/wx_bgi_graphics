@@ -195,3 +195,27 @@ cmake --build build --config Debug --target demo_bgi_wrapper_gui_pascal_build
 
 Each target compiles the `.pas` source and copies the up-to-date DLL into the output directory.  
 See also: `examples/demoFreePascal/` and `examples/bgidemo-pascal/README.md`.
+
+### Linux / macOS: Required `SetExceptionMask` in Pascal Programs
+
+On Linux and macOS, GTK loads `librsvg` for icon rendering.  `librsvg` performs
+floating-point operations (NaN / denormal) that violate FreePascal's default
+strict x87 FPU mask and raise an `EInvalidOp` exception.
+
+Every Pascal program that opens a wx window (uses `wxbgi_wx_app_create`) must
+mask FPU exceptions **before** any GTK initialisation:
+
+```pascal
+uses SysUtils, Math;   { add Math to uses clause }
+
+begin
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
+  wxbgi_wx_app_create;
+  ...
+```
+
+The bundled test programs (`demo_bgi_api_coverage.pas`,
+`demo_bgi_canvas_coverage.pas`, `test_input_hooks.pas`) already include this
+call.  This fix is harmless on Windows (GTK is not used) and can be included
+unconditionally in portable Pascal programs.

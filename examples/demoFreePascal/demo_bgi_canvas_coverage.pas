@@ -11,7 +11,7 @@ program DemoBgiCanvasCoverage;
   Phase 2: print success, close immediately }
 
 uses
-  SysUtils;
+  SysUtils, Math;
 
 {$IFDEF MSWINDOWS}
 const
@@ -252,6 +252,12 @@ var
   ImageBuffer: array of Byte;
 
 begin
+  { Mask all FPU exceptions before GTK/librsvg is loaded (via wx_app_create).
+    On Linux, librsvg performs FP operations that trigger SIGFPE when FreePascal's
+    default strict exception mask is active. }
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
+
   { -----------------------------------------------------------------------
     Pre-initgraph checks (no window needed) }
   Require(setgraphbufsize(4096) = 0,   'setgraphbufsize mismatch');

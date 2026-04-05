@@ -11,7 +11,7 @@ program TestInputBypass;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils;
+  SysUtils, Math;
 
 {$IFDEF MSWINDOWS}
 const
@@ -337,6 +337,12 @@ begin
   gHkMouseY    := -1;
   gHkSelCount  := -1;
   gFailures    := 0;
+
+  { Mask FPU exceptions before GTK/wx init — required on Linux/macOS.
+    GTK's librsvg performs NaN/denormal operations that raise SIGFPE under
+    FreePascal's default strict x87 exception mask. }
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
 
   automated := False;
   for i := 1 to ParamCount do

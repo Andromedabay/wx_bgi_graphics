@@ -189,6 +189,20 @@ BGI_API void BGI_CALL wxbgi_wx_frame_create(int width, int height, const char* t
     wxbgi_wx_set_poll_callback(&StandaloneYield);
     if (wxTheApp) wxTheApp->SetTopWindow(s_frame);
     s_frame->Show(true);
+
+#ifndef _WIN32
+    // On Linux/macOS, the window needs the GTK/Cocoa event loop to process
+    // the initial map/show event before IsShownOnScreen() returns true.
+    // Yielding here ensures the window is fully realized and the first
+    // WxBgiCanvas::Render() call (which initializes the DLL-local GLEW
+    // function pointer table) succeeds.  Without this, callers that invoke
+    // GL-dependent extension functions (e.g. wxbgi_write_pixels_rgba8) before
+    // wxbgi_wx_app_main_loop will crash on a null function pointer.
+    if (wxTheApp)
+        wxTheApp->Yield(true);
+    if (g_canvas)
+        g_canvas->Render();
+#endif
 }
 
 BGI_API void BGI_CALL wxbgi_wx_app_main_loop(void)

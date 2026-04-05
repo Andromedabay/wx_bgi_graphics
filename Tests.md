@@ -81,6 +81,48 @@ The build step copies the up-to-date DLL into the output directory automatically
 
 > **Note:** `demo_bgi_canvas_coverage.pas` (tests 14–15) is the **wx-only** version — it does not call `initgraph` or `closegraph`.  It uses a `YieldMs()` helper to keep the wx event loop alive between draw phases.
 
+#### Linux / macOS: FreePascal FPU Exception Mask
+
+On Linux and macOS, FreePascal enables strict x87 FPU exception masking by default.
+GTK's SVG icon renderer (`librsvg` → `libxml2`) performs floating-point operations
+(NaN / denormal arithmetic) that violate this strict mask and raise `SIGFPE`,
+appearing as:
+
+```
+An unhandled exception occurred at $...:
+EInvalidOp: Invalid floating point operation
+```
+
+All Pascal test programs that open a wx window already include the fix at the top
+of their `begin` block:
+
+```pascal
+uses SysUtils, Math;
+
+begin
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
+  // ... rest of program
+```
+
+**When writing new Pascal programs** on Linux / macOS that use `wxbgi_wx_app_create`
+or any GTK-backed wx function, add `Math` to the `uses` clause and call
+`SetExceptionMask` as the very first statement.
+
+#### Linux / macOS: GLEW Initialisation Before `wxbgi_wx_app_main_loop`
+
+`WxBgiCanvas::Render()` performs lazy GLEW initialisation the first time the
+canvas paints.  In the C++ tests this paint occurs inside the wx event loop.
+Pascal (and Python / C) programs that call GL-dependent extension functions such
+as `wxbgi_write_pixels_rgba8` *before* `wxbgi_wx_app_main_loop` would previously
+crash with `EAccessViolation` (null `glWindowPos2i` function pointer).
+
+`wxbgi_wx_frame_create` now calls `wxApp::Yield()` followed by an explicit
+`WxBgiCanvas::Render()` on Linux / macOS after `Show(true)`, so that the GL
+context is fully initialised — including the DLL-local GLEW function pointer
+table — before the function returns.  This makes GL extension calls safe
+immediately after `wxbgi_wx_frame_create` on all platforms.
+
 ### wxWidgets Canvas Tests (20–22)
 
 These link against `wx_bgi_wx` (the static wx integration library) and use `WxBgiCanvas` embedded inside a `wxFrame`.  

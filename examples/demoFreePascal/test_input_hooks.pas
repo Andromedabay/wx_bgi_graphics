@@ -16,7 +16,7 @@ program TestInputHooks;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils;
+  SysUtils, Math;
 
 {$IFDEF MSWINDOWS}
 const
@@ -180,6 +180,12 @@ end;
 
 { ----- Main ----- }
 begin
+  { Mask all FPU exceptions before GTK/librsvg is loaded (via wx_app_create).
+    On Linux, librsvg performs FP operations that trigger SIGFPE when FreePascal's
+    default strict exception mask is active. }
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
+
   { Initialise all state variables }
   gKeyCount := 0;  gKeyLast := -1;  gKeyAction := -1;  gKeyMods := -1;
   gCharCount := 0; gCharLast := 0;

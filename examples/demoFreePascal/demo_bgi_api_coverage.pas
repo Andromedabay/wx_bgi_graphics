@@ -3,7 +3,7 @@ program DemoBgiApiCoverage;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils;
+  SysUtils, Math;
 
 {$IFDEF MSWINDOWS}
 const
@@ -232,6 +232,12 @@ var
   ImgSize: Cardinal;
   ImageBuffer: array of Byte;
 begin
+  { Mask all FPU exceptions before GTK/librsvg is loaded (via wx_app_create).
+    On Linux, librsvg performs FP operations that trigger SIGFPE when FreePascal's
+    default strict exception mask is active. }
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
+
   gd := -1;
   gm := -1;
   detectgraph(@gd, @gm);

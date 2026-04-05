@@ -169,9 +169,46 @@ end.
    `WxBgiCanvas`, calls `wxbgi_wx_init_for_canvas(w, h)` to set up the BGI CPU
    page buffers, then shows the frame.  All BGI drawing calls made after this
    point write into the page buffer and are displayed on the next paint.
-3. `wxbgi_wx_app_main_loop()` runs a Win32 message pump.  When the frame is
-   closed (timer, user click, or `wxbgi_wx_close_frame()`), the pump exits and
-   the function returns.
+   **On Linux and macOS**, after `Show(true)` the function calls `wxApp::Yield()`
+   and `WxBgiCanvas::Render()` to ensure the GL context is fully initialised
+   (including the DLL-local GLEW function pointer table) before returning.  This
+   makes GL extension functions such as `wxbgi_write_pixels_rgba8` safe to call
+   immediately — without needing `wxbgi_wx_app_main_loop` to run first.
+3. `wxbgi_wx_app_main_loop()` runs a Win32 message pump (Windows) or a
+   `wxEventLoop` (Linux / macOS).  When the frame is closed (timer, user click,
+   or `wxbgi_wx_close_frame()`), the pump exits and the function returns.
+
+### Linux / macOS: FreePascal FPU Exception Mask
+
+GTK on Linux and macOS loads `librsvg` for SVG icon rendering.  `librsvg` (via
+`libxml2`) performs floating-point operations (NaN / denormal arithmetic) that
+violate FreePascal's default strict x87 exception mask, producing:
+
+```
+EInvalidOp: Invalid floating point operation
+```
+
+**All FreePascal programs** that call `wxbgi_wx_app_create` must mask FPU
+exceptions at program start:
+
+```pascal
+uses SysUtils, Math;
+
+begin
+  { Must come before wxbgi_wx_app_create / any GTK init }
+  SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide,
+                    exOverflow, exUnderflow, exPrecision]);
+  wxbgi_wx_app_create;
+  wxbgi_wx_frame_create(640, 480, 'My App');
+  ...
+```
+
+This has **no effect on Windows** (where GTK is not used) and is safe to include
+unconditionally.
+
+The existing Pascal example in this section does not open a wx window, so it is
+unaffected.  The full test programs in `examples/demoFreePascal/` already include
+this call.
 
 ---
 

@@ -4,7 +4,7 @@ build-dbg
 .DS_Store
 build32
 build64
-build-*
+build*
 *.o
 *.obj
 *.so
