@@ -66,6 +66,7 @@ public:
 
         m_canvas->Bind(wxEVT_PAINT, &CoverageFrame::OnFirstPaint, this);
         Bind(wxEVT_TIMER, &CoverageFrame::OnTimer, this, m_timer.GetId());
+        Bind(wxEVT_CLOSE_WINDOW, &CoverageFrame::OnClose, this);
     }
 
 private:
@@ -293,6 +294,14 @@ private:
                 m_timer.StartOnce(1500);  // stay on colorful screen for 1.5 s
             });
         }
+    }
+
+    void OnClose(wxCloseEvent&)
+    {
+        // wxWidgets/GLX teardown crashes on Linux when the GL context is
+        // destroyed after the X11 surface is gone. Use std::exit() to skip
+        // teardown, matching the approach used by bgi_wx_standalone.
+        std::exit(g_exitCode);
     }
 
     wxDECLARE_EVENT_TABLE();

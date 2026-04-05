@@ -22,6 +22,7 @@
 #include <wx/timer.h>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <algorithm>
 #include <string>
 
@@ -64,6 +65,7 @@ public:
         sizer->Add(m_canvas, 1, wxEXPAND | wxALL, 4);
         SetSizer(sizer);
         m_canvas->Bind(wxEVT_PAINT, &OrbitFrame::OnFirstPaint, this);
+        Bind(wxEVT_CLOSE_WINDOW, &OrbitFrame::OnClose, this);
     }
 
 private:
@@ -226,6 +228,14 @@ private:
                 m_timer.Start(kTimerMs);
             });
         }
+    }
+
+    void OnClose(wxCloseEvent&)
+    {
+        // wxWidgets/GLX teardown crashes on Linux when the GL context is
+        // destroyed after the X11 surface is gone. Use std::exit() to skip
+        // teardown, matching the approach used by bgi_wx_standalone.
+        std::exit(0);
     }
 
     wxDECLARE_EVENT_TABLE();
