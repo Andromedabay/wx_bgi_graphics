@@ -494,14 +494,30 @@ endif()
 set(FPC_CANDIDATES)
 if(WIN32)
     list(APPEND FPC_CANDIDATES ppcrossx64 ppcx64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
+    # Apple Silicon (M-series) and Linux aarch64: fpc wrapper or ppca64 native
+    list(APPEND FPC_CANDIDATES fpc ppca64)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    list(APPEND FPC_CANDIDATES ppcx64)
+    list(APPEND FPC_CANDIDATES ppcx64 fpc)
 else()
     list(APPEND FPC_CANDIDATES ppc386 fpc)
 endif()
 
 unset(FPC_COMPILER CACHE)
-find_program(FPC_COMPILER NAMES ${FPC_CANDIDATES})
+# Include Homebrew prefixes so CMake can locate FPC on macOS even when the
+# shell PATH is not inherited by the cmake process (e.g. on Apple Silicon
+# where Homebrew installs to /opt/homebrew or the user prefix).
+find_program(FPC_COMPILER NAMES ${FPC_CANDIDATES}
+    HINTS
+        "$ENV{HOME}/homebrew/bin"
+        /opt/homebrew/bin
+        /usr/local/bin
+)
+if(FPC_COMPILER)
+    message(STATUS "Found FreePascal compiler: ${FPC_COMPILER}")
+else()
+    message(STATUS "FreePascal compiler not found — Pascal targets skipped")
+endif()
 
 if(FPC_COMPILER)
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bgidemo_pascal)

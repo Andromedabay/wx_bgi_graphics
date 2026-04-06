@@ -1,0 +1,15 @@
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/sysinit.o
+examples/demoFreePascal/demo_bgi_api_coverage.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/system.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/objpas.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/sysutils.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/math.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/unix.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/errors.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/sysconst.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/unixtype.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/baseunix.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/sysctl.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/unixutil.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/initc.o
+/Users/hammadrauf/homebrew/Cellar/fpc/3.2.2_1/lib/fpc/3.2.2/units/aarch64-darwin/rtl/ctypes.o

@@ -380,8 +380,9 @@ See **[Tests.md](./Tests.md)** for CTest commands, test categories, and CI detai
 
 See **[Building.md](./Building.md)** for full dependency details.
 
-- GLFW 3.4, GLEW 2.2.0, GLM 1.0.1, wxWidgets 3.2.5, nlohmann/json, yaml-cpp — all auto-fetched by CMake `FetchContent`.
-- Optional: Doxygen (API docs), LaTeX / MiKTeX (PDF docs), FreePascal (Pascal examples), Python 3 (Python test).
+- GLFW 3.4, GLEW 2.2.0, GLM 1.0.1, wxWidgets 3.2.5+, nlohmann/json, yaml-cpp — auto-fetched by CMake `FetchContent` on Windows/Linux.
+  - **macOS:** install GLFW and wxWidgets via `brew install glfw wxwidgets` and configure with `-DWXBGI_SYSTEM_GLFW=ON -DWXBGI_SYSTEM_WX=ON` (FetchContent builds fail on macOS 15 / Apple Clang 17).
+- Optional: Doxygen (API docs), LaTeX / MacTeX (PDF docs), FreePascal (Pascal examples), Python 3 (Python test).
 
 ## Building the Project
 
@@ -395,10 +396,20 @@ cmake --build build -j --config Debug
 ctest --test-dir build -C Debug --output-on-failure
 ```
 
-Quick start (Linux / macOS):
+Quick start (Linux):
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+
+Quick start (macOS Apple Silicon — system GLFW and wxWidgets required):
+
+```bash
+brew install glfw wxwidgets
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+  -DWXBGI_SYSTEM_GLFW=ON -DWXBGI_SYSTEM_WX=ON
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```

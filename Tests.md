@@ -61,8 +61,9 @@ These tests link directly against `wx_bgi_opengl` (the DLL/shared library) and e
 ### Python Test (11)
 
 ```bash
-python examples/python/bgi_api_coverage.py build/Debug/wx_bgi_opengl.dll   # Windows
-python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so      # Linux
+python examples/python/bgi_api_coverage.py build/Debug/wx_bgi_opengl.dll    # Windows
+python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so       # Linux
+python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.dylib    # macOS
 ```
 
 Exercises the full BGI API surface via Python `ctypes` — the same functions as the C++ coverage test.
@@ -170,17 +171,36 @@ ctest --test-dir build --output-on-failure
 ctest --test-dir build -R bgi_api_coverage_cpp --output-on-failure
 ```
 
-### macOS (single-config)
+### macOS (single-config, Apple Silicon)
+
+First-time setup — install system GLFW and wxWidgets if not already done:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+brew install glfw wxwidgets
+```
+
+Configure and build with the system-package flags:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+  -DWXBGI_SYSTEM_GLFW=ON -DWXBGI_SYSTEM_WX=ON \
+  -DWXBGI_ENABLE_TEST_SEAMS=ON
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-### Enabling Test Seams (keyboard injection)
+> **FreePascal tests (12–19) on macOS:** Pascal CTest targets require a working
+> FPC Homebrew install with correct linker paths.  If FPC is installed to a
+> non-standard Homebrew prefix the linker may report `ld: library 'c' not found`.
+> All C++, Python, and wxWidgets tests (1–11, 20–22) pass regardless.
 
-Tests 9–10 and 16–17 (`test_input_hooks`, `test_input_bypass`) require the keyboard injection test seam API to be compiled in:
+### Single test
+
+```bash
+ctest --test-dir build -R bgi_api_coverage_cpp --output-on-failure
+```
+
+### Enabling Test Seams (keyboard injection)
 
 ```powershell
 cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
