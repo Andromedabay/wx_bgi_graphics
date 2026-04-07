@@ -347,13 +347,67 @@ void renderPageAsTexture(int w, int h, int vpW, int vpH)
     glDepthMask(GL_TRUE);
 
     // Draw selection cursors (uses legacy GL but is fine as an overlay).
-    drawSelectionCursorsGL();
+    // NOTE: drawSelectionCursorsGL() is intentionally NOT called here.
+    // It is called AFTER the 3-D solid pass (in flushToScreen / wxbgi_wx_render_overlays_for_camera)
+    // so the cursor always appears in front of all geometry.
     glFlush();
 }
 
 // ---------------------------------------------------------------------------
-// renderSolidsGLPass
+// renderPageAsTextureAlpha — overlay composite pass
 // ---------------------------------------------------------------------------
+
+void renderPageAsTextureAlpha(int w, int h, int vpW, int vpH)
+{
+    if (!g_pageTex || !g_pageProgram)
+        return; // no fallback for alpha pass; missing objects means no GL init
+
+    // Build RGBA pixel data: background pixels → alpha 0 (transparent),
+    // all other pixels → alpha 255 (fully opaque overlay).
+    const auto &buf = visualPageBuffer();
+    const int   npx = w * h;
+    std::vector<std::uint8_t> rgba(static_cast<std::size_t>(npx) * 4);
+    const ColorRGB bg = colorToRGB(gState.bkColor);
+    for (int i = 0; i < npx; ++i)
+    {
+        const ColorRGB c = colorToRGB(buf[static_cast<std::size_t>(i)]);
+        const bool isBg  = (c.r == bg.r && c.g == bg.g && c.b == bg.b);
+        rgba[static_cast<std::size_t>(i) * 4 + 0] = c.r;
+        rgba[static_cast<std::size_t>(i) * 4 + 1] = c.g;
+        rgba[static_cast<std::size_t>(i) * 4 + 2] = c.b;
+        rgba[static_cast<std::size_t>(i) * 4 + 3] = isBg ? 0u : 255u;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, g_pageTex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h,
+                    GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    const int finalVpW = (vpW > 0) ? vpW : w;
+    const int finalVpH = (vpH > 0) ? vpH : h;
+    glViewport(0, 0, finalVpW, finalVpH);
+
+    // Alpha blending: overlay pixels appear on top; transparent pixels are no-ops.
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+
+    glUseProgram(g_pageProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_pageTex);
+    glUniform1i(glGetUniformLocation(g_pageProgram, "uTex"), 0);
+    glBindVertexArray(g_pageVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+    glUseProgram(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+}
+
 
 static void setPhongUniforms(GLuint prog, const LightState &light,
                               const glm::mat4 &mvp, const glm::vec3 &camPos)
@@ -378,12 +432,14 @@ static void setPhongUniforms(GLuint prog, const LightState &light,
 
 void renderSolidsGLPass(const PendingGlRender &pending, int w, int h,
                         const LightState &light, const glm::mat4 &vp,
-                        const glm::vec3 &camPos)
+                        const glm::vec3 &camPos, int vpX, int vpY)
 {
     if (!g_inited || !pending.hasSolids())
         return;
 
-    glViewport(0, 0, w, h);
+    glViewport(vpX, vpY, w, h);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(vpX, vpY, w, h);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
@@ -429,6 +485,7 @@ void renderSolidsGLPass(const PendingGlRender &pending, int w, int h,
     glBindVertexArray(0);
     glUseProgram(0);
     glDisable(GL_CULL_FACE);
+    glDisable(GL_SCISSOR_TEST);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,12 +493,15 @@ void renderSolidsGLPass(const PendingGlRender &pending, int w, int h,
 // ---------------------------------------------------------------------------
 
 void renderWireframeGLPass(const PendingGlRender &pending, int w, int h,
-                            const glm::mat4 &vp, const glm::vec3 &camPos)
+                            const glm::mat4 &vp, const glm::vec3 &camPos,
+                            int vpX, int vpY)
 {
     if (!g_inited || !pending.hasWireframe())
         return;
 
-    glViewport(0, 0, w, h);
+    glViewport(vpX, vpY, w, h);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(vpX, vpY, w, h);
 
     // ------------------------------------------------------------------
     // Pass 1 — populate depth buffer only (no colour output).
@@ -508,17 +568,20 @@ void renderWireframeGLPass(const PendingGlRender &pending, int w, int h,
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_SCISSOR_TEST);
 }
 
 
 
 void renderWorldLinesGLPass(const PendingGlRender &pending, int w, int h,
-                             const glm::mat4 &vp)
+                             const glm::mat4 &vp, int vpX, int vpY)
 {
     if (!g_inited || !pending.hasLines() || !g_lineProgram)
         return;
 
-    glViewport(0, 0, w, h);
+    glViewport(vpX, vpY, w, h);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(vpX, vpY, w, h);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDisable(GL_CULL_FACE);
@@ -537,6 +600,7 @@ void renderWorldLinesGLPass(const PendingGlRender &pending, int w, int h,
     glBindVertexArray(0);
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_SCISSOR_TEST);
 }
 
 // ---------------------------------------------------------------------------

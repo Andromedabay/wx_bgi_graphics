@@ -402,6 +402,26 @@ namespace bgi
             gState.pendingGl.clear();
         }
 
+        // Overlay alpha-blit pass — draw grid, UCS axes, concentric circles and
+        // selection cursor ON TOP of any 3-D solid/line geometry rendered above.
+        // Uses alpha blending so background-coloured pixels are transparent.
+        if (!gState.legacyGlRender && !gState.pendingOverlayCam.empty())
+        {
+            auto camIt = gState.cameras.find(gState.pendingOverlayCam);
+            if (camIt != gState.cameras.end())
+            {
+                // Clear page buffer to background, draw only overlays into it.
+                auto &buf = gState.pageBuffers[static_cast<std::size_t>(
+                    std::clamp(gState.activePage, 0, kPageCount - 1))];
+                std::fill(buf.begin(), buf.end(),
+                          static_cast<std::uint8_t>(gState.bkColor));
+                drawOverlaysForCamera(gState.pendingOverlayCam, camIt->second->camera);
+                renderPageAsTextureAlpha(gState.width, gState.height, fbW, fbH);
+            }
+            drawSelectionCursorsGL();
+            gState.pendingOverlayCam.clear();
+        }
+
         glfwSwapBuffers(gState.window);
 
         gState.lastResult = grOk;

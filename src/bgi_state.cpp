@@ -31,9 +31,13 @@ namespace bgi
     BgiState gState;
 
     // BgiState constructor / destructor are defined here (not inline in the
-    // header) so the compiler can generate the unique_ptr<DdsScene> destructor
+    // header) so the compiler can generate DdsScene constructors/destructors
     // in a translation unit where DdsScene is fully defined (bgi_dds.h above).
-    BgiState::BgiState() : dds(std::make_unique<DdsScene>()) {}
+    BgiState::BgiState()
+    {
+        ddsRegistry["default"] = std::make_unique<DdsScene>();
+        dds = ddsRegistry["default"].get();
+    }
     BgiState::~BgiState() = default;
 
     void resetPaletteState()
@@ -106,12 +110,26 @@ namespace bgi
         const std::size_t pixelCount = static_cast<std::size_t>(gState.width) * static_cast<std::size_t>(gState.height);
         gState.pageBuffers.assign(static_cast<std::size_t>(kPageCount), std::vector<std::uint8_t>(pixelCount, static_cast<std::uint8_t>(gState.bkColor)));
 
-        // Clear the DDS and reinitialise camera / UCS registries.
-        // Cameras and UCS are DDS-first: their data lives inside DdsCamera /
-        // DdsUcs objects; BgiState::cameras and ucsSystems are just name→ptr indexes.
-        gState.dds->clearAll();
+        // Rebuild the DDS scene registry: destroy all non-default scenes, reset
+        // the default scene to empty.  Camera / UCS registries are rebuilt below.
+        for (auto it = gState.ddsRegistry.begin(); it != gState.ddsRegistry.end(); )
+        {
+            if (it->first != "default")
+                it = gState.ddsRegistry.erase(it);
+            else
+                ++it;
+        }
+        if (gState.ddsRegistry.find("default") == gState.ddsRegistry.end())
+            gState.ddsRegistry["default"] = std::make_unique<DdsScene>();
+        else
+            gState.ddsRegistry["default"]->clearAll();
+        gState.activeDdsName = "default";
+        gState.dds = gState.ddsRegistry["default"].get();
+
         gState.cameras.clear();
         gState.ucsSystems.clear();
+        gState.pendingGl.clear();
+        gState.pendingGlQueue.clear();
 
         // Create the default pixel-space camera that replicates classic BGI
         // coordinates: (0,0) = top-left, Y increases downward.
@@ -135,6 +153,7 @@ namespace bgi
             dc->camera.orthoTop        = 0.f;
             dc->camera.nearPlane       = -1.f;
             dc->camera.farPlane        =  1.f;
+            dc->camera.assignedSceneName = "default";
             gState.dds->append(dc);
             gState.cameras["default"]  = dc;
         }
@@ -152,6 +171,28 @@ namespace bgi
 
         // Reset world extents to "empty".
         gState.worldExtents = WorldExtents{};
+    }
+
+    void resizePixelBuffer(int width, int height)
+    {
+        // Resize the pixel buffer to the new dimensions while preserving all
+        // DDS scenes, cameras, UCS systems, and drawing state.  Called by
+        // wxbgi_wx_resize() when an embedded canvas is resized by the OS —
+        // a resize must NOT wipe user-created scene graphs.
+        gState.width  = std::max(1, width);
+        gState.height = std::max(1, height);
+
+        const std::size_t pixelCount =
+            static_cast<std::size_t>(gState.width) *
+            static_cast<std::size_t>(gState.height);
+        gState.pageBuffers.assign(
+            static_cast<std::size_t>(kPageCount),
+            std::vector<std::uint8_t>(pixelCount, static_cast<std::uint8_t>(gState.bkColor)));
+
+        // Update viewport to full new window size.
+        gState.viewport = {0, 0, gState.width - 1, gState.height - 1, false};
+        gState.currentX = 0;
+        gState.currentY = 0;
     }
 
     std::vector<std::uint8_t> &activePageBuffer()

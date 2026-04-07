@@ -26,6 +26,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace
 {
@@ -925,9 +926,49 @@ BGI_API void BGI_CALL wxbgi_wx_render_page_gl_vp(int pageW, int pageH, int vpW, 
     // high-DPI displays, while the page texture uses logical page dimensions.
     bgi::renderPageAsTexture(pageW, pageH, vpW, vpH);
 
-    // GL solid / wireframe / line passes — only run if there is pending GL
-    // geometry accumulated by a preceding wxbgi_render_dds() call.
-    if (!bgi::gState.legacyGlRender && bgi::gState.pendingGl.hasPending())
+    if (bgi::gState.legacyGlRender)
+        return;
+
+    // Multi-camera path: drain the per-camera queue built by wxbgi_render_dds().
+    // Each frame stores the geometry + VP matrix + screen viewport for one camera.
+    // This correctly handles multi-panel layouts where each camera covers a
+    // different sub-region of the window.
+    if (!bgi::gState.pendingGlQueue.empty())
+    {
+        for (const auto &frame : bgi::gState.pendingGlQueue)
+        {
+            // Convert BGI pixel viewport (Y=0 at top) to GL coords (Y=0 at bottom).
+            const bool fullWin = (frame.camVpW == 0 && frame.camVpH == 0);
+            const int glW  = fullWin ? vpW : frame.camVpW;
+            const int glH  = fullWin ? vpH : frame.camVpH;
+            const int glX  = fullWin ? 0   : frame.camVpX;
+            const int glY  = fullWin ? 0   : (vpH - frame.camVpY - glH);
+
+            const glm::mat4 vpMat = glm::make_mat4(frame.viewProj);
+            const glm::vec3 eye(frame.eyeX, frame.eyeY, frame.eyeZ);
+
+            if (frame.geometry.hasSolids())
+                bgi::renderSolidsGLPass(frame.geometry, glW, glH,
+                                        frame.light, vpMat, eye, glX, glY);
+            if (frame.geometry.hasWireframe())
+                bgi::renderWireframeGLPass(frame.geometry, glW, glH,
+                                           vpMat, eye, glX, glY);
+            if (frame.geometry.hasLines())
+                bgi::renderWorldLinesGLPass(frame.geometry, glW, glH,
+                                            vpMat, glX, glY);
+        }
+        // Do NOT clear pendingGlQueue here. It persists until the next
+        // cleardevice() call (at the start of each onIdle()/renderFrame()).
+        // If Render() fires twice between onIdle() calls (extra wx paint
+        // events from a backlogged timer), the second Render() re-draws the
+        // same geometry — identical pixels, no visible flicker. Clearing the
+        // queue here caused every other Render() to show blank GL geometry.
+        return;
+    }
+
+    // Single-camera fallback: geometry accumulated directly in pendingGl
+    // (e.g. when wxbgi_render_dds was not called, or for legacy call sites).
+    if (bgi::gState.pendingGl.hasPending())
     {
         auto camIt = bgi::gState.cameras.find(bgi::gState.activeCamera);
         if (camIt != bgi::gState.cameras.end())
@@ -949,15 +990,50 @@ BGI_API void BGI_CALL wxbgi_wx_render_page_gl_vp(int pageW, int pageH, int vpW, 
             if (bgi::gState.pendingGl.hasLines())
                 bgi::renderWorldLinesGLPass(bgi::gState.pendingGl, vpW, vpH, vp);
         }
-        bgi::gState.pendingGl.clear();
+        // Same reasoning: do not clear here; cleardevice() resets at frame start.
     }
+}
+
+BGI_API void BGI_CALL wxbgi_wx_render_overlays_for_camera(const char *camName,
+                                                           int pageW, int pageH,
+                                                           int vpW,   int vpH)
+{
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+
+    const std::string key = (camName != nullptr && camName[0] != '\0')
+                                ? std::string(camName)
+                                : bgi::gState.activeCamera;
+    auto camIt = bgi::gState.cameras.find(key);
+    if (camIt == bgi::gState.cameras.end())
+        return;
+
+    // Clear the page buffer to the background colour so only overlay pixels
+    // (non-background) are visible when the alpha-blit composites them on top.
+    const int pageIdx = std::clamp(bgi::gState.activePage, 0, bgi::kPageCount - 1);
+    auto &buf = bgi::gState.pageBuffers[static_cast<std::size_t>(pageIdx)];
+    std::fill(buf.begin(), buf.end(),
+              static_cast<std::uint8_t>(bgi::gState.bkColor));
+
+    // Draw only overlays (grid, UCS axes, concentric circles) into the
+    // now-cleared page buffer.
+    bgi::drawOverlaysForCamera(key, camIt->second->camera);
+
+    // Alpha-composite the overlay layer ON TOP of the existing GL content.
+    // Background-coloured pixels become fully transparent so only the overlay
+    // strokes are visible in front of any 3-D solid geometry.
+    bgi::renderPageAsTextureAlpha(pageW, pageH, vpW, vpH);
+
+    // Draw selection cursor as a GL overlay on top of everything.
+    bgi::drawSelectionCursorsGL();
 }
 
 BGI_API void BGI_CALL wxbgi_wx_resize(int width, int height)
 {
+    // Resize the pixel buffer only — does NOT reset DDS scenes, cameras or UCS.
+    // The scene graph is preserved across OS-level window resize events.
     if (width <= 0 || height <= 0) return;
     std::lock_guard<std::mutex> lock(bgi::gMutex);
-    bgi::resetStateForWindow(width, height, true);
+    bgi::resizePixelBuffer(width, height);
 }
 
 BGI_API void BGI_CALL wxbgi_wx_get_size(int* width, int* height)

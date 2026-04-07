@@ -1,4 +1,4 @@
-﻿# Visual Aids
+# Visual Aids
 
 The Visual Aids system provides non-DDS overlays for camera/UCS workflows.
 These overlays are designed for orientation, scale awareness, and interactive
@@ -10,7 +10,10 @@ Key behavior:
 - They are not serialized to DDJ/DDY.
 - They are not selectable as DDS objects.
 - They are disabled by default to keep legacy behavior unchanged.
-- They are rendered automatically during `wxbgi_render_dds()`.
+- They are rendered automatically during `wxbgi_render_dds()` in GLFW mode.
+- In wxWidgets mode they are rendered via `wxbgi_wx_render_overlays_for_camera()`
+  in the `WxBgiCanvas::PostBlit()` hook, **after** 3-D solid geometry, ensuring
+  visual aids are always in front of all scene content.
 
 Primary API header: `src/wx_bgi_overlay.h`
 
@@ -310,10 +313,13 @@ Pure drawing routines; no public API symbols.  All functions operate under
 void drawSelectionCursorsGL();
 ```
 
-Called from `flushToScreen()` in the **OpenGL pass** -- after the BGI pixel
-buffer is uploaded but before `glFlush()`.  Uses immediate-mode `GL_LINE_LOOP`
-so the square renders on top of everything.  Does not acquire `gMutex` (caller
-holds it).
+Called **after** the 3-D solid geometry GL pass, so the square always renders
+on top of solid objects.  Uses immediate-mode `GL_LINE_LOOP` with a pixel-space
+orthographic projection (`glOrtho(0, w, h, 0, -1, 1)`) so screen-pixel
+coordinates are used directly.  Does not acquire `gMutex` (caller holds it).
+
+The blink animation uses `std::chrono::steady_clock` (not `glfwGetTime`), so
+it works correctly in both GLFW-standalone and wxWidgets-embedded modes.
 
 ### Pick handler
 
@@ -367,17 +373,58 @@ front).  Per-type logic:
 
 ---
 
-## 3. Rendering pass integration -- `src/bgi_dds_render.cpp`
+## 3. Rendering pass integration -- `src/bgi_dds_render.cpp`, `src/bgi_draw.cpp`, `src/bgi_modern_api.cpp`
 
-`wxbgi_render_dds()` calls the overlay system in two places:
+Visual aids are composited **after** 3-D solid geometry so they always appear
+in front.  The rendering pipeline uses two texture passes to achieve this:
 
 ```
-for each camera:
-    render DDS scene objects
-    drawOverlaysForCamera(camName, cam)   <- grid, UCS axes, concentric circles
-    flushToScreen()
-        +-- drawSelectionCursorsGL()      <- selection cursor (OpenGL pass)
+for each camera in wxbgi_render_dds():
+    render DDS scene objects into pixel buffer
+    queue 3-D solid GL geometry  (pendingGl)
+    store camName in gState.pendingOverlayCam
+
+GLFW / flushToScreen() path:
+    +-- renderPageAsTexture()        <- pixel buffer as opaque RGBA texture
+    +-- drain pendingGl queue        <- 3-D solid GL geometry (depth-tested)
+    +-- [clear pixel buffer; drawOverlaysForCamera()]  <- grid, UCS axes, circles
+    +-- renderPageAsTextureAlpha()   <- overlay-only buffer; background = alpha 0
+    +-- drawSelectionCursorsGL()     <- selection cursor (OpenGL pass, on top)
+    +-- glfwSwapBuffers()
+
+wx / WxBgiCanvas::Render() path (per panel):
+    +-- PreBlit(w, h)                <- cleardevice() + wxbgi_render_dds(camName)
+    +-- wxbgi_wx_render_page_gl_vp() <- opaque page texture + 3-D solid GL
+    +-- PostBlit(pageW, pageH, vpW, vpH)
+            calls wxbgi_wx_render_overlays_for_camera(camName, ...):
+                +-- clear pixel buffer to background
+                +-- drawOverlaysForCamera()   <- grid, UCS axes, circles
+                +-- renderPageAsTextureAlpha() <- alpha-blit overlays on top of solids
+                +-- drawSelectionCursorsGL()   <- cursor on top of everything
+    +-- SwapBuffers()
 ```
+
+**`renderPageAsTextureAlpha()`** (in `src/bgi_gl.cpp`):
+- Same as `renderPageAsTexture()` but does **not** clear the framebuffer.
+- Background-colored pixels in the CPU buffer get `alpha = 0`; all other pixels
+  get `alpha = 255`.
+- Enables `GL_BLEND(SRC_ALPHA, ONE_MINUS_SRC_ALPHA)` so only overlay strokes
+  are composited on top of the existing framebuffer (3-D solids remain visible).
+
+**`wxbgi_wx_render_overlays_for_camera()`** (in `src/bgi_modern_api.cpp`,
+declared in `src/wx_bgi_ext.h`):
+
+```c
+BGI_API void BGI_CALL wxbgi_wx_render_overlays_for_camera(
+    const char *camName,
+    int pageW, int pageH,
+    int vpW, int vpH);
+```
+
+Clears the page buffer, draws overlays for the named camera, calls
+`renderPageAsTextureAlpha`, then calls `drawSelectionCursorsGL`.  Call from
+`WxBgiCanvas::PostBlit` only -- the GL context must already be current and the
+3-D solid pass must already be complete.
 
 Flash rendering for selected objects:
 
@@ -388,7 +435,11 @@ const bool isSelected = std::find(gState.selectedObjectIds.begin(),
                           != gState.selectedObjectIds.end();
 int colorOverride = -1;
 if (isSelected) {
-    const int flashPhase = static_cast<int>(glfwGetTime()) & 1;
+    using clock = std::chrono::steady_clock;
+    static const auto t0 = clock::now();
+    const int flashPhase =
+        (int)std::chrono::duration_cast<std::chrono::seconds>(
+            clock::now() - t0).count() & 1;
     colorOverride = (gState.selectionFlashScheme == 0)
         ? (flashPhase ? 252 : 214)   // orange / dark-orange
         : (flashPhase ? 253 : 93);   // purple / dark-purple
@@ -460,9 +511,16 @@ struct, then releases the mutex.
 | `wxbgi_selection_set_flash_scheme(s)` | `0` = orange (default), `1` = purple |
 | `wxbgi_selection_set_pick_radius(px)` | Pick radius clamped to `2..64` (default 16) |
 
----
+### wxWidgets Overlay Helper (`src/wx_bgi_ext.h` / `src/bgi_modern_api.cpp`)
 
-## 5. File dependency diagram
+Called from `WxBgiCanvas::PostBlit` only -- composites overlays in front of
+3-D solid GL geometry within an already-current GL context.
+
+| Function | Description |
+|---|---|
+| `wxbgi_wx_render_overlays_for_camera(camName, pageW, pageH, vpW, vpH)` | Clears CPU buffer → draws overlays for `camName` → alpha-blits buffer onto the GL framebuffer → draws selection cursor |
+
+---
 
 ```
 wx_bgi_overlay.h        (public declarations -- include in user code)
@@ -479,11 +537,18 @@ bgi_overlay_api.cpp     (public C API implementation: lock gMutex, mutate gState
      |         +---> bgi_ucs.h/cpp      (ucsLocalToWorldMatrix for grid UCS transform)
      |
      +---> bgi_types.h   (OverlayGridState, OverlayUcsAxesState, Camera3D overlay structs,
-                          BgiState::selectedObjectIds / selectionFlashScheme / selectionPickRadiusPx)
+                          BgiState::selectedObjectIds / selectionFlashScheme / selectionPickRadiusPx
+                          BgiState::pendingOverlayCam)
 
-bgi_dds_render.cpp  (calls drawOverlaysForCamera + renderObject flash logic)
+bgi_gl.h/cpp        (renderPageAsTexture, renderPageAsTextureAlpha)
+bgi_dds_render.cpp  (sets pendingOverlayCam; renderObject flash logic)
 bgi_api.cpp         (mouseButtonCallback -> overlayPerformPick)
-bgi_draw.cpp        (flushToScreen -> drawSelectionCursorsGL)
+bgi_draw.cpp        (flushToScreen -> renderPageAsTextureAlpha + drawSelectionCursorsGL
+                      after 3-D solid pass)
+bgi_modern_api.cpp  (wxbgi_wx_render_overlays_for_camera -- wx PostBlit helper)
+wx_bgi_canvas.cpp   (WxBgiCanvas::Render calls PostBlit; PostBlit calls
+                      wxbgi_wx_render_overlays_for_camera)
+wx_bgi_ext.h        (wxbgi_wx_render_overlays_for_camera public declaration)
 ```
 
 ---

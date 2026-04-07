@@ -242,6 +242,7 @@ set(SRCS
     src/bgi_world_api.cpp
     src/bgi_dds.cpp
     src/bgi_dds_api.cpp
+    src/bgi_dds_scene_api.cpp
     src/bgi_dds_serial.cpp
     src/bgi_dds_render.cpp
     src/bgi_solid_api.cpp
@@ -309,15 +310,9 @@ add_custom_command(
             $<TARGET_FILE_DIR:wxbgi_keyboard_queue_cpp>
 )
 
-add_executable(wxbgi_camera_demo_cpp examples/cpp/wxbgi_camera_demo.cpp)
-target_link_libraries(wxbgi_camera_demo_cpp PRIVATE wx_bgi_opengl)
 
-add_custom_command(
-    TARGET wxbgi_camera_demo_cpp POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:wx_bgi_opengl>
-            $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
-)
+# wxbgi_camera_demo_cpp is now defined inside if(WXBGI_ENABLE_WX) below
+# (it uses wxIMPLEMENT_APP and requires the wx_bgi_wx static integration lib).
 
 # Screenshot capture utility ---------------------------------------------------
 
@@ -376,6 +371,24 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:test_dds_cam3d_persp>
+)
+
+add_executable(test_multi_scene examples/cpp/test_multi_scene.cpp)
+target_link_libraries(test_multi_scene PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_multi_scene POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_multi_scene>
+)
+
+add_executable(wxbgi_multi_scene_demo examples/cpp/wxbgi_multi_scene_demo.cpp)
+target_link_libraries(wxbgi_multi_scene_demo PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET wxbgi_multi_scene_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:wxbgi_multi_scene_demo>
 )
 
 add_executable(test_solids examples/cpp/test_solids.cpp)
@@ -579,8 +592,10 @@ if(BUILD_TESTING)
     add_test(NAME bgi_api_coverage_cpp COMMAND $<TARGET_FILE:bgi_api_coverage_cpp>)
     set_tests_properties(bgi_api_coverage_cpp PROPERTIES TIMEOUT 20)
 
-    add_test(NAME wxbgi_camera_demo_cpp COMMAND $<TARGET_FILE:wxbgi_camera_demo_cpp> --test)
-    set_tests_properties(wxbgi_camera_demo_cpp PROPERTIES TIMEOUT 20)
+    if(WXBGI_ENABLE_WX)
+        add_test(NAME wxbgi_camera_demo_cpp COMMAND $<TARGET_FILE:wxbgi_camera_demo_cpp> --test)
+        set_tests_properties(wxbgi_camera_demo_cpp PROPERTIES TIMEOUT 20)
+    endif()
 
     add_test(NAME test_dds_serialize     COMMAND $<TARGET_FILE:test_dds_serialize>)
     set_tests_properties(test_dds_serialize     PROPERTIES TIMEOUT 20)
@@ -596,6 +611,12 @@ if(BUILD_TESTING)
 
     add_test(NAME test_dds_cam3d_persp   COMMAND $<TARGET_FILE:test_dds_cam3d_persp>)
     set_tests_properties(test_dds_cam3d_persp   PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_multi_scene       COMMAND $<TARGET_FILE:test_multi_scene>)
+    set_tests_properties(test_multi_scene       PROPERTIES TIMEOUT 20)
+
+    add_test(NAME wxbgi_multi_scene_demo COMMAND $<TARGET_FILE:wxbgi_multi_scene_demo> --test)
+    set_tests_properties(wxbgi_multi_scene_demo PROPERTIES TIMEOUT 20)
 
     add_test(NAME test_solids            COMMAND $<TARGET_FILE:test_solids>)
     set_tests_properties(test_solids            PROPERTIES TIMEOUT 30)
@@ -1084,4 +1105,52 @@ if(WXBGI_ENABLE_WX)
                 $<TARGET_FILE:wx_bgi_opengl>
                 $<TARGET_FILE_DIR:wx_bgi_3d_app>
     )
+
+    # Multi-Scene demo — wxFrame with menu bar, status bar, 3-panel canvas
+    if(WIN32)
+        add_executable(wx_multi_scene_demo WIN32
+            examples/wx/wx_multi_scene_demo.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wx_multi_scene_demo MACOSX_BUNDLE
+            examples/wx/wx_multi_scene_demo.cpp)
+        set_target_properties(wx_multi_scene_demo PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wx_multi_scene_demo examples/wx/wx_multi_scene_demo.cpp)
+    endif()
+    target_link_libraries(wx_multi_scene_demo PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wx_multi_scene_demo POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wx_multi_scene_demo>
+    )
+
+    # 4-panel camera demo — proper wxApp with 4 independent WxBgiCanvas panels,
+    # each rendering one named camera into the same "scene_3d" DDS scene graph.
+    if(WIN32)
+        add_executable(wxbgi_camera_demo_cpp WIN32
+            examples/cpp/wxbgi_camera_demo.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wxbgi_camera_demo_cpp MACOSX_BUNDLE
+            examples/cpp/wxbgi_camera_demo.cpp)
+        set_target_properties(wxbgi_camera_demo_cpp PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wxbgi_camera_demo_cpp examples/cpp/wxbgi_camera_demo.cpp)
+    endif()
+    target_link_libraries(wxbgi_camera_demo_cpp PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wxbgi_camera_demo_cpp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
+    )
+
 endif()

@@ -530,6 +530,11 @@ BGI_API void BGI_CALL cleardevice(void)
     bgi::clearActivePage(bgi::gState.bkColor);
     bgi::gState.currentX = 0;
     bgi::gState.currentY = 0;
+    // Discard any stale per-camera GL frames from the previous logical frame.
+    // Without this, frames accumulate if the idle callback fires multiple times
+    // before WxBgiCanvas::Render() drains the queue, causing flicker.
+    bgi::gState.pendingGl.clear();
+    bgi::gState.pendingGlQueue.clear();
     flushIfVisible();
 }
 

@@ -831,7 +831,16 @@ BGI_API void BGI_CALL wxbgi_render_dds(const char *camName)
                                   : bgi::kSelectionPurpleColor;
     const auto  &selIds     = bgi::gState.selectedObjectIds;
 
-    bgi::gState.dds->forEachDrawing([&](const bgi::DdsObject &obj) {
+    // Determine which DDS scene this camera should render.
+    // Falls back to the "default" scene if the assigned scene no longer exists.
+    const std::string &sceneName = cam.assignedSceneName;
+    auto sceneIt = bgi::gState.ddsRegistry.find(sceneName);
+    if (sceneIt == bgi::gState.ddsRegistry.end())
+        sceneIt = bgi::gState.ddsRegistry.find("default");
+    if (sceneIt == bgi::gState.ddsRegistry.end())
+        return; // should never happen
+
+    sceneIt->second->forEachDrawing([&](const bgi::DdsObject &obj) {
         if (!obj.visible)
             return;
         const bool selected = !selIds.empty() &&
@@ -841,10 +850,41 @@ BGI_API void BGI_CALL wxbgi_render_dds(const char *camName)
 
     restoreStyle(savedStyle);
 
-    // Draw visual aids overlays (grid, UCS axes, concentric circles).
-    // These write into the same page buffer as the DDS objects but are not
-    // DDS objects themselves — they are not serialised or selectable.
-    bgi::drawOverlaysForCamera(key, cam);
+    // Visual-aids overlays (grid, UCS axes, concentric circles) are drawn AFTER
+    // the 3-D solid GL pass so they always appear in front of all primitives:
+    //   - GLFW mode: flushToScreen() reads pendingOverlayCam and does an alpha blit.
+    //   - wx mode  : CameraPanel::PostBlit() calls wxbgi_wx_render_overlays_for_camera().
+    // Store the camera name here so flushToScreen() knows which overlays to draw.
+    bgi::gState.pendingOverlayCam = key;
+
+    // In wxEmbedded mode flushToScreen() is a no-op (the GL context is managed
+    // by WxBgiCanvas::Render).  Queue the current camera's GL geometry + matrices
+    // so the canvas can replay all panels with the correct per-panel viewport.
+    if (bgi::gState.wxEmbedded && bgi::gState.pendingGl.hasPending())
+    {
+        const float ar = (cam.vpW > 0 && cam.vpH > 0)
+            ? static_cast<float>(cam.vpW) / static_cast<float>(cam.vpH)
+            : ((bgi::gState.height > 0)
+               ? static_cast<float>(bgi::gState.width) / static_cast<float>(bgi::gState.height)
+               : 1.f);
+        const glm::mat4 view  = bgi::cameraViewMatrix(cam);
+        const glm::mat4 proj  = bgi::cameraProjMatrix(cam, ar);
+        const glm::mat4 vpMat = proj * view;
+
+        bgi::PendingGlFrame frame;
+        frame.geometry = std::move(bgi::gState.pendingGl);
+        std::memcpy(frame.viewProj, glm::value_ptr(vpMat), 16 * sizeof(float));
+        frame.eyeX = cam.eyeX;
+        frame.eyeY = cam.eyeY;
+        frame.eyeZ = cam.eyeZ;
+        frame.light    = bgi::gState.lightState;
+        frame.camVpX   = cam.vpX;
+        frame.camVpY   = cam.vpY;
+        frame.camVpW   = cam.vpW;
+        frame.camVpH   = cam.vpH;
+        bgi::gState.pendingGlQueue.push_back(std::move(frame));
+        bgi::gState.pendingGl.clear();
+    }
 
     bgi::flushToScreen();
 }

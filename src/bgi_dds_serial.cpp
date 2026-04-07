@@ -223,6 +223,7 @@ json cameraToJ(const bgi::DdsCamera &dc)
     j["zoom2d"]       = dc.camera.zoom2d;
     j["rot2d"]        = dc.camera.rot2dDeg;
     j["worldHeight2d"]= dc.camera.worldHeight2d;
+    j["scene"]        = dc.camera.assignedSceneName;
     return j;
 }
 
@@ -269,6 +270,7 @@ std::shared_ptr<bgi::DdsCamera> cameraFromJ(const json &j)
     dc->camera.zoom2d       = j.value("zoom2d",        1.f);
     dc->camera.rot2dDeg     = j.value("rot2d",         0.f);
     dc->camera.worldHeight2d= j.value("worldHeight2d", 2.f);
+    dc->camera.assignedSceneName = j.value("scene", "default");
     return dc;
 }
 
@@ -861,6 +863,7 @@ json sceneToJson()
     root["version"]      = kDdsVersion;
     root["activeCamera"] = bgi::gState.activeCamera;
     root["activeUcs"]    = bgi::gState.activeUcs;
+    root["activeScene"]  = bgi::gState.activeDdsName;
 
     // World extents
     const auto &we = bgi::gState.worldExtents;
@@ -870,11 +873,29 @@ json sceneToJson()
         {"max",     json::array({we.maxX, we.maxY, we.maxZ})}
     };
 
+    // Serialize the active (default) scene's objects under "objects" for
+    // backward compatibility, and all scenes under "scenes".
     auto objs = json::array();
     bgi::gState.dds->forEach([&](const bgi::DdsObject &obj) {
         objs.push_back(objectToJ(obj));
     });
     root["objects"] = objs;
+
+    // Multi-scene: serialize all non-default scenes under "scenes".
+    auto scenes = json::object();
+    for (const auto &[sname, scene] : bgi::gState.ddsRegistry)
+    {
+        if (sname == "default")
+            continue; // already in "objects"
+        auto sobjs = json::array();
+        scene->forEach([&](const bgi::DdsObject &obj) {
+            sobjs.push_back(objectToJ(obj));
+        });
+        scenes[sname] = sobjs;
+    }
+    if (!scenes.empty())
+        root["scenes"] = scenes;
+
     return root;
 }
 
@@ -884,8 +905,20 @@ json sceneToJson()
 
 void sceneFromJson(const json &root)
 {
-    // Clear everything first.
-    bgi::gState.dds->clearAll();
+    // Clear everything: destroy non-default scenes, reset default scene.
+    for (auto it = bgi::gState.ddsRegistry.begin(); it != bgi::gState.ddsRegistry.end(); )
+    {
+        if (it->first != "default")
+            it = bgi::gState.ddsRegistry.erase(it);
+        else
+            ++it;
+    }
+    if (!bgi::gState.ddsRegistry.count("default"))
+        bgi::gState.ddsRegistry["default"] = std::make_unique<bgi::DdsScene>();
+    else
+        bgi::gState.ddsRegistry["default"]->clearAll();
+    bgi::gState.activeDdsName = "default";
+    bgi::gState.dds = bgi::gState.ddsRegistry["default"].get();
     bgi::gState.cameras.clear();
     bgi::gState.ucsSystems.clear();
     bgi::gState.worldExtents = bgi::WorldExtents{};
@@ -906,31 +939,51 @@ void sceneFromJson(const json &root)
         }
     }
 
-    // Objects
-    if (root.contains("objects") && root["objects"].is_array()) {
-        for (const auto &jo : root["objects"]) {
+    // Helper lambda: deserialize one array of JSON objects into a named scene.
+    auto loadObjectsIntoScene = [&](const json &arr, const std::string &sname)
+    {
+        auto &scene = bgi::gState.ddsRegistry.at(sname);
+        if (!arr.is_array())
+            return;
+        for (const auto &jo : arr)
+        {
             auto obj = objectFromJ(jo);
             if (!obj)
                 continue;
-
-            // Preserve the serialized id, label, and visibility.
             obj->id      = jo.value("id",      "");
             obj->label   = jo.value("label",   "");
             obj->visible = jo.value("visible", true);
 
             if (obj->type == bgi::DdsObjectType::Camera) {
                 auto dc = std::static_pointer_cast<bgi::DdsCamera>(obj);
-                bgi::gState.dds->appendWithId(dc);
+                scene->appendWithId(dc);
                 bgi::gState.cameras[dc->name] = dc;
             }
             else if (obj->type == bgi::DdsObjectType::Ucs) {
                 auto du = std::static_pointer_cast<bgi::DdsUcs>(obj);
-                bgi::gState.dds->appendWithId(du);
+                scene->appendWithId(du);
                 bgi::gState.ucsSystems[du->name] = du;
             }
             else {
-                bgi::gState.dds->appendWithId(obj);
+                scene->appendWithId(obj);
             }
+        }
+    };
+
+    // Load the "default" scene from "objects" (backward-compat key).
+    if (root.contains("objects"))
+        loadObjectsIntoScene(root["objects"], "default");
+
+    // Load additional scenes from "scenes" (new multi-CHDOP key).
+    if (root.contains("scenes") && root["scenes"].is_object())
+    {
+        for (const auto &[sname, sarr] : root["scenes"].items())
+        {
+            if (sname == "default")
+                continue; // already loaded above
+            if (!bgi::gState.ddsRegistry.count(sname))
+                bgi::gState.ddsRegistry[sname] = std::make_unique<bgi::DdsScene>();
+            loadObjectsIntoScene(sarr, sname);
         }
     }
 
@@ -945,6 +998,14 @@ void sceneFromJson(const json &root)
         bgi::gState.activeUcs = bgi::gState.ucsSystems.empty()
                               ? "world" : bgi::gState.ucsSystems.begin()->first;
 
+    // Restore active scene (new field; old files default to "default").
+    std::string loadedActiveScene = root.value("activeScene", "default");
+    if (bgi::gState.ddsRegistry.count(loadedActiveScene))
+    {
+        bgi::gState.activeDdsName = loadedActiveScene;
+        bgi::gState.dds = bgi::gState.ddsRegistry[loadedActiveScene].get();
+    }
+
     // Ensure mandatory defaults exist even if the JSON omitted them.
     if (!bgi::gState.cameras.count("default")) {
         auto dc = std::make_shared<bgi::DdsCamera>();
@@ -958,6 +1019,7 @@ void sceneFromJson(const json &root)
         dc->camera.orthoTop    = 0.f;
         dc->camera.nearPlane   = -1.f;
         dc->camera.farPlane    =  1.f;
+        dc->camera.assignedSceneName = "default";
         bgi::gState.dds->append(dc);
         bgi::gState.cameras["default"] = dc;
     }
@@ -1078,6 +1140,7 @@ YAML::Node objectToY(const bgi::DdsObject &obj)
         n["zoom2d"]        = dc.camera.zoom2d;
         n["rot2d"]         = dc.camera.rot2dDeg;
         n["worldHeight2d"] = dc.camera.worldHeight2d;
+        n["scene"]         = dc.camera.assignedSceneName;
         break;
     }
     case bgi::DdsObjectType::Ucs: {
@@ -1432,6 +1495,7 @@ std::shared_ptr<bgi::DdsObject> objectFromY(const YAML::Node &n)
         dc->camera.zoom2d        = n["zoom2d"]        ? n["zoom2d"].as<float>(1.f)        : 1.f;
         dc->camera.rot2dDeg      = n["rot2d"]         ? n["rot2d"].as<float>(0.f)         : 0.f;
         dc->camera.worldHeight2d = n["worldHeight2d"] ? n["worldHeight2d"].as<float>(2.f) : 2.f;
+        dc->camera.assignedSceneName = n["scene"] ? n["scene"].as<std::string>("default") : "default";
         return std::static_pointer_cast<bgi::DdsObject>(dc);
     }
     if (type == "Ucs") {
@@ -1682,7 +1746,20 @@ std::shared_ptr<bgi::DdsObject> objectFromY(const YAML::Node &n)
 
 void sceneFromYaml(const YAML::Node &root)
 {
-    bgi::gState.dds->clearAll();
+    // Clear everything: destroy non-default scenes, reset default scene.
+    for (auto it = bgi::gState.ddsRegistry.begin(); it != bgi::gState.ddsRegistry.end(); )
+    {
+        if (it->first != "default")
+            it = bgi::gState.ddsRegistry.erase(it);
+        else
+            ++it;
+    }
+    if (!bgi::gState.ddsRegistry.count("default"))
+        bgi::gState.ddsRegistry["default"] = std::make_unique<bgi::DdsScene>();
+    else
+        bgi::gState.ddsRegistry["default"]->clearAll();
+    bgi::gState.activeDdsName = "default";
+    bgi::gState.dds = bgi::gState.ddsRegistry["default"].get();
     bgi::gState.cameras.clear();
     bgi::gState.ucsSystems.clear();
     bgi::gState.worldExtents = bgi::WorldExtents{};
@@ -1694,23 +1771,44 @@ void sceneFromYaml(const YAML::Node &root)
         if (we["max"]) { auto v = vec3FromY(we["max"]); bgi::gState.worldExtents.maxX=v.x; bgi::gState.worldExtents.maxY=v.y; bgi::gState.worldExtents.maxZ=v.z; }
     }
 
-    if (root["objects"] && root["objects"].IsSequence()) {
-        for (const auto &yo : root["objects"]) {
+    // Helper lambda: load YAML objects into a named scene.
+    auto loadYamlIntoScene = [&](const YAML::Node &arr, const std::string &sname)
+    {
+        if (!arr || !arr.IsSequence())
+            return;
+        auto &scene = bgi::gState.ddsRegistry.at(sname);
+        for (const auto &yo : arr) {
             auto obj = objectFromY(yo);
             if (!obj) continue;
             if (obj->type == bgi::DdsObjectType::Camera) {
                 auto dc = std::static_pointer_cast<bgi::DdsCamera>(obj);
-                bgi::gState.dds->appendWithId(dc);
+                scene->appendWithId(dc);
                 bgi::gState.cameras[dc->name] = dc;
             }
             else if (obj->type == bgi::DdsObjectType::Ucs) {
                 auto du = std::static_pointer_cast<bgi::DdsUcs>(obj);
-                bgi::gState.dds->appendWithId(du);
+                scene->appendWithId(du);
                 bgi::gState.ucsSystems[du->name] = du;
             }
             else {
-                bgi::gState.dds->appendWithId(obj);
+                scene->appendWithId(obj);
             }
+        }
+    };
+
+    loadYamlIntoScene(root["objects"], "default");
+
+    // Load additional named scenes (new multi-CHDOP key).
+    if (root["scenes"] && root["scenes"].IsMap())
+    {
+        for (const auto &kv : root["scenes"])
+        {
+            std::string sname = kv.first.as<std::string>("");
+            if (sname.empty() || sname == "default")
+                continue;
+            if (!bgi::gState.ddsRegistry.count(sname))
+                bgi::gState.ddsRegistry[sname] = std::make_unique<bgi::DdsScene>();
+            loadYamlIntoScene(kv.second, sname);
         }
     }
 
@@ -1722,6 +1820,17 @@ void sceneFromYaml(const YAML::Node &root)
     if (!bgi::gState.ucsSystems.count(bgi::gState.activeUcs))
         bgi::gState.activeUcs = "world";
 
+    // Restore active scene (new field; old YAML files default to "default").
+    if (root["activeScene"])
+    {
+        std::string loadedActiveScene = root["activeScene"].as<std::string>("default");
+        if (bgi::gState.ddsRegistry.count(loadedActiveScene))
+        {
+            bgi::gState.activeDdsName = loadedActiveScene;
+            bgi::gState.dds = bgi::gState.ddsRegistry[loadedActiveScene].get();
+        }
+    }
+
     // Ensure mandatory defaults.
     if (!bgi::gState.cameras.count("default")) {
         auto dc = std::make_shared<bgi::DdsCamera>();
@@ -1732,6 +1841,7 @@ void sceneFromYaml(const YAML::Node &root)
         dc->camera.orthoLeft=0.f; dc->camera.orthoRight=static_cast<float>(bgi::gState.width);
         dc->camera.orthoBottom=static_cast<float>(bgi::gState.height); dc->camera.orthoTop=0.f;
         dc->camera.nearPlane=-1.f; dc->camera.farPlane=1.f;
+        dc->camera.assignedSceneName = "default";
         bgi::gState.dds->append(dc);
         bgi::gState.cameras["default"] = dc;
     }
@@ -1770,6 +1880,7 @@ BGI_API const char *BGI_CALL wxbgi_dds_to_yaml(void)
         root["version"]      = kDdsVersion;
         root["activeCamera"] = bgi::gState.activeCamera;
         root["activeUcs"]    = bgi::gState.activeUcs;
+        root["activeScene"]  = bgi::gState.activeDdsName;
 
         YAML::Node we;
         we["hasData"] = bgi::gState.worldExtents.hasData;
@@ -1782,6 +1893,23 @@ BGI_API const char *BGI_CALL wxbgi_dds_to_yaml(void)
             objs.push_back(objectToY(obj));
         });
         root["objects"] = objs;
+
+        // Multi-scene: serialize non-default scenes under "scenes".
+        YAML::Node scenes(YAML::NodeType::Map);
+        bool hasExtraScenes = false;
+        for (const auto &[sname, scene] : bgi::gState.ddsRegistry)
+        {
+            if (sname == "default")
+                continue;
+            hasExtraScenes = true;
+            YAML::Node sobjs(YAML::NodeType::Sequence);
+            scene->forEach([&](const bgi::DdsObject &obj) {
+                sobjs.push_back(objectToY(obj));
+            });
+            scenes[sname] = sobjs;
+        }
+        if (hasExtraScenes)
+            root["scenes"] = scenes;
 
         std::ostringstream oss;
         oss << root;

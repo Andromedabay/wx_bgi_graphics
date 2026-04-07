@@ -27,7 +27,7 @@ The download URLs above always point to the newest tagged GitHub Release asset w
 | Document | Contents |
 |----------|----------|
 | **[Building.md](./Building.md)** | Dependencies, compile requirements, CMake flags, build commands for Windows / Linux / macOS, running examples |
-| **[Tests.md](./Tests.md)** | All 22 CTest targets, how to run them, test categories, test seam security policy, CI integration |
+| **[Tests.md](./Tests.md)** | All 24 CTest targets, how to run them, test categories, test seam security policy, CI integration |
 | **[Tutorial.md](./Tutorial.md)** | BGI double-buffering deep dive: page buffers, `setactivepage`, `swapbuffers`, animation loops |
 | **[WxWidgets.md](./WxWidgets.md)** | wxWidgets embedded canvas guide: `WxBgiCanvas`, standalone wx API, event routing, 3D in wx mode |
 | **[DDS.md](./DDS.md)** | Drawing Description Data Structure: scene graph, CHDOP hierarchy, `wxbgi_dds_*` API, JSON/YAML serialization |
@@ -50,6 +50,7 @@ The library now includes classic BGI-style support for:
 - double-buffer style page selection via `setactivepage`, `setvisualpage`, `getactivepage`, `getvisualpage`, `swapbuffers`
 - additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
 - retained-mode scene graph (DDS / DDDS) with JSON and YAML serialisation via `wxbgi_dds_*`
+- **multi-scene CHDOP graph registry**: create and manage named scene graphs; route any camera to any scene; multiple cameras can share one scene (1 scene → many cameras), each camera is assigned to exactly one scene (1 camera → 1 scene) — see [DDS.md §Multi-Scene](./DDS.md#multi-scene-management-chdop-graph-registry)
 - 3D solid primitives (box, sphere, cylinder, cone, torus) with wireframe and filled draw modes via `wxbgi_solid_*`
 - Phong lighting model (key + fill lights, ambient/diffuse/specular) configured via `wxbgi_solid_set_light_*`
 - wxWidgets embedded canvas (`wx_bgi_wx`) with OpenGL 3.3 texture-quad compositing and automatic legacy fallback

@@ -317,6 +317,88 @@ BGI_API void BGI_CALL wxbgi_solid_set_diffuse(float d);
  *  Defaults: specular = 0.30, shininess = 32. */
 BGI_API void BGI_CALL wxbgi_solid_set_specular(float s, float shininess);
 
+// =============================================================================
+// Multi-Scene (CHDOP) Management
+// =============================================================================
+//
+// The library maintains a registry of named DDS scene graphs. A "default"
+// scene always exists and cannot be destroyed.  Immediate-mode draw calls
+// (circle, box, wxbgi_world_line, etc.) always append to the *active* scene.
+// Each camera renders its *assigned* scene (see wxbgi_cam_set_scene).
+//
+// Typical usage:
+//   wxbgi_dds_scene_create("secondary");         // create a second scene
+//   wxbgi_dds_scene_set_active("secondary");     // route draws to it
+//   wxbgi_world_box(0,0,0, 5,5,5);              // appends to "secondary"
+//   wxbgi_dds_scene_set_active("default");       // switch back
+//   wxbgi_cam_set_scene("cam_side", "secondary");// cam_side renders "secondary"
+//   wxbgi_render_dds("cam_main");               // renders "default" scene
+//   wxbgi_render_dds("cam_side");               // renders "secondary" scene
+
+/**
+ * @brief Creates a new named DDS scene graph.
+ * @param name  Non-empty name for the new scene.  Must not already exist.
+ * @return 0 on success, -1 if the name is empty, already exists, or is "default".
+ */
+BGI_API int BGI_CALL wxbgi_dds_scene_create(const char *name);
+
+/**
+ * @brief Destroys a named DDS scene graph and all its objects.
+ *
+ * Any cameras assigned to the destroyed scene fall back to rendering the
+ * "default" scene.  Attempting to destroy "default" is a no-op.
+ * @param name  Name of the scene to destroy.
+ */
+BGI_API void BGI_CALL wxbgi_dds_scene_destroy(const char *name);
+
+/**
+ * @brief Sets the active scene for immediate-mode draw calls.
+ *
+ * All subsequent draw calls (circle, box, wxbgi_world_line, etc.) append
+ * objects to this scene until changed again.  Passing NULL or an empty
+ * string selects "default".
+ * @param name  Name of an existing scene, or NULL/"" for "default".
+ */
+BGI_API void BGI_CALL wxbgi_dds_scene_set_active(const char *name);
+
+/**
+ * @brief Returns the name of the currently active scene.
+ * @return Pointer to a static string; valid until the next call to this function.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_scene_get_active(void);
+
+/**
+ * @brief Tests whether a named scene exists in the registry.
+ * @param name  Scene name to test.
+ * @return 1 if the scene exists, 0 otherwise.
+ */
+BGI_API int BGI_CALL wxbgi_dds_scene_exists(const char *name);
+
+/**
+ * @brief Clears all drawing-primitive objects from a named scene.
+ *
+ * Camera and UCS objects in the scene are retained.
+ * @param name  Scene name, or NULL/"" for the active scene.
+ */
+BGI_API void BGI_CALL wxbgi_dds_scene_clear(const char *name);
+
+/**
+ * @brief Assigns a DDS scene to a camera.
+ *
+ * After this call, wxbgi_render_dds(camName) will render the specified scene
+ * through that camera.  If @p sceneName does not exist the call is a no-op.
+ * @param camName    Camera name, or NULL/"" for the active camera.
+ * @param sceneName  Name of the scene to assign.  NULL/"" selects "default".
+ */
+BGI_API void BGI_CALL wxbgi_cam_set_scene(const char *camName, const char *sceneName);
+
+/**
+ * @brief Returns the name of the scene currently assigned to a camera.
+ * @param camName  Camera name, or NULL/"" for the active camera.
+ * @return Scene name string, or NULL if the camera is not found.
+ */
+BGI_API const char *BGI_CALL wxbgi_cam_get_scene(const char *camName);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

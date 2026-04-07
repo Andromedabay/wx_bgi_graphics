@@ -242,3 +242,142 @@ approach over the tessellated triangle list:
 
 This produces smooth curvature on spheres and cylinders while preserving hard edges
 on box corners where the shared-vertex map has no neighbours.
+
+---
+
+## Multi-Scene Management (CHDOP Graph Registry)
+
+### Overview
+
+The library maintains a **registry of named DDS / CHDOP graphs**.  Each graph is
+an independent retained-mode scene.  A scene named `"default"` always exists and
+cannot be destroyed — backward-compatible code that never calls any
+`wxbgi_dds_scene_*` function continues to work exactly as before.
+
+### Two Key Relationships
+
+#### 1 Scene → Many Cameras
+
+Multiple cameras can be assigned to the same scene graph.  All of them will render
+the same set of objects from their own viewpoint:
+
+```
+Scene "main"  -->  cam_a (top-left perspective)
+              -->  cam_b (top-right orthographic)
+```
+
+This is the primary use-case for split-view CAD / engineering visualisations.
+
+#### 1 Camera → 1 Scene (exclusive)
+
+Each camera is assigned to exactly one scene at a time.  Changing the assignment
+with `wxbgi_cam_set_scene()` is immediate — the next `wxbgi_render_dds(camName)`
+call uses the new scene.  If the previously assigned scene is destroyed, the
+camera automatically falls back to `"default"`.
+
+```
+cam_a --> "main"       (changed via wxbgi_cam_set_scene("cam_a","main"))
+cam_b --> "main"
+cam_c --> "secondary"  (different object graph entirely)
+```
+
+### Scene Management API (`wx_bgi_dds.h`)
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `wxbgi_dds_scene_create(name)` | `int` 0=ok / -1 | Create a new named scene.  No-op if `name` already exists. |
+| `wxbgi_dds_scene_destroy(name)` | `void` | Destroy a named scene; cameras assigned to it fall back to `"default"`.  No-op on `"default"`. |
+| `wxbgi_dds_scene_set_active(name)` | `void` | Route all subsequent immediate-mode draw calls to this scene. |
+| `wxbgi_dds_scene_get_active()` | `const char *` | Return the name of the currently active scene. |
+| `wxbgi_dds_scene_exists(name)` | `int` 1=yes / 0 | Test whether a named scene exists in the registry. |
+| `wxbgi_dds_scene_clear(name)` | `void` | Remove all drawing objects from the named scene; cameras and UCS in that scene are kept. |
+| `wxbgi_dds_scene_clear_active()` | `void` | Same as above for the currently active scene. |
+
+### Camera-to-Scene Assignment API (`wx_bgi_dds.h`)
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `wxbgi_cam_set_scene(camName, sceneName)` | `void` | Assign a camera to a named scene.  Pass `NULL` as `camName` for the active camera. |
+| `wxbgi_cam_get_scene(camName)` | `const char *` | Return the scene name currently assigned to `camName`. |
+
+### Per-Camera Shading Modes
+
+When multiple cameras share a scene you will often want different shading per
+camera (e.g. camera A in Smooth, camera B in Wireframe).  Call
+`wxbgi_dds_set_solid_draw_mode()` immediately before each `wxbgi_render_dds()`
+call to apply a per-camera draw mode without permanently changing the DDS:
+
+```c
+// Camera A — smooth shading
+wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_SMOOTH);
+wxbgi_render_dds("cam_a");
+
+// Camera B — wireframe
+wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_WIREFRAME);
+wxbgi_render_dds("cam_b");
+```
+
+### Multi-Scene Usage Example
+
+```c
+#include "wx_bgi.h"
+#include "wx_bgi_dds.h"
+#include "wx_bgi_3d.h"
+
+initwindow(1200, 600, "Multi-Scene Demo", 0, 0, 1, 1);
+
+// --- Create two named scenes -------------------------------------------------
+wxbgi_dds_scene_create("main");
+wxbgi_dds_scene_create("secondary");
+
+// --- Populate "main" scene ---------------------------------------------------
+wxbgi_dds_scene_set_active("main");
+setcolor(CYAN);
+wxbgi_solid_sphere(0.0f, 0.0f, 0.0f, 1.0f, 24, 24, WXBGI_SOLID_SMOOTH);
+setcolor(YELLOW);
+wxbgi_solid_box(-3.0f, -0.5f, -0.5f, -1.5f, 0.5f, 0.5f, WXBGI_SOLID_FLAT);
+
+// --- Populate "secondary" scene ----------------------------------------------
+wxbgi_dds_scene_set_active("secondary");
+setcolor(MAGENTA);
+wxbgi_solid_torus(0.0f, 0.0f, 0.0f, 1.2f, 0.4f, 32, 16, WXBGI_SOLID_SMOOTH);
+setcolor(GREEN);
+wxbgi_world_line(0,0,0, 2,0,0);
+wxbgi_world_line(0,0,0, 0,2,0);
+
+// --- Create cameras and assign scenes ----------------------------------------
+wxbgi_cam_create("cam_a");
+wxbgi_cam_create("cam_b");
+wxbgi_cam_create("cam_c");
+wxbgi_cam_set_scene("cam_a", "main");       // cam_a and cam_b both see "main"
+wxbgi_cam_set_scene("cam_b", "main");
+wxbgi_cam_set_scene("cam_c", "secondary");  // cam_c sees a different graph
+
+// Set viewports and positions ...
+
+// --- Render each camera independently ----------------------------------------
+// Both cam_a and cam_b show the same sphere + box from different angles:
+wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_SMOOTH);
+wxbgi_render_dds("cam_a");
+
+wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_WIREFRAME);
+wxbgi_render_dds("cam_b");
+
+// cam_c shows only the torus + lines:
+wxbgi_dds_set_solid_draw_mode(WXBGI_SOLID_SMOOTH);
+wxbgi_render_dds("cam_c");
+
+// --- Round-trip: DDJ serialisation preserves scene assignments ---------------
+wxbgi_dds_save_json("multi_scene.ddj");   // serialises registry + camera assignments
+wxbgi_dds_load_json("multi_scene.ddj");   // restores all scenes + assignments
+```
+
+### Serialisation Notes
+
+DDJ/DDY files produced by `wxbgi_dds_save_json()` and `wxbgi_dds_save_yaml()` now
+include a `"scenes"` top-level key that lists every named scene graph, and each
+camera node carries a `"scene"` field recording its `assignedSceneName`.
+
+**Backward compatibility:** Old DDJ/DDY files that do not have a `"scenes"` key
+load cleanly — all objects are placed into the `"default"` scene and all cameras
+are assigned to `"default"`.

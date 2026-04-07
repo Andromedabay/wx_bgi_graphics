@@ -387,6 +387,11 @@ namespace bgi
             int   sizePx      {8};       ///< square side length, pixels (2..16)
             int   colorScheme {0};       ///< 0 = blue, 1 = green, 2 = red
         } selCursorOverlay;
+
+        // --- Scene assignment ---
+        /// Name of the DDS scene graph this camera renders.
+        /// Defaults to "default". Set with wxbgi_cam_set_scene().
+        std::string assignedSceneName{"default"};
     };
 
     // -------------------------------------------------------------------------
@@ -534,10 +539,26 @@ namespace bgi
         }
     };
 
+    /**
+     * Per-camera GL frame queued by wxbgi_render_dds() in wxEmbedded mode.
+     * Stores the pre-built geometry and camera matrices for one render_dds call
+     * so multi-panel wx rendering can replay all cameras during Render().
+     */
+    struct PendingGlFrame
+    {
+        PendingGlRender geometry;
+        float           viewProj[16]{};  ///< column-major 4×4 view-projection matrix
+        float           eyeX{0}, eyeY{0}, eyeZ{0};
+        LightState      light;
+        /// Camera screen viewport in BGI pixel coords (Y=0 at top). All-zero = full window.
+        int camVpX{0}, camVpY{0}, camVpW{0}, camVpH{0};
+    };
+
     // -------------------------------------------------------------------------
     // Forward declarations for DDS types (full definitions in bgi_dds.h).
-    // These let BgiState hold shared_ptr<DdsCamera> and unique_ptr<DdsScene>
-    // without creating a circular include between bgi_types.h and bgi_dds.h.
+    // These let BgiState hold shared_ptr<DdsCamera>, the ddsRegistry map, and
+    // a raw DdsScene* shortcut without creating a circular include between
+    // bgi_types.h and bgi_dds.h.
     // -------------------------------------------------------------------------
     class DdsCamera;
     class DdsUcs;
@@ -602,12 +623,19 @@ namespace bgi
         // --- World drawing extents (AABB in world space) ---
         WorldExtents worldExtents;
 
-        // --- Drawing Description Data Structure (DDS) scene graph ---
-        // unique_ptr so BgiState can be defined in this header without the
-        // full DdsScene definition.  Initialized in BgiState::BgiState() and
-        // reset in resetStateForWindow() (both defined in bgi_state.cpp where
-        // bgi_dds.h is included).
-        std::unique_ptr<DdsScene> dds;
+        // --- Drawing Description Data Structure (DDS) scene graph registry ---
+        //
+        // ddsRegistry owns all named scene graphs. The "default" scene is
+        // created at startup and cannot be destroyed.
+        //
+        // dds is a non-owning raw-pointer shortcut that always points to
+        // ddsRegistry[activeDdsName].get(). All legacy gState.dds->foo() call
+        // sites continue to work without modification because both unique_ptr
+        // and raw pointer support operator->. The shortcut is updated whenever
+        // activeDdsName changes (wxbgi_dds_scene_set_active / resetStateForWindow).
+        std::unordered_map<std::string, std::unique_ptr<DdsScene>> ddsRegistry;
+        std::string activeDdsName{"default"};
+        DdsScene   *dds{nullptr};   ///< Non-owning shortcut → ddsRegistry[activeDdsName]
 
         // --- 3D Solid / Surface / Extrusion defaults ---
         int solidDrawMode{0};         ///< 0 = Wireframe, 1 = Solid (painter's algorithm).
@@ -649,9 +677,16 @@ namespace bgi
         bool legacyGlRender{false}; ///< When true, uses the old GL_POINTS per-pixel path.
         LightState lightState;       ///< Lighting parameters for GL Phong shading passes.
         PendingGlRender pendingGl;   ///< Geometry collected by wxbgi_render_dds() for the GL solid/line passes.
+        /// Per-camera GL frames queued in wxEmbedded mode so WxBgiCanvas::Render()
+        /// can replay each camera's solid geometry with the correct viewport.
+        std::vector<PendingGlFrame> pendingGlQueue;
+        /// Camera name for the post-solid overlay alpha-blit in GLFW mode.
+        /// Set by wxbgi_render_dds() and consumed by flushToScreen().
+        std::string pendingOverlayCam{};
 
-        // Explicitly declared(defined in bgi_state.cpp) so that the compiler
-        // generates the destructor only where DdsScene is fully defined.
+        // Constructor/destructor defined in bgi_state.cpp (where bgi_dds.h is
+        // included) so DdsScene is fully defined when the ddsRegistry map's
+        // unique_ptr destructors are generated.
         BgiState();
         ~BgiState();
         BgiState(const BgiState &) = delete;

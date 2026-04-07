@@ -16,8 +16,9 @@ drawing surface -- cameras, viewports, DDS scene graph -- inside a **wxWidgets**
 7. [Scroll and Input Hooks in wx Mode](#scroll-and-input-hooks-in-wx-mode)
 8. [3D Camera and Solid Primitives](#3d-camera-and-solid-primitives)
 9. [Thread Safety](#thread-safety)
-10. [Multi-Canvas (Future)](#multi-canvas-future)
+10. [Multi-Canvas — Shared GL Context Architecture](#multi-canvas--shared-gl-context-architecture)
 11. [Automated Test](#automated-test)
+12. [Interactive Demos](#interactive-demos)
 
 ---
 
@@ -273,6 +274,7 @@ CMake targets provided by wx: `wxcore`, `wxgl`, `wxbase`.
 | `wx_bgi_wx` | STATIC lib | Link into your app |
 | `wx_bgi_app` | Executable | Interactive 2-D demo (mouse crosshair, key feedback) |
 | `wx_bgi_3d_app` | Executable | Interactive 3-D orbit demo (camera, solids) |
+| `wx_multi_scene_demo` | Executable | Multi-scene / multi-camera demo with menubar + statusbar |
 | `wx_bgi_solids_test` | Executable | 3-second automated test |
 
 ---
@@ -300,6 +302,17 @@ public:
     // Start/update automatic repaint timer (default: off, i.e. hz=0).
     // Call with hz=60 for smooth animation, hz=0 to disable.
     void SetAutoRefreshHz(int hz);
+
+protected:
+    // Override to fill the BGI page buffer before the GL blit.
+    // Called with the GL context current and BGI initialised.
+    // Typical use: cleardevice(), wxbgi_render_dds(camName).
+    virtual void PreBlit(int w, int h) {}
+
+    // Override to composite visual-aids overlays on top of 3-D solid GL
+    // geometry, after wxbgi_wx_render_page_gl_vp() and before SwapBuffers().
+    // Typical use: wxbgi_wx_render_overlays_for_camera(camName, ...).
+    virtual void PostBlit(int pageW, int pageH, int vpW, int vpH) {}
 };
 
 } // namespace wxbgi
@@ -323,19 +336,42 @@ the [Architecture Note](#architecture-note) below.
 
 ### Rendering
 
-`OnPaint` makes the `wxGLContext` current (via `SetCurrent(*m_glContext)`), calls
-`wxbgi_wx_render_page_gl(w, h)` (pure GL, no GLFW calls, exported by the DLL),
+`Render()` makes the `wxGLContext` current (shared across all `WxBgiCanvas`
+instances in the application), runs the **three-phase composite pipeline**,
 then calls `SwapBuffers()`.
 
 ```
 flushToScreen()               (GLFW mode -- standalone)
-    +-- renderPageToCurrentGLContext(w, h)  <- shared GL work
+    +-- PreBlit virtual omitted (GLFW apps call wxbgi_render_dds directly)
+    +-- renderPageAsTexture()       <- pixel buffer as opaque RGBA texture
+    +-- drain pendingGl queue       <- 3-D solid GL geometry (depth-tested)
+    +-- renderPageAsTextureAlpha()  <- overlays as alpha-blended layer on top
+    +-- drawSelectionCursorsGL()    <- selection cursor (OpenGL pass)
     +-- glfwSwapBuffers()
 
-WxBgiCanvas::OnPaint()        (wx mode -- embedded)
-    +-- wxbgi_wx_render_page_gl(w, h)       <- same shared GL work via C API
+WxBgiCanvas::Render()         (wx mode -- embedded)
+    +-- SetCurrent(*m_sharedGlCtx)  <- shared GL context (all panels same ctx)
+    +-- PreBlit(w, h)               <- subclass: cleardevice() + wxbgi_render_dds()
+    +-- wxbgi_wx_render_page_gl_vp( <- blit page texture + drain 3-D solid GL
+            camName, pageW, pageH,
+            vpX, vpY, vpW, vpH)
+    +-- PostBlit(pageW, pageH, vpW, vpH)
+    |       <- subclass: wxbgi_wx_render_overlays_for_camera()
+    |       <- composites grid/UCS/circles/cursor on top of 3-D geometry
     +-- SwapBuffers()
 ```
+
+**Why the two-pass approach?**  3-D solid geometry is rendered directly by
+OpenGL into the framebuffer (depth-tested).  Visual aids (grid, UCS axes,
+concentric circles, selection cursor) live in the BGI pixel buffer and must
+appear *in front of* all solid geometry.  `PostBlit` / `renderPageAsTextureAlpha`
+achieve this by:
+1. Clearing the pixel buffer to the background colour.
+2. Redrawing only the overlay elements.
+3. Uploading that buffer as a texture with `alpha = 0` for all background
+   pixels and `alpha = 255` for overlay pixels.
+4. Alpha-blending the texture onto the existing framebuffer (solids are
+   already rendered) so only overlay strokes are visible.
 
 ### Architecture Note
 
@@ -502,12 +538,39 @@ delete myGlCtx;
 
 ---
 
-## Multi-Canvas (Future)
+## Multi-Canvas — Shared GL Context Architecture
 
-The `WxBgiCanvas` constructor accepts a `bgi::BgiState*` parameter (defaults
-to `&bgi::gState`).  When per-instance state is added in a future phase, pass
-a heap-allocated `BgiState` to each canvas for isolated drawing surfaces with
-no API changes required.
+The `WxBgiCanvas` implementation creates **one shared `wxGLContext`** for the
+entire application.  All canvas instances (panels) use `SetCurrent()` with the
+same context object.
+
+This design is required because:
+- VAO / VBO names are **per-context** on Windows OpenGL.  Using separate
+  contexts per panel would invalidate the VBO objects created during `glewInit`.
+- The `wx_bgi_opengl.dll` has a single global GL state (`bgi::gState`). Using
+  a single shared context keeps that state consistent.
+
+Each panel runs its own `PreBlit → wxbgi_wx_render_page_gl_vp → PostBlit`
+pipeline sequentially on the wx main thread.  There is no concurrent access to
+the pixel buffer.  A representative 4-panel setup:
+
+```cpp
+class CameraPanel : public wxbgi::WxBgiCanvas {
+    std::string m_camName;
+protected:
+    void PreBlit(int w, int h) override {
+        cleardevice();
+        wxbgi_render_dds(m_camName.c_str());
+    }
+    void PostBlit(int pw, int ph, int vw, int vh) override {
+        wxbgi_wx_render_overlays_for_camera(
+            m_camName.c_str(), pw, ph, vw, vh);
+    }
+};
+```
+
+See the [4-Panel Camera Demo](#4-panel-camera-demo-wxbgi_camera_demo_cpp) for
+a complete working example.
 
 ---
 
@@ -580,6 +643,133 @@ scene graph) via `wxbgi_solid_*` calls.  On each camera change only
 `wxbgi_render_dds("cam3d")` is called after updating the camera eye position --
 there is no need to re-submit geometry every frame.
 
+### Multi-Scene Demo (`wx_multi_scene_demo`)
+
+Source: `examples/wx/wx_multi_scene_demo.cpp`
+
+A full `wxIMPLEMENT_APP` application that demonstrates the
+[Multi-Scene Management](DDS.md#multi-scene-management-chdop-graph-registry)
+feature with a 3-panel split view, menubar, and statusbar.
+
+**Layout:**
+
+```
++-------------------+-------------------+
+|  Camera A         |  Camera B         |
+|  "main" scene     |  "main" scene     |
+|  Perspective      |  Perspective      |
+|  (left-right      |  (up-down orbit)  |
+|   orbit)          |                   |
++-------------------+-------------------+
+|  Camera C -- "secondary" scene        |
+|  Pixel-space bar chart / labels       |
++---------------------------------------+
+```
+
+Both **Camera A** and **Camera B** view the same `"main"` scene graph
+(sphere + box + solid primitives) from independently-controlled viewpoints.
+**Camera C** is assigned to the `"secondary"` scene, which contains entirely
+different objects (bar-chart elements drawn with classic BGI calls).
+
+**Menu bar:**
+
+| Menu | Items |
+|------|-------|
+| **File** | Exit |
+| **Camera A** | Smooth (radio), Flat (radio), Wireframe (radio), Reset Yaw |
+| **Camera B** | Smooth (radio), Flat (radio), Wireframe (radio), Reset Pitch |
+| **Help** | Controls…, About |
+
+**Status bar** (2 fields): `Cam A: yaw=…° | Smooth` and `Cam B: pitch=…° | Flat`
+
+**Keyboard controls:**
+
+| Key | Effect |
+|-----|--------|
+| ← / → | Orbit Camera A (yaw) |
+| ↑ / ↓ | Orbit Camera B (pitch) |
+| `S` / `F` / `W` | Camera A shading: Smooth / Flat / Wireframe |
+| `1` / `2` / `3` | Camera B shading: Smooth / Flat / Wireframe |
+
+```sh
+# Windows
+.\build\Debug\wx_multi_scene_demo.exe
+
+# Headless test mode (renders 1 frame, exits 0)
+.\build\Debug\wx_multi_scene_demo.exe --test
+```
+
+**Key implementation details:**
+- Deferred GL init via `OnFirstPaint` → `CallAfter` pattern ensures the GL context is ready before `wxbgi_cam_create` is called.
+- Continuous orbit driven by `wxEVT_IDLE` + held-key booleans (`m_keyLeft/Right/Up/Down`); `evt.RequestMore(anyKeyHeld)` keeps idle events flowing only when keys are held (CPU-friendly).
+- Per-camera shading: `wxbgi_dds_set_solid_draw_mode(mode)` called immediately before each `wxbgi_render_dds(cam)` — no separate state per camera needed in the DDS itself.
+- Menu radio items are kept in sync with keyboard shortcuts via `setCamAShading()` / `setCamBShading()` helpers.
+
 ---
 
-*See also: [README.md](README.md) * [InputsProcessing.md](InputsProcessing.md) * [DDS.md](DDS.md)*
+### 4-Panel Camera Demo (`wxbgi_camera_demo_cpp`)
+
+Source: `examples/cpp/wxbgi_camera_demo.cpp`
+
+A four-panel interactive demo that shows the same DDS scene graph rendered
+simultaneously through four independent cameras, each in its own `WxBgiCanvas`
+panel.  All four panels are hosted inside a single `wxFrame` using a `wxGridSizer`.
+
+**Layout:**
+
+```
++---------------------+---------------------+
+|  cam_left           |  cam2d              |
+|  Perspective        |  2D Orthographic    |
+|  (primary view)     |  (top-down, zoomable)|
++---------------------+---------------------+
+|  cam3d              |  cam_iso            |
+|  Perspective        |  Isometric          |
+|  (orbit with keys)  |  (fixed iso view)   |
++---------------------+---------------------+
+```
+
+All four panels share the single DDS scene graph `"scene_3d"` containing:
+a solid **box** (red), solid **sphere** (cyan), solid **cylinder** (yellow),
+solid **cone** (magenta), solid **torus** (light green), a ground **grid**, and
+XYZ **axes** (red / green / blue line segments).
+
+**Keyboard controls (any panel focused):**
+
+| Key | Effect |
+|-----|--------|
+| ← / → | Orbit `cam3d` (azimuth) |
+| ↑ / ↓ | Orbit `cam3d` (elevation) |
+| `+` / `-` | Zoom `cam3d` in / out |
+| `S` | Solid shading (`WXBGI_SOLID_SMOOTH`) |
+| `F` | Flat shading (`WXBGI_SOLID_FLAT`) |
+| `W` | Wireframe (`WXBGI_SOLID_WIREFRAME`) |
+| `R` | Reset `cam3d` to default position |
+| Mouse scroll (cam2d panel) | Zoom 2D camera |
+
+**Overlay system per panel:**
+
+Each `CameraPanel` overrides both `PreBlit` and `PostBlit`:
+- `PreBlit`: calls `cleardevice()` + `wxbgi_render_dds(camName)` to fill the
+  page buffer with scene content for the assigned camera.
+- `PostBlit`: calls `wxbgi_wx_render_overlays_for_camera(camName, ...)` to
+  composite the visual-aids overlays (grid, UCS axes, concentric circles,
+  selection cursor) in front of all 3-D solid geometry.
+
+**OS-level redraw safety:**
+
+All drawing primitives are stored in the DDS scene graph.  On any OS repaint
+event (minimize/maximize/resize) each panel's `Render()` is called
+automatically, `PreBlit` re-renders the DDS, and the scene reappears correctly.
+
+```sh
+# Windows
+.\build\Debug\wxbgi_camera_demo_cpp.exe
+
+# Headless test mode (renders 1 frame, exits 0)
+.\build\Debug\wxbgi_camera_demo_cpp.exe --test
+```
+
+---
+
+*See also: [README.md](README.md) · [InputsProcessing.md](InputsProcessing.md) · [DDS.md](DDS.md) · [VisualAids.md](VisualAids.md)*

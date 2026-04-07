@@ -65,21 +65,38 @@ void glPassResetState();
  *                 use the page dimensions (default for non-DPI-scaled paths). */
 void renderPageAsTexture(int w, int h, int vpW = -1, int vpH = -1);
 
+/** Overlay pass — Upload the visual page buffer as an RGBA texture and
+ *  composite it ON TOP of the current framebuffer contents using alpha
+ *  blending.  Background-coloured pixels are rendered as fully transparent
+ *  (alpha = 0) so only non-background overlay pixels appear.
+ *
+ *  Call AFTER all 3-D solid/line passes so overlays always appear in front.
+ *  Does NOT clear the colour or depth buffer.
+ *
+ *  @param w,h     Page-buffer (logical) dimensions — used for the texture.
+ *  @param vpW,vpH Physical viewport dimensions for glViewport.  Pass -1 to
+ *                 use the page dimensions. */
+void renderPageAsTextureAlpha(int w, int h, int vpW = -1, int vpH = -1);
+
 /** Pass 2a — Draw Phong-lit solid triangles (flat and/or smooth shading) with
- *  depth test.  Uses flat program for solidVerts, smooth program for smoothVerts. */
+ *  depth test.  Uses flat program for solidVerts, smooth program for smoothVerts.
+ *  vpX/vpY: GL-coord bottom-left of the target sub-panel (0,0 = full window). */
 void renderSolidsGLPass(const PendingGlRender &pending, int w, int h,
                         const LightState &light, const glm::mat4 &vp,
-                        const glm::vec3 &camPos);
+                        const glm::vec3 &camPos, int vpX = 0, int vpY = 0);
 
 /** Pass 2b — Two-pass hidden-line wireframe with proper depth-buffer HSR.
  *  Pass 1 fills the depth buffer with solid triangles (no colour output, back-face
- *  culled).  Pass 2 draws only the visible edges (depth write off, GL_LEQUAL). */
+ *  culled).  Pass 2 draws only the visible edges (depth write off, GL_LEQUAL).
+ *  vpX/vpY: GL-coord bottom-left of the target sub-panel (0,0 = full window). */
 void renderWireframeGLPass(const PendingGlRender &pending, int w, int h,
-                            const glm::mat4 &vp, const glm::vec3 &camPos);
+                            const glm::mat4 &vp, const glm::vec3 &camPos,
+                            int vpX = 0, int vpY = 0);
 
-/** Pass 3 — Draw world-space line segments with depth test (hidden behind solids). */
+/** Pass 3 — Draw world-space line segments with depth test (hidden behind solids).
+ *  vpX/vpY: GL-coord bottom-left of the target sub-panel (0,0 = full window). */
 void renderWorldLinesGLPass(const PendingGlRender &pending, int w, int h,
-                             const glm::mat4 &vp);
+                             const glm::mat4 &vp, int vpX = 0, int vpY = 0);
 
 /** Legacy per-pixel GL_POINTS path (kept for backward compat / diagnostics). */
 void renderPageLegacyPoints(int w, int h, int vpW = -1, int vpH = -1);

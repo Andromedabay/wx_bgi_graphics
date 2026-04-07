@@ -19,29 +19,31 @@ See **[WxWidgets.md](./WxWidgets.md)** for the embedded canvas integration guide
 | 5 | `test_dds_clear` | C++ / DDS | `examples/cpp/` | DDS scene clear |
 | 6 | `test_dds_cam2d_yz` | C++ / DDS | `examples/cpp/` | 2-D camera in YZ plane |
 | 7 | `test_dds_cam3d_persp` | C++ / DDS | `examples/cpp/` | 3-D perspective camera |
-| 8 | `test_solids` | C++ / DDS | `examples/cpp/` | 3-D solid primitives (box, sphere, cylinder, …) |
-| 9 | `test_input_hooks` | C++ | `examples/cpp/` | Keyboard hook / input-inject (requires `WXBGI_ENABLE_TEST_SEAMS`) |
-| 10 | `test_input_bypass` | C++ | `examples/cpp/` | Input bypass + scroll hook |
-| 11 | `bgi_api_coverage_python` | Python | `examples/python/bgi_api_coverage.py` | ctypes BGI API coverage |
-| 12 | `bgi_api_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_api_coverage.pas` | FPC compile |
-| 13 | `bgi_api_coverage_pascal_run` | Pascal | same | GLFW → wx-standalone path |
-| 14 | `bgi_canvas_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_canvas_coverage.pas` | FPC compile |
-| 15 | `bgi_canvas_coverage_pascal_run` | Pascal | same | wx-only path (no GLFW) |
-| 16 | `test_input_hooks_pascal_build` | Pascal | `examples/demoFreePascal/test_input_hooks.pas` | FPC compile |
-| 17 | `test_input_hooks_pascal_run` | Pascal | same | Keyboard hook — Pascal |
-| 18 | `test_input_bypass_pascal_build` | Pascal | `examples/demoFreePascal/test_input_bypass.pas` | FPC compile |
-| 19 | `test_input_bypass_pascal_run` | Pascal | same | Input bypass — Pascal |
-| 20 | `wx_bgi_solids_test` | wxWidgets | `examples/wx/wx_bgi_solids_test.cpp` | 3-D solids in embedded canvas |
-| 21 | `wx_bgi_3d_orbit_test` | wxWidgets | `examples/wx/wx_bgi_3d_orbit_test.cpp` | 3-D orbit animation in embedded canvas |
-| 22 | `wx_bgi_canvas_coverage_test` | wxWidgets | `examples/wx/wx_bgi_canvas_coverage_test.cpp` | Full BGI API coverage — C++ embedded `WxBgiCanvas` |
+| 8 | `test_multi_scene` | C++ / DDS | `examples/cpp/test_multi_scene.cpp` | Multi-CHDOP: scene lifecycle, camera→scene assignment, JSON round-trip |
+| 9 | `wxbgi_multi_scene_demo` | C++ / DDS | `examples/cpp/wxbgi_multi_scene_demo.cpp` | 3-panel multi-scene demo — `--test` flag |
+| 10 | `test_solids` | C++ / DDS | `examples/cpp/` | 3-D solid primitives (box, sphere, cylinder, …) |
+| 11 | `test_input_hooks` | C++ | `examples/cpp/` | Keyboard hook / input-inject (requires `WXBGI_ENABLE_TEST_SEAMS`) |
+| 12 | `test_input_bypass` | C++ | `examples/cpp/` | Input bypass + scroll hook |
+| 13 | `bgi_api_coverage_python` | Python | `examples/python/bgi_api_coverage.py` | ctypes BGI API coverage |
+| 14 | `bgi_api_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_api_coverage.pas` | FPC compile |
+| 15 | `bgi_api_coverage_pascal_run` | Pascal | same | GLFW → wx-standalone path |
+| 16 | `bgi_canvas_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_canvas_coverage.pas` | FPC compile |
+| 17 | `bgi_canvas_coverage_pascal_run` | Pascal | same | wx-only path (no GLFW) |
+| 18 | `test_input_hooks_pascal_build` | Pascal | `examples/demoFreePascal/test_input_hooks.pas` | FPC compile |
+| 19 | `test_input_hooks_pascal_run` | Pascal | same | Keyboard hook — Pascal |
+| 20 | `test_input_bypass_pascal_build` | Pascal | `examples/demoFreePascal/test_input_bypass.pas` | FPC compile |
+| 21 | `test_input_bypass_pascal_run` | Pascal | same | Input bypass — Pascal |
+| 22 | `wx_bgi_solids_test` | wxWidgets | `examples/wx/wx_bgi_solids_test.cpp` | 3-D solids in embedded canvas |
+| 23 | `wx_bgi_3d_orbit_test` | wxWidgets | `examples/wx/wx_bgi_3d_orbit_test.cpp` | 3-D orbit animation in embedded canvas |
+| 24 | `wx_bgi_canvas_coverage_test` | wxWidgets | `examples/wx/wx_bgi_canvas_coverage_test.cpp` | Full BGI API coverage — C++ embedded `WxBgiCanvas` |
 
-Pascal tests (12–19) run only when a matching-architecture FreePascal compiler (`fpc`) is found at CMake configure time.
+Pascal tests (14–21) run only when a matching-architecture FreePascal compiler (`fpc`) is found at CMake configure time.
 
 ---
 
 ## Test Categories
 
-### C++ Core Tests (1–10)
+### C++ Core Tests (1–12)
 
 These tests link directly against `wx_bgi_opengl` (the DLL/shared library) and exercise the full API surface through a real graphics window.
 
@@ -54,11 +56,13 @@ These tests link directly against `wx_bgi_opengl` (the DLL/shared library) and e
 | `test_dds_clear` | `wxbgi_dds_clear` removes all scene objects |
 | `test_dds_cam2d_yz` | 2-D orthographic camera in the YZ plane; coordinate projection |
 | `test_dds_cam3d_persp` | 3-D perspective projection; worldToScreen math |
+| `test_multi_scene` | Multi-CHDOP scene lifecycle: `wxbgi_dds_scene_create`, `wxbgi_dds_scene_exists`, `wxbgi_dds_scene_set_active`, `wxbgi_cam_set_scene`/`wxbgi_cam_get_scene`, scene isolation (objects in "secondary" do not appear in "default"), `wxbgi_dds_scene_destroy` (cameras fall back to "default"), JSON round-trip preserving scene assignment |
+| `wxbgi_multi_scene_demo` | Full 3-panel multi-scene demo in `--test` mode: builds "main" and "secondary" scene graphs, creates three cameras (two perspective + one pixel-space ortho), renders one frame via `wxbgi_render_dds`, exits cleanly |
 | `test_solids` | `wxbgi_solid_box`, `wxbgi_solid_sphere`, `wxbgi_solid_cylinder`, `wxbgi_solid_cone`, `wxbgi_solid_torus` — all draw modes |
 | `test_input_hooks` | Keyboard queue injection via test seams; hook ordering (see [Test Seam Policy](#keyboard-injection-test-seams-wxbgi_enable_test_seams)) |
 | `test_input_bypass` | Scroll bypass, input hook chaining, `wxbgi_set_input_hook` |
 
-### Python Test (11)
+### Python Test (13)
 
 ```bash
 python examples/python/bgi_api_coverage.py build/Debug/wx_bgi_opengl.dll    # Windows
@@ -68,17 +72,17 @@ python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.dylib    # ma
 
 Exercises the full BGI API surface via Python `ctypes` — the same functions as the C++ coverage test.
 
-### FreePascal Tests (12–19)
+### FreePascal Tests (14–21)
 
 Each Pascal test has a **build** step (FPC compile) and a **run** step.  
 The build step copies the up-to-date DLL into the output directory automatically.
 
 | Tests | Source | What it checks |
 |-------|--------|----------------|
-| 12–13 `bgi_api_coverage_pascal_*` | `demo_bgi_api_coverage.pas` | Full BGI API surface: GLFW `initgraph` / `closegraph` → `wxbgi_wx_frame_create`; all classic drawing functions + extension API |
-| 14–15 `bgi_canvas_coverage_pascal_*` | `demo_bgi_canvas_coverage.pas` | wx-only path (no GLFW): `wxbgi_wx_app_create` + `wxbgi_wx_frame_create`; colorful primitives phase + blue-screen phase + extension API |
-| 16–17 `test_input_hooks_pascal_*` | `test_input_hooks.pas` | Pascal keyboard hook API |
-| 18–19 `test_input_bypass_pascal_*` | `test_input_bypass.pas` | Pascal input bypass / scroll hooks |
+| 14–15 `bgi_api_coverage_pascal_*` | `demo_bgi_api_coverage.pas` | Full BGI API surface: GLFW `initgraph` / `closegraph` → `wxbgi_wx_frame_create`; all classic drawing functions + extension API |
+| 16–17 `bgi_canvas_coverage_pascal_*` | `demo_bgi_canvas_coverage.pas` | wx-only path (no GLFW): `wxbgi_wx_app_create` + `wxbgi_wx_frame_create`; colorful primitives phase + blue-screen phase + extension API |
+| 18–19 `test_input_hooks_pascal_*` | `test_input_hooks.pas` | Pascal keyboard hook API |
+| 20–21 `test_input_bypass_pascal_*` | `test_input_bypass.pas` | Pascal input bypass / scroll hooks |
 
 > **Note:** `demo_bgi_canvas_coverage.pas` (tests 14–15) is the **wx-only** version — it does not call `initgraph` or `closegraph`.  It uses a `YieldMs()` helper to keep the wx event loop alive between draw phases.
 
@@ -124,7 +128,7 @@ context is fully initialised — including the DLL-local GLEW function pointer
 table — before the function returns.  This makes GL extension calls safe
 immediately after `wxbgi_wx_frame_create` on all platforms.
 
-### wxWidgets Canvas Tests (20–22)
+### wxWidgets Canvas Tests (22–24)
 
 These link against `wx_bgi_wx` (the static wx integration library) and use `WxBgiCanvas` embedded inside a `wxFrame`.  
 They are the C++ equivalents of the standalone wx demos.
@@ -230,6 +234,20 @@ These APIs allow CI to inject synthetic key events into the keyboard queue deter
 ```powershell
 # CI / test-only configure — never use for release artifacts
 cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
+```
+
+### Multi-Scene Demo Headless Mode (`--test` flag)
+
+`wxbgi_multi_scene_demo` (test #9) uses the same always-available `--test` mechanism:
+passing it on the command line causes the demo to build both scene graphs, render
+one frame with all three cameras, and exit cleanly.
+
+- No compile-time option required.
+- No synthetic input surface exposed.
+
+```powershell
+# Manual headless run
+.\build\Debug\wxbgi_multi_scene_demo.exe --test
 ```
 
 ### Camera Demo Headless Mode (`--test` flag)

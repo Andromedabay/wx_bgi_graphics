@@ -699,6 +699,26 @@ BGI_API void BGI_CALL wxbgi_wx_render_page_gl(int width, int height);
 BGI_API void BGI_CALL wxbgi_wx_render_page_gl_vp(int pageW, int pageH, int vpW, int vpH);
 
 /**
+ * @brief Composite visual-aids overlays (grid, UCS axes, concentric circles,
+ *        selection cursor) for a named camera ON TOP of the current GL content.
+ *
+ * Call from @c WxBgiCanvas::PostBlit() — i.e. after @c wxbgi_wx_render_page_gl_vp()
+ * and all 3-D solid/line GL passes — so overlays always appear in front of
+ * 3-D primitives.
+ *
+ * The function clears the BGI page buffer to the background colour, redraws only
+ * the overlay geometry for @p camName, then alpha-blits the result with alpha=0
+ * for background pixels (transparent) and alpha=255 for overlay pixels (opaque).
+ *
+ * @param camName  Camera to draw overlays for.  NULL or "" = active camera.
+ * @param pageW,pageH  Logical BGI page dimensions.
+ * @param vpW,vpH      Physical framebuffer (viewport) dimensions.
+ */
+BGI_API void BGI_CALL wxbgi_wx_render_overlays_for_camera(const char *camName,
+                                                           int pageW, int pageH,
+                                                           int vpW,   int vpH);
+
+/**
  * @brief Notify BGI that the canvas has been resized.
  *
  * Call from @c EVT_SIZE.  Reallocates page buffers for the new dimensions.

@@ -61,6 +61,13 @@ static const int kGLAttrs[] = {
 };
 #endif
 
+// Single shared GL context used by all WxBgiCanvas instances in the process.
+// GL objects (VAOs, textures, programs, buffers) are created once in this
+// context and are valid for every canvas that calls SetCurrent(*s_sharedGLCtx).
+// VAOs are NOT shared between distinct GL contexts; using one context for all
+// panels is the only reliable approach for multi-panel BGI rendering.
+static wxGLContext* s_sharedGLCtx = nullptr;
+
 wxBEGIN_EVENT_TABLE(WxBgiCanvas, wxGLCanvas)
     EVT_PAINT(WxBgiCanvas::OnPaint)
     EVT_SIZE(WxBgiCanvas::OnSize)
@@ -93,16 +100,22 @@ WxBgiCanvas::~WxBgiCanvas()
 {
     Unbind(wxEVT_IDLE, &WxBgiCanvas::OnIdle, this);
 #ifdef _WIN32
-    if (m_glContext && m_glewInited)
+    if (m_ownsGLCtx && m_glContext && m_glewInited)
     {
-        // Make context current so GL cleanup calls are valid, then release
-        // all GL objects (textures, VAOs, programs) before deleting the context.
-        // Skipping this causes driver crashes on some Windows GPU drivers during
-        // process shutdown (STATUS_FATAL_APP_EXIT / 0xc000041d).
+        // Only the owner of the shared context destroys the GL objects.
+        // Non-owning canvases must not touch GL here — they don't own the
+        // context and the owner may have already cleaned up.
         SetCurrent(*m_glContext);
         wxbgi_gl_pass_destroy();
     }
 #endif
+    // Only the owner deletes the context; non-owners just clear their pointer.
+    if (m_ownsGLCtx)
+    {
+        delete m_glContext;
+        s_sharedGLCtx = nullptr;
+    }
+    m_glContext = nullptr;
     // On Linux/macOS: GL resources are released when the context is deleted.
     // Calling SetCurrent here is unsafe — the X11/Wayland surface may already
     // be invalid during frame destruction, causing glXMakeCurrent to segfault.
@@ -122,24 +135,40 @@ void WxBgiCanvas::Render()
 {
     if (!IsShownOnScreen()) return;
 
-    // Lazily create the GL context on the first render — official wx pattern.
+    // Lazily create (or acquire) the one shared GL context.
+    // All WxBgiCanvas instances use the SAME wxGLContext so that GL objects
+    // (VAOs, textures, programs, buffers) are valid for every panel.
+    // Each canvas supplies itself as the rendering surface via SetCurrent(),
+    // directing GL output to its own HDC/drawable.
     if (!m_glContext)
-        m_glContext = new wxGLContext(this);
+    {
+        if (!s_sharedGLCtx)
+        {
+            // First canvas: create the process-wide shared context.
+            m_glContext   = new wxGLContext(this);
+            s_sharedGLCtx = m_glContext;
+            m_ownsGLCtx   = true;
+        }
+        else
+        {
+            // Subsequent canvases: reuse the shared context (do not delete it).
+            m_glContext = s_sharedGLCtx;
+            m_ownsGLCtx = false;
+        }
+    }
 
     if (!m_glContext->IsOK())
         return;
 
     SetCurrent(*m_glContext);
 
-    // One-time GLEW + BGI initialisation, executed with a valid GL context.
+    // One-time GLEW + BGI initialisation for the shared context.
     if (!m_glewInited)
     {
         glewExperimental = GL_TRUE;
         glewInit();
         m_glewInited = true;
 
-        // If the context doesn't support GL 3.3 (VAOs, shaders), fall back to
-        // the legacy GL_POINTS rendering path which only requires GL 1.x.
         if (!GLEW_VERSION_3_3)
             wxbgi_set_legacy_gl_render(1);
     }
@@ -157,6 +186,13 @@ void WxBgiCanvas::Render()
         SetFocus();
     }
 
+    // Allow subclasses to render content into the BGI buffer before it is
+    // blitted to this canvas's OpenGL surface.
+    {
+        const wxSize sz = GetClientSize();
+        PreBlit(std::max(1, sz.GetWidth()), std::max(1, sz.GetHeight()));
+    }
+
     int pageW = 0, pageH = 0;
     wxbgi_wx_get_size(&pageW, &pageH);
     if (pageW > 0 && pageH > 0)
@@ -171,6 +207,7 @@ void WxBgiCanvas::Render()
         const int vpW = std::max(1, (int)std::round(logSz.GetWidth()  * scale));
         const int vpH = std::max(1, (int)std::round(logSz.GetHeight() * scale));
         wxbgi_wx_render_page_gl_vp(pageW, pageH, vpW, vpH);
+        PostBlit(pageW, pageH, vpW, vpH);
     }
 
     SwapBuffers();

@@ -49,8 +49,37 @@ public:
      */
     void SetAutoRefreshHz(int hz);
 
+protected:
+    /**
+     * @brief Called inside Render() after the GL context is current and BGI
+     *        is initialised, but *before* the BGI pixel buffer is blitted to
+     *        this canvas's OpenGL surface.
+     *
+     * Override in subclasses to render a specific camera's scene into the
+     * shared BGI scratch buffer.  Because wx paint events are sequential on
+     * the main thread, the scratch buffer is safe to reuse across panels.
+     *
+     * @param w  Logical pixel width  of this canvas.
+     * @param h  Logical pixel height of this canvas.
+     */
+    virtual void PreBlit(int /*w*/, int /*h*/) {}
+
+    /**
+     * @brief Called AFTER @c wxbgi_wx_render_page_gl_vp() and all 3-D solid
+     *        GL passes, but BEFORE @c SwapBuffers().
+     *
+     * Override in subclasses to composite overlays (concentric circles, grid,
+     * UCS axes) on top of 3-D solid geometry.  Typically implemented by
+     * calling @c wxbgi_wx_render_overlays_for_camera() for this panel's camera.
+     *
+     * @param pageW,pageH  Logical BGI page dimensions.
+     * @param vpW,vpH      Physical framebuffer dimensions (may differ on HiDPI).
+     */
+    virtual void PostBlit(int /*pageW*/, int /*pageH*/, int /*vpW*/, int /*vpH*/) {}
+
 private:
-    wxGLContext* m_glContext{nullptr};   ///< Created lazily on first paint.
+    wxGLContext* m_glContext{nullptr};   ///< Points to the process-wide shared context.
+    bool         m_ownsGLCtx{false};    ///< True only for the first canvas that created the context.
     bool         m_glewInited{false};
     bool         m_bgiInited{false};
     int          m_autoRefreshHz{0};

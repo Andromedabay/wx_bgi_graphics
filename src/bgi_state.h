@@ -13,6 +13,7 @@ namespace bgi
     void resetPaletteState();
     void resetDrawingState();
     void resetStateForWindow(int width, int height, bool doubleBuffered);
+    void resizePixelBuffer(int width, int height);   ///< Resize only — preserves DDS scenes, cameras, UCS.
     std::vector<std::uint8_t> &activePageBuffer();
     const std::vector<std::uint8_t> &visualPageBuffer();
     void syncPagesIfNeeded();

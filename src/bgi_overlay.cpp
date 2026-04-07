@@ -12,6 +12,7 @@
 #include "bgi_ucs.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -772,9 +773,6 @@ void drawOverlaysForCamera(const std::string &camName, const Camera3D &cam)
 
 void drawSelectionCursorsGL()
 {
-    // In wx-embedded mode GLFW is not initialised — skip GLFW timing.
-    if (gState.wxEmbedded) return;
-
     // Colour palette: [colorScheme 0..2][phase 0=bright / 1=dark][R, G, B] 0-255.
     static constexpr float kColors[3][2][3] = {
         {{100.f, 150.f, 255.f}, {20.f,  60.f, 180.f}},  // 0 = blue
@@ -782,7 +780,23 @@ void drawSelectionCursorsGL()
         {{255.f, 130.f, 100.f}, {180.f, 40.f,  20.f}},  // 2 = red
     };
 
-    const double t = glfwGetTime();
+    // Use steady_clock for timing so this works in both GLFW and wx-embedded modes.
+    static const auto kStartTime = std::chrono::steady_clock::now();
+    const double t = std::chrono::duration<double>(
+                         std::chrono::steady_clock::now() - kStartTime).count();
+
+    // Set up a 2-D pixel-space ortho projection for the immediate-mode GL draws
+    // below.  This is necessary after the 3-D solid pass which leaves an arbitrary
+    // projection matrix active.  Coordinates match BGI pixel space: (0,0) top-left.
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0.0, static_cast<double>(gState.width),
+            static_cast<double>(gState.height), 0.0, -1.0, 1.0);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    glUseProgram(0);  // ensure fixed-function pipeline is active
 
     for (const auto &[name, dcam] : gState.cameras)
     {
@@ -812,8 +826,6 @@ void drawSelectionCursorsGL()
         const int x0 = mx - half, y0 = my - half;
         const int x1 = mx + half, y1 = my + half;
 
-        // Draw as a filled-outline square directly in GL (pixel-space ortho is
-        // already set by flushToScreen, so coordinates are window pixels).
         glColor3f(c[0] / 255.f, c[1] / 255.f, c[2] / 255.f);
         glLineWidth(1.0f);
         glBegin(GL_LINE_LOOP);
@@ -823,6 +835,11 @@ void drawSelectionCursorsGL()
         glVertex2i(x0, y1);
         glEnd();
     }
+
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
 }
 
 } // namespace bgi
