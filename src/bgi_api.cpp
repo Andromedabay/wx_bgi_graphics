@@ -228,10 +228,11 @@ namespace
     {
         if (!bgi::gState.glfwInitialized)
         {
-#ifdef __linux__
+#if defined(__linux__) && defined(GLFW_PLATFORM)
             // GLEW uses GLX (X11) for function-pointer loading.  Force GLFW to
             // select the X11/GLX backend even when WAYLAND_DISPLAY is set so
             // that glewInit() can find the GLX display it requires.
+            // GLFW_PLATFORM was added in GLFW 3.4; skip on older system GLFW.
             glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
 #endif
             if (glfwInit() == GLFW_FALSE)

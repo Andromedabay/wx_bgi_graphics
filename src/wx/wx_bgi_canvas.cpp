@@ -68,21 +68,13 @@ static const int kGLAttrs[] = {
 // panels is the only reliable approach for multi-panel BGI rendering.
 static wxGLContext* s_sharedGLCtx = nullptr;
 
-wxBEGIN_EVENT_TABLE(WxBgiCanvas, wxGLCanvas)
-    EVT_PAINT(WxBgiCanvas::OnPaint)
-    EVT_SIZE(WxBgiCanvas::OnSize)
-    EVT_KEY_DOWN(WxBgiCanvas::OnKeyDown)
-    EVT_KEY_UP(WxBgiCanvas::OnKeyUp)
-    EVT_CHAR(WxBgiCanvas::OnChar)
-    EVT_MOTION(WxBgiCanvas::OnMouseMove)
-    EVT_LEFT_DOWN(WxBgiCanvas::OnMouseDown)
-    EVT_LEFT_UP(WxBgiCanvas::OnMouseUp)
-    EVT_RIGHT_DOWN(WxBgiCanvas::OnMouseDown)
-    EVT_RIGHT_UP(WxBgiCanvas::OnMouseUp)
-    EVT_MIDDLE_DOWN(WxBgiCanvas::OnMouseDown)
-    EVT_MIDDLE_UP(WxBgiCanvas::OnMouseUp)
-    EVT_MOUSEWHEEL(WxBgiCanvas::OnMouseWheel)
-wxEND_EVENT_TABLE()
+// Do NOT use wxBEGIN_EVENT_TABLE / wxEND_EVENT_TABLE here.
+// Those macros create a static array of wxEventTableEntry objects in the shared
+// library (.so).  On Linux/macOS, the SO's global destructors run AFTER wxApp
+// has been torn down, and the wxEventTableEntryBase destructor then crashes
+// trying to free functor objects whose vtables are no longer valid.
+// Using Bind() in the constructor instead keeps all event connections on the
+// heap and they are released by ~wxEvtHandler() before the SO unloads.
 
 WxBgiCanvas::WxBgiCanvas(wxWindow* parent, wxWindowID id,
                          const wxPoint& pos, const wxSize& size,
@@ -94,6 +86,21 @@ WxBgiCanvas::WxBgiCanvas(wxWindow* parent, wxWindowID id,
     // NOTE: No GL work here.  wxGLContext is created lazily on the first paint
     // (following the official wxWidgets OpenGL sample pattern) so that a valid
     // context is always current before any GL call is made.
+
+    // Bind all event handlers dynamically (avoids static event-table dtors in SO).
+    Bind(wxEVT_PAINT,         &WxBgiCanvas::OnPaint,     this);
+    Bind(wxEVT_SIZE,          &WxBgiCanvas::OnSize,      this);
+    Bind(wxEVT_KEY_DOWN,      &WxBgiCanvas::OnKeyDown,   this);
+    Bind(wxEVT_KEY_UP,        &WxBgiCanvas::OnKeyUp,     this);
+    Bind(wxEVT_CHAR,          &WxBgiCanvas::OnChar,      this);
+    Bind(wxEVT_MOTION,        &WxBgiCanvas::OnMouseMove, this);
+    Bind(wxEVT_LEFT_DOWN,     &WxBgiCanvas::OnMouseDown, this);
+    Bind(wxEVT_LEFT_UP,       &WxBgiCanvas::OnMouseUp,   this);
+    Bind(wxEVT_RIGHT_DOWN,    &WxBgiCanvas::OnMouseDown, this);
+    Bind(wxEVT_RIGHT_UP,      &WxBgiCanvas::OnMouseUp,   this);
+    Bind(wxEVT_MIDDLE_DOWN,   &WxBgiCanvas::OnMouseDown, this);
+    Bind(wxEVT_MIDDLE_UP,     &WxBgiCanvas::OnMouseUp,   this);
+    Bind(wxEVT_MOUSEWHEEL,    &WxBgiCanvas::OnMouseWheel,this);
 }
 
 WxBgiCanvas::~WxBgiCanvas()

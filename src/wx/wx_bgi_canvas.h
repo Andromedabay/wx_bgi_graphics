@@ -98,8 +98,6 @@ private:
 
     static int WxKeyToGlfw(int wxKey);
     void       RouteKeyEvent(wxKeyEvent& evt, int action);
-
-    wxDECLARE_EVENT_TABLE();
 };
 
 } // namespace wxbgi
