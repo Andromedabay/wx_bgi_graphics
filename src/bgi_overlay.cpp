@@ -773,7 +773,14 @@ void drawOverlaysForCamera(const std::string &camName, const Camera3D &cam)
 
 void drawSelectionCursorsGL()
 {
-    // Colour palette: [colorScheme 0..2][phase 0=bright / 1=dark][R, G, B] 0-255.
+#ifdef __APPLE__
+    // macOS: WxBgiCanvas always requests a Core Profile context (GL 4.1).
+    // Fixed-function GL (glMatrixMode / glBegin / glEnd) is absent on Core
+    // Profile — skip cursor rendering rather than crash on a NULL entry point.
+    return;
+#endif
+
+    // Colour palette:[colorScheme 0..2][phase 0=bright / 1=dark][R, G, B] 0-255.
     static constexpr float kColors[3][2][3] = {
         {{100.f, 150.f, 255.f}, {20.f,  60.f, 180.f}},  // 0 = blue
         {{100.f, 255.f, 150.f}, {20.f, 150.f,  60.f}},  // 1 = green

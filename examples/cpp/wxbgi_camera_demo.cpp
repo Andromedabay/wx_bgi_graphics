@@ -266,11 +266,18 @@ DemoFrame::DemoFrame(bool testMode, int panelW, int panelH)
 
     RegisterHuds();
 
-    // Refresh timer at ~60 fps
-    m_timer = new wxTimer(this, ID_TIMER);
-    Bind(wxEVT_TIMER,        &DemoFrame::OnTimer, this, ID_TIMER);
     Bind(wxEVT_CLOSE_WINDOW, &DemoFrame::OnClose, this);
-    m_timer->Start(16);
+
+    // In test mode the timer must NOT run: wxYieldIfNeeded() already triggers
+    // the first paint, and the timer firing during wxWidgets cleanup (after
+    // OnRun returns 0) would dereference panel pointers that are being
+    // destroyed — causing a segfault on Linux.
+    if (!testMode)
+    {
+        m_timer = new wxTimer(this, ID_TIMER);
+        Bind(wxEVT_TIMER, &DemoFrame::OnTimer, this, ID_TIMER);
+        m_timer->Start(16);
+    }
 }
 
 // ---- Orbit helpers ---------------------------------------------------------
