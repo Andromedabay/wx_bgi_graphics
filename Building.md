@@ -67,6 +67,11 @@ cmake -S . -B build -DWXBGI_ENABLE_WX=OFF
 
 # Enable keyboard injection test seams (CI / testing only)
 cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
+
+# Stage OpenLB bridge assets (requires a local OpenLB tree)
+cmake -S . -B build `
+  -DWXBGI_ENABLE_OPENLB=ON `
+  -DOPENLB_ROOT=C:\path\to\openlb\release
 ```
 
 ### Linux (GCC / Clang, single-config)
@@ -79,6 +84,13 @@ cmake --build build -j
 # Release
 cmake -S . -B build-rel -DCMAKE_BUILD_TYPE=Release
 cmake --build build-rel -j
+
+# Optional: stage OpenLB bridge assets
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DWXBGI_ENABLE_OPENLB=ON \
+  -DOPENLB_ROOT=/path/to/openlb/release
+cmake --build build --target openlb_bridge_package -j
 ```
 
 ### macOS (Clang, single-config)
@@ -174,6 +186,7 @@ Public headers installed under `build/install/include/`:
 ```
 wx_bgi.h        Classic BGI C API
 wx_bgi_ext.h    Extension API (wxbgi_* helpers)
+wx_bgi_openlb.h Header-only OpenLB-style live-loop helpers
 wx_bgi_3d.h     Camera, UCS, world-coordinate API
 wx_bgi_dds.h    Drawing Description Data Structure (DDS) API
 bgi_types.h     Shared types, structs, BGI constants, Camera3D
@@ -220,6 +233,9 @@ The Doxygen source is `docs/Doxyfile.in` — processed by CMake to substitute `@
 # Camera demo (interactive — W/A/S/D pan, +/- zoom, arrow keys orbit, Esc to exit)
 .\build\Debug\wxbgi_camera_demo_cpp.exe
 
+# OpenLB-style live loop demo
+.\build\Debug\wxbgi_openlb_live_demo.exe
+
 # wx embedded canvas coverage test (~4 s, exits automatically)
 .\build\Debug\wx_bgi_canvas_coverage_test.exe
 
@@ -245,6 +261,7 @@ export DYLD_LIBRARY_PATH="$PWD/build:$DYLD_LIBRARY_PATH"  # macOS
 
 ./build/bgi_api_coverage_cpp
 ./build/wxbgi_camera_demo_cpp
+./build/wxbgi_openlb_live_demo
 ./build/wx_bgi_canvas_coverage_test
 ./build/wx_bgi_3d_orbit_test
 
@@ -254,6 +271,26 @@ python3 examples/python/bgi_api_coverage.py build/libwx_bgi_opengl.so     # Linu
 ```
 
 > **Note:** The camera demo also accepts `--test` (`wxbgi_camera_demo_cpp --test`) to render one frame and exit immediately — this is the mode used by CTest.
+
+## OpenLB Integration Workflow
+
+OpenLB remains the simulation owner. The intended runtime pattern is:
+
+1. create a standalone wx-backed viewer with `wxbgi_openlb_begin_session(...)`
+2. advance the OpenLB solver in your own loop
+3. draw the latest scalar/vector snapshot with `wxbgi_field_draw_scalar_grid(...)`
+   and `wxbgi_field_draw_vector_grid(...)`
+4. keep the viewer responsive with `wxbgi_openlb_present()` or `wxbgi_poll_events()`
+
+When `WXBGI_ENABLE_OPENLB=ON`, the build adds the `openlb_bridge_package` target,
+which stages the current shared library, public headers, and the live-loop demo in:
+
+```text
+build/openlb_bridge
+```
+
+This staging directory is meant to be copied or referenced from an OpenLB checkout
+whose own examples are built with GNU Make.
 
 ---
 

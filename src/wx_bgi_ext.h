@@ -513,6 +513,137 @@ BGI_API int BGI_CALL wxbgi_read_pixels_rgba8(int x, int y, int width, int height
 BGI_API int BGI_CALL wxbgi_write_pixels_rgba8(int x, int y, int width, int height, const unsigned char *inBuffer, int inBufferSize);
 
 /**
+ * @name Field-visualization palettes
+ * Palette constants for @ref wxbgi_field_draw_scalar_grid and
+ * @ref wxbgi_field_draw_scalar_legend.
+ *
+ * These helpers use internal extended-palette slots 192-239 while drawing.
+ * Avoid treating those slots as persistent user-defined colours.
+ * @{
+ */
+#define WXBGI_FIELD_PALETTE_GRAYSCALE 0
+#define WXBGI_FIELD_PALETTE_VIRIDIS   1
+#define WXBGI_FIELD_PALETTE_INFERNO   2
+#define WXBGI_FIELD_PALETTE_TURBO     3
+/** @} */
+
+/**
+ * @brief Draw a 2-D scalar field as a false-colour grid into the active page buffer.
+ *
+ * Each scalar sample is drawn as a square cell of @p cellSizePx pixels. The field
+ * is laid out row-major with @p cols * @p rows samples. If @p maxValue is not
+ * greater than @p minValue, the range is auto-computed from the input data.
+ *
+ * @return 1 on success, -1 on invalid input / no active graphics session.
+ */
+BGI_API int BGI_CALL wxbgi_field_draw_scalar_grid(int left, int top,
+                                                  int cols, int rows,
+                                                  const float *values, int valueCount,
+                                                  int cellSizePx,
+                                                  float minValue, float maxValue,
+                                                  int paletteMode);
+
+/**
+ * @brief Draw a 2-D vector field as arrow glyphs into the active page buffer.
+ *
+ * @p vectorsXY contains row-major interleaved `(vx, vy)` pairs:
+ * `[vx0, vy0, vx1, vy1, ...]`. Positive @p vy points upward in the rendered
+ * field, so it is flipped internally for BGI's top-left / Y-down pixel coordinates.
+ *
+ * @return 1 on success, -1 on invalid input / no active graphics session.
+ */
+BGI_API int BGI_CALL wxbgi_field_draw_vector_grid(int left, int top,
+                                                  int cols, int rows,
+                                                  const float *vectorsXY, int vectorCount,
+                                                  int cellSizePx,
+                                                  float scale,
+                                                  int stride,
+                                                  int color);
+
+/**
+ * @brief Draw a scalar legend bar with min/max labels.
+ *
+ * If @p label is NULL or empty, only the colour bar and min/max values are drawn.
+ *
+ * @return 1 on success, -1 on invalid input / no active graphics session.
+ */
+BGI_API int BGI_CALL wxbgi_field_draw_scalar_legend(int left, int top,
+                                                    int width, int height,
+                                                    float minValue, float maxValue,
+                                                    int paletteMode,
+                                                    const char *label);
+
+/**
+ * @name Field-visualization palettes
+ * Palette constants for @ref wxbgi_field_draw_scalar_grid and
+ * @ref wxbgi_field_draw_scalar_legend.
+ *
+ * These helpers use internal extended-palette slots 192-239 while drawing.
+ * Avoid treating those slots as persistent user-defined colours.
+ * @{
+ */
+#define WXBGI_FIELD_PALETTE_GRAYSCALE 0
+#define WXBGI_FIELD_PALETTE_VIRIDIS   1
+#define WXBGI_FIELD_PALETTE_INFERNO   2
+#define WXBGI_FIELD_PALETTE_TURBO     3
+/** @} */
+
+/**
+ * @brief Draw a 2-D scalar field as a false-colour grid into the active page buffer.
+ *
+ * Each scalar sample is drawn as a square cell of @p cellSizePx pixels. The field
+ * is laid out row-major with @p cols * @p rows samples. If @p maxValue is not
+ * greater than @p minValue, the range is auto-computed from the input data.
+ *
+ * This is intended for live CFD / simulation visualisation (OpenLB, custom finite
+ * difference solvers, etc.) in both GLFW and wx modes.
+ *
+ * @return 1 on success, -1 on invalid input / no active graphics session.
+ */
+BGI_API int BGI_CALL wxbgi_field_draw_scalar_grid(int left, int top,
+                                                  int cols, int rows,
+                                                  const float *values, int valueCount,
+                                                  int cellSizePx,
+                                                  float minValue, float maxValue,
+                                                  int paletteMode);
+
+/**
+ * @brief Draw a 2-D vector field as arrow glyphs into the active page buffer.
+ *
+ * @p vectorsXY contains row-major interleaved `(vx, vy)` pairs:
+ * `[vx0, vy0, vx1, vy1, ...]`. Positive @p vy points upward in the rendered
+ * field (mathematical convention), so it is flipped internally for BGI's
+ * top-left / Y-down pixel coordinates.
+ *
+ * @p stride decimates the field: 1 draws every vector, 2 draws every other
+ * sample, etc. @p scale scales the arrow length relative to cell size.
+ *
+ * @return 1 on success, -1 on invalid input / no active graphics session.
+ */
+BGI_API int BGI_CALL wxbgi_field_draw_vector_grid(int left, int top,
+                                                  int cols, int rows,
+                                                  const float *vectorsXY, int vectorCount,
+                                                  int cellSizePx,
+                                                  float scale,
+                                                  int stride,
+                                                  int color);
+
+/**
+ * @brief Draw a scalar legend bar with min/max labels.
+ *
+ * The legend is useful alongside @ref wxbgi_field_draw_scalar_grid for live
+ * solver visualisation. If @p label is NULL or empty, only the colour bar and
+ * min/max values are drawn.
+ *
+ * @return 1 on success, -1 on invalid input / no active graphics session.
+ */
+BGI_API int BGI_CALL wxbgi_field_draw_scalar_legend(int left, int top,
+                                                    int width, int height,
+                                                    float minValue, float maxValue,
+                                                    int paletteMode,
+                                                    const char *label);
+
+/**
  * @brief Assigns an RGB colour to a specific extended palette slot (index 16-255).
  *
  * The classic 16-colour BGI palette (indices 0-15) is unaffected; use the

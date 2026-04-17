@@ -24,6 +24,12 @@ option(
     "Enable internal test seam APIs for automated testing (never enable for public release artifacts)."
     OFF
 )
+option(
+    WXBGI_ENABLE_OPENLB
+    "Stage optional OpenLB bridge helpers and live-loop demo assets."
+    OFF
+)
+set(OPENLB_ROOT "" CACHE PATH "Path to a local OpenLB release tree (used only when WXBGI_ENABLE_OPENLB=ON)")
 
 # Use static MSVC runtime on Windows (/MT or /MTd) so the binary
 # has no dependency on the MSVC Redistributable.
@@ -46,6 +52,18 @@ option(WXBGI_ENABLE_GLFW
     OFF)
 if(NOT WXBGI_ENABLE_WX)
     set(WXBGI_ENABLE_GLFW ON CACHE BOOL "GLFW fallback" FORCE)
+endif()
+
+if(WXBGI_ENABLE_OPENLB)
+    if(NOT WXBGI_ENABLE_WX)
+        message(FATAL_ERROR "WXBGI_ENABLE_OPENLB requires WXBGI_ENABLE_WX=ON.")
+    endif()
+    if(OPENLB_ROOT STREQUAL "")
+        message(FATAL_ERROR "WXBGI_ENABLE_OPENLB=ON requires OPENLB_ROOT to point at an OpenLB release tree.")
+    endif()
+    if(NOT EXISTS "${OPENLB_ROOT}/src/olb.h")
+        message(FATAL_ERROR "OPENLB_ROOT does not appear to be an OpenLB release tree: expected ${OPENLB_ROOT}/src/olb.h")
+    endif()
 endif()
 
 message(STATUS "Fetching GLEW...")
@@ -251,6 +269,7 @@ set(SRCS
     src/bgi_gl.cpp
     src/bgi_overlay.cpp
     src/bgi_overlay_api.cpp
+    src/bgi_field_vis.cpp
 )
 
 if(WXBGI_ENABLE_WX)
@@ -309,6 +328,26 @@ add_custom_command(
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:wxbgi_keyboard_queue_cpp>
 )
+
+if(WXBGI_ENABLE_WX)
+    add_executable(test_field_vis examples/cpp/test_field_vis.cpp)
+    target_link_libraries(test_field_vis PRIVATE wx_bgi_opengl)
+    add_custom_command(
+        TARGET test_field_vis POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:test_field_vis>
+    )
+
+    add_executable(wxbgi_openlb_live_demo examples/cpp/wxbgi_openlb_live_demo.cpp)
+    target_link_libraries(wxbgi_openlb_live_demo PRIVATE wx_bgi_opengl)
+    add_custom_command(
+        TARGET wxbgi_openlb_live_demo POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wxbgi_openlb_live_demo>
+    )
+endif()
 
 
 # wxbgi_camera_demo_cpp is now defined inside if(WXBGI_ENABLE_WX) below
@@ -595,6 +634,10 @@ if(BUILD_TESTING)
     if(WXBGI_ENABLE_WX)
         add_test(NAME wxbgi_camera_demo_cpp COMMAND $<TARGET_FILE:wxbgi_camera_demo_cpp> --test)
         set_tests_properties(wxbgi_camera_demo_cpp PROPERTIES TIMEOUT 20)
+        add_test(NAME test_field_vis COMMAND $<TARGET_FILE:test_field_vis>)
+        set_tests_properties(test_field_vis PROPERTIES TIMEOUT 20)
+        add_test(NAME wxbgi_openlb_live_demo COMMAND $<TARGET_FILE:wxbgi_openlb_live_demo> --test)
+        set_tests_properties(wxbgi_openlb_live_demo PROPERTIES TIMEOUT 20)
     endif()
 
     add_test(NAME test_dds_serialize     COMMAND $<TARGET_FILE:test_dds_serialize>)
@@ -1152,5 +1195,22 @@ if(WXBGI_ENABLE_WX)
                 $<TARGET_FILE:wx_bgi_opengl>
                 $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
     )
+
+    if(WXBGI_ENABLE_OPENLB)
+        add_custom_target(openlb_bridge_package
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/openlb_bridge
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    ${CMAKE_BINARY_DIR}/openlb_bridge
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${CMAKE_SOURCE_DIR}/src/wx_bgi.h
+                    ${CMAKE_SOURCE_DIR}/src/wx_bgi_ext.h
+                    ${CMAKE_SOURCE_DIR}/src/wx_bgi_openlb.h
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/wxbgi_openlb_live_demo.cpp
+                    ${CMAKE_BINARY_DIR}/openlb_bridge
+            DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo
+            COMMENT "Staging wx_bgi OpenLB bridge assets in ${CMAKE_BINARY_DIR}/openlb_bridge"
+        )
+    endif()
 
 endif()

@@ -19,6 +19,7 @@ drawing surface -- cameras, viewports, DDS scene graph -- inside a **wxWidgets**
 10. [Multi-Canvas — Shared GL Context Architecture](#multi-canvas--shared-gl-context-architecture)
 11. [Automated Test](#automated-test)
 12. [Interactive Demos](#interactive-demos)
+13. [Non-Blocking Solver Loop (OpenLB Style)](#non-blocking-solver-loop-openlb-style)
 
 ---
 
@@ -210,6 +211,37 @@ unconditionally.
 The existing Pascal example in this section does not open a wx window, so it is
 unaffected.  The full test programs in `examples/demoFreePascal/` already include
 this call.
+
+### Non-Blocking Solver Loop (OpenLB Style)
+
+For OpenLB and similar solvers, keep the simulation loop in charge and use the
+standalone wx API only as a responsive viewer shell.
+
+```cpp
+#include "wx_bgi.h"
+#include "wx_bgi_ext.h"
+#include "wx_bgi_openlb.h"
+
+int main() {
+    wxbgi_openlb_begin_session(960, 540, "OpenLB Live View");
+    setbkcolor(BLACK);
+
+    while (wxbgi_openlb_pump()) {
+        stepSolverChunk();   // your OpenLB time stepping
+
+        cleardevice();
+        wxbgi_field_draw_scalar_grid(...);
+        wxbgi_field_draw_vector_grid(...);
+        wxbgi_field_draw_scalar_legend(...);
+
+        wxbgi_openlb_present();
+    }
+}
+```
+
+This works because `wxbgi_poll_events()` already routes to the internal standalone
+wx event pump. No `wxIMPLEMENT_APP` or blocking `wxbgi_wx_app_main_loop()` call is
+required for this integration style.
 
 ---
 

@@ -54,11 +54,13 @@ The library now includes classic BGI-style support for:
 - 3D solid primitives (box, sphere, cylinder, cone, torus) with wireframe and filled draw modes via `wxbgi_solid_*`
 - Phong lighting model (key + fill lights, ambient/diffuse/specular) configured via `wxbgi_solid_set_light_*`
 - wxWidgets embedded canvas (`wx_bgi_wx`) with OpenGL 3.3 texture-quad compositing and automatic legacy fallback
+- live scalar/vector field helpers for solver integration via `wxbgi_field_*`, plus the convenience wrapper header `src/wx_bgi_openlb.h`
 
 Public API declarations are available in:
 
 - `src/wx_bgi.h` (classic BGI API)
 - `src/wx_bgi_ext.h` (modern extension helpers)
+- `src/wx_bgi_openlb.h` (header-only helpers for OpenLB-style live loops)
 - `src/wx_bgi_3d.h` (camera, UCS, world-coordinate extension API)
 - `src/wx_bgi_dds.h` (Drawing Description Data Structure -- DDS/CHDOP/DDJ/DDY)
 

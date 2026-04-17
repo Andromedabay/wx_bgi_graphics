@@ -36,6 +36,8 @@ See **[WxWidgets.md](./WxWidgets.md)** for the embedded canvas integration guide
 | 22 | `wx_bgi_solids_test` | wxWidgets | `examples/wx/wx_bgi_solids_test.cpp` | 3-D solids in embedded canvas |
 | 23 | `wx_bgi_3d_orbit_test` | wxWidgets | `examples/wx/wx_bgi_3d_orbit_test.cpp` | 3-D orbit animation in embedded canvas |
 | 24 | `wx_bgi_canvas_coverage_test` | wxWidgets | `examples/wx/wx_bgi_canvas_coverage_test.cpp` | Full BGI API coverage — C++ embedded `WxBgiCanvas` |
+| 25 | `test_field_vis` | C++ / field vis | `examples/cpp/test_field_vis.cpp` | Scalar grid, vector glyphs, legend helpers |
+| 26 | `wxbgi_openlb_live_demo` | C++ / wx standalone | `examples/cpp/wxbgi_openlb_live_demo.cpp` | OpenLB-style non-blocking live loop — `--test` flag |
 
 Pascal tests (14–21) run only when a matching-architecture FreePascal compiler (`fpc`) is found at CMake configure time.
 
