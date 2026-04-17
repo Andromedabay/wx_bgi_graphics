@@ -15,6 +15,7 @@ INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
                          "@CMAKE_SOURCE_DIR@/Tests.md" \
                          "@CMAKE_SOURCE_DIR@/Tutorial.md" \
                          "@CMAKE_SOURCE_DIR@/WxWidgets.md" \
+                         "@CMAKE_SOURCE_DIR@/OpenLB-Support.md" \
                          "@CMAKE_SOURCE_DIR@/DDS.md" \
                          "@CMAKE_SOURCE_DIR@/VisualAids.md" \
                          "@CMAKE_SOURCE_DIR@/ScreenShots.md" \

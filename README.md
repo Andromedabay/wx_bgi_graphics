@@ -9,6 +9,7 @@ wx BGI Graphics is a C/C++ shared library that implements a classic BGI-compatib
 4. Easy to use Graphics Library tool for Python, Pascal, C/C++, etc. and other language users.
 5. Hide away OpenGL complexities, behind simple interface for Programmers/Developers.
 6. C/C++ Developers can choose light weight GLEW or Full Windowing wxWidgets framework.
+7. Support [OpenLB](https://www.openlb.net/) 'Live' animations, by suppressing the library local 'main loop' and using OpenLB based driver code main loop.
 
 ## Latest Downloads
 
@@ -27,9 +28,10 @@ The download URLs above always point to the newest tagged GitHub Release asset w
 | Document | Contents |
 |----------|----------|
 | **[Building.md](./Building.md)** | Dependencies, compile requirements, CMake flags, build commands for Windows / Linux / macOS, running examples |
-| **[Tests.md](./Tests.md)** | All 24 CTest targets, how to run them, test categories, test seam security policy, CI integration |
+| **[Tests.md](./Tests.md)** | All 26 CTest targets, how to run them, test categories, test seam security policy, CI integration |
 | **[Tutorial.md](./Tutorial.md)** | BGI double-buffering deep dive: page buffers, `setactivepage`, `swapbuffers`, animation loops |
 | **[WxWidgets.md](./WxWidgets.md)** | wxWidgets embedded canvas guide: `WxBgiCanvas`, standalone wx API, event routing, 3D in wx mode |
+| **[OpenLB-Support.md](./OpenLB-Support.md)** | What OpenLB is, how wx_bgi integrates with it, optional build/staging support, and the live demo workflow |
 | **[DDS.md](./DDS.md)** | Drawing Description Data Structure: scene graph, CHDOP hierarchy, `wxbgi_dds_*` API, JSON/YAML serialization |
 | **[Camera3D_Map.md](./Camera3D_Map.md)** | 3-D camera code map: `Camera3D` struct, GLM math, `wxbgi_cam_*` API |
 | **[Camera2D_Map.md](./Camera2D_Map.md)** | 2-D overhead camera: pan/zoom/rotation, `wxbgi_cam2d_*` API |

@@ -88,6 +88,19 @@ dividers and panel labels are drawn in pixel space on top of the DDS renders.
 
 ---
 
+## OpenLB-Style Live Demo
+
+> `examples/cpp/wxbgi_openlb_live_demo.cpp`
+
+![OpenLB live demo](images/screenshot_openlb_live_demo.png)
+
+Demonstrates the new non-blocking solver-view pattern for OpenLB-style usage:
+the simulation loop stays in control, `wxbgi_field_draw_scalar_grid()` renders
+the false-colour scalar field, `wxbgi_field_draw_vector_grid()` adds decimated
+vector arrows, and `wxbgi_field_draw_scalar_legend()` draws the live legend.
+
+---
+
 ## Generating Screenshots Yourself
 
 After building the project:
