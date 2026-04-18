@@ -2,14 +2,15 @@
  * @file test_dds_serialize.cpp
  * @brief Phase E – Test 1: DDS serialization.
  *
- * Draws one line and one circle, serializes the scene to JSON (DDJ) and YAML
+ * Draws one line, one circle, and one retained affine Transform node,
+ * serializes the scene to JSON (DDJ) and YAML
  * (DDY), then validates that:
  *  - The JSON output is non-empty and contains the expected type tokens.
  *  - The JSON output contains the expected coordinate values for the line and
  *    circle.
  *  - The YAML output is non-empty and contains the expected type tokens.
- *  - wxbgi_dds_object_count() reflects the two drawing objects plus the
- *    default camera and world UCS (total 4).
+ *  - wxbgi_dds_object_count() reflects the two drawing objects plus one
+ *    retained Transform wrapper and the default camera/world UCS (total 5).
  *
  * The test exits with code 0 on success, 1 on any assertion failure.
  */
@@ -66,14 +67,20 @@ int main()
     setcolor(bgi::CYAN);
     circle(100, 80, 50);     // Circle: centre=(100,80) radius=50
 
+    const std::string circleId = wxbgi_dds_get_id_at(wxbgi_dds_object_count() - 1);
+    require(!circleId.empty(), "Failed to fetch circle DDS id");
+    const std::string scaledId = wxbgi_dds_scale_xyz(circleId.c_str(), 1.25f, 0.75f, 1.0f);
+    require(!scaledId.empty(), "wxbgi_dds_scale_xyz returned empty id");
+
     // -----------------------------------------------------------------------
-    // Validate object count: default camera + world UCS + line + circle = 4.
+    // Validate object count: default camera + world UCS + line + circle +
+    // affine Transform wrapper = 5.
     // -----------------------------------------------------------------------
     const int total = wxbgi_dds_object_count();
-    if (total != 4)
+    if (total != 5)
     {
         std::fprintf(stderr,
-                     "FAIL [test_dds_serialize]: expected 4 objects, got %d\n",
+                     "FAIL [test_dds_serialize]: expected 5 objects, got %d\n",
                      total);
         std::exit(1);
     }
@@ -93,6 +100,10 @@ int main()
             "JSON missing Line object");
     require(contains(json, "\"type\": \"Circle\""),
             "JSON missing Circle object");
+    require(contains(json, "\"type\": \"Transform\""),
+            "JSON missing Transform object");
+    require(contains(json, "\"matrix\""),
+            "JSON missing Transform matrix");
 
     // Validate line endpoints are present in the output.
     // nlohmann/json pretty-prints floats; integer coords are emitted as
@@ -118,6 +129,8 @@ int main()
     require(contains(yaml, "objects"),  "YAML missing 'objects' key");
     require(contains(yaml, "Line"),     "YAML missing Line type");
     require(contains(yaml, "Circle"),   "YAML missing Circle type");
+    require(contains(yaml, "Transform"), "YAML missing Transform type");
+    require(contains(yaml, "matrix"),    "YAML missing Transform matrix");
 
     // -----------------------------------------------------------------------
     // Clean up.

@@ -61,6 +61,9 @@ Key design choices:
 | `wxbgi_dds_clear()` | Remove all drawing objects; keeps cameras and UCS frames. |
 | `wxbgi_dds_clear_all()` | Remove every object including cameras and UCS frames. |
 | `wxbgi_dds_translate(id, dx, dy, dz)` | Create a retained Transform node that references `id` and replays it with a translation offset. |
+| `wxbgi_dds_rotate_*()` | Create retained Transform nodes for X/Y/Z or arbitrary-axis rotation in degrees or radians. |
+| `wxbgi_dds_scale_uniform()` / `wxbgi_dds_scale_xyz()` | Create retained Transform nodes for uniform or per-axis scaling. |
+| `wxbgi_dds_skew()` | Create a retained Transform node from six 3D shear factors. |
 | `wxbgi_dds_union(count, ids)` | Create a retained SetUnion node over existing DDS object IDs. |
 | `wxbgi_dds_intersection(count, ids)` | Create a retained SetIntersection node over existing DDS object IDs. |
 | `wxbgi_dds_difference(count, ids)` | Create a retained ordered SetDifference node over existing DDS object IDs. |
@@ -126,7 +129,7 @@ The following constants identify the concrete CHDOP sub-type of each DDS entry:
 | `WXBGI_DDS_HEIGHTMAP` | 23 | `wxbgi_surface_heightmap` (surface) |
 | `WXBGI_DDS_PARAM_SURFACE` | 24 | `wxbgi_surface_parametric` (surface) |
 | `WXBGI_DDS_EXTRUSION` | 25 | `wxbgi_extrude_polygon` (extrusion) |
-| `WXBGI_DDS_TRANSFORM` | 26 | Retained affine-transform wrapper (translation is implemented first) |
+| `WXBGI_DDS_TRANSFORM` | 26 | Retained affine-transform wrapper used by translate, rotate, scale, and skew helpers |
 | `WXBGI_DDS_SET_UNION` | 27 | Retained set-operation node performing a union over referenced DDS objects |
 | `WXBGI_DDS_SET_INTERSECTION` | 28 | Retained set-operation node performing an intersection over referenced DDS objects |
 | `WXBGI_DDS_SET_DIFFERENCE` | 29 | Retained set-operation node performing ordered subtraction over referenced DDS objects |
@@ -137,7 +140,7 @@ The DDS/CHDOP graph now supports a small retained composition layer on top of
 leaf primitives:
 
 - **Transform** nodes reference one or more child IDs and carry a 4x4 affine
-  matrix. The first public helper is `wxbgi_dds_translate(...)`.
+  matrix. Public helpers include translate, rotate, scale, and skew wrappers.
 - **SetUnion**, **SetIntersection**, and **SetDifference** nodes reference
   existing DDS object IDs and render them as a single composed result.
 - **SetDifference** is ordered: operand 0 is the base, operands 1..N are
@@ -157,18 +160,19 @@ resulting mesh is cached per DDS scene revision for efficient redraws.
 
 ### Current status
 
-- Public affine helper today: **translate** via `wxbgi_dds_translate(...)`
+- Public affine helpers today: **translate**, **rotate**, **scale**, and **skew**
 - Public retained set operations today: **union**, **intersection**, **difference**
 - Render ownership is enforced by DDS traversal: an object referenced by a `Transform`, `SetUnion`, `SetIntersection`, or `SetDifference` is skipped as a standalone render root and is expected to appear through its owning composed node
 - Supported 3D solids use the exact Manifold boolean path; unsupported analytic cases fall back to closed triangle meshes before boolean evaluation
 - `wxbgi_dds_set_solid_draw_mode(...)` propagates draw-mode changes to both leaf solids and retained set-operation nodes
+- Full retained transform chains now accumulate the entire 4x4 matrix during replay and exact 3D boolean evaluation; translation is no longer a special-case fast path only
 
 ### High-level implementation design
 
 1. Leaf primitives are stored in `DdsScene::index` / `order` like any other DDS object.
 2. `Transform` and `Set*` nodes store only referenced child IDs plus node-local state (style, matrix, draw mode, labels, visibility).
 3. `DdsScene::forEachRenderRoot()` computes which IDs are referenced by composition nodes and suppresses those IDs as top-level roots during `wxbgi_render_dds(...)`.
-4. `renderNodeRecursive(...)` traverses from each render root. Leaf objects render directly; transform nodes update the translation; set-operation nodes evaluate or mask-combine their operands.
+4. `renderNodeRecursive(...)` traverses from each render root. Leaf objects render directly; transform nodes post-multiply their local matrix into the accumulated chain; set-operation nodes evaluate or mask-combine their operands.
 5. For supported 3D solids, `renderExactSetOperation3D(...)` evaluates a closed-volume Manifold result, caches the generated triangles per DDS scene revision, and replays that cached mesh on later frames.
 
 ### Safe usage note for DDS IDs

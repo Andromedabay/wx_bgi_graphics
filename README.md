@@ -33,7 +33,7 @@ The download URLs above always point to the newest tagged GitHub Release asset w
 | **[WxWidgets.md](./WxWidgets.md)** | wxWidgets embedded canvas guide: `WxBgiCanvas`, standalone wx API, event routing, 3D in wx mode |
 | **[OpenLB-Support.md](./OpenLB-Support.md)** | What OpenLB is, how wx_bgi integrates with it, optional build/staging support, and the live demo workflow |
 | **[DDS.md](./DDS.md)** | Drawing Description Data Structure: scene graph, CHDOP hierarchy, `wxbgi_dds_*` API, JSON/YAML serialization |
-| **[Object-Operation.md](./Object-Operation.md)** | Retained set operations and affine-transform workflow: union, intersection, translate, and composition usage |
+| **[Object-Operation.md](./Object-Operation.md)** | Retained set operations and affine-transform workflow: union, intersection, translate, rotate, scale, skew, and composition usage |
 | **[Camera3D_Map.md](./Camera3D_Map.md)** | 3-D camera code map: `Camera3D` struct, GLM math, `wxbgi_cam_*` API |
 | **[Camera2D_Map.md](./Camera2D_Map.md)** | 2-D overhead camera: pan/zoom/rotation, `wxbgi_cam2d_*` API |
 | **[InputsProcessing.md](./InputsProcessing.md)** | Keyboard and mouse event handling, keyboard queue, DOS-style extended keys, input hooks |
@@ -54,7 +54,7 @@ The library now includes classic BGI-style support for:
 - additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
 - retained-mode scene graph (DDS / DDDS) with JSON and YAML serialisation via `wxbgi_dds_*`
 - **multi-scene CHDOP graph registry**: create and manage named scene graphs; route any camera to any scene; multiple cameras can share one scene (1 scene → many cameras), each camera is assigned to exactly one scene (1 camera → 1 scene) — see [DDS.md §Multi-Scene](./DDS.md#multi-scene-management-chdop-graph-registry)
-- retained DDS composition nodes for **translate**, **union**, **intersection**, and **difference** (`wxbgi_dds_translate`, `wxbgi_dds_union`, `wxbgi_dds_intersection`, `wxbgi_dds_difference`); for supported 3D solids the exact retained backend evaluates **closed Manifold volumes**, then caches the rendered triangle result per scene revision
+- retained DDS composition nodes for **translate / rotate / scale / skew** and **union / intersection / difference** (`wxbgi_dds_translate`, `wxbgi_dds_rotate_*`, `wxbgi_dds_scale_*`, `wxbgi_dds_skew`, `wxbgi_dds_union`, `wxbgi_dds_intersection`, `wxbgi_dds_difference`); for supported 3D solids the exact retained backend evaluates **closed Manifold volumes**, then caches the rendered triangle result per scene revision
 - 3D solid primitives (box, sphere, cylinder, cone, torus) with wireframe and filled draw modes via `wxbgi_solid_*`
 - Phong lighting model (key + fill lights, ambient/diffuse/specular) configured via `wxbgi_solid_set_light_*`
 - wxWidgets embedded canvas (`wx_bgi_wx`) with OpenGL 3.3 texture-quad compositing and automatic legacy fallback
@@ -80,13 +80,14 @@ path in this library.
 - Other supported solids fall back to closed triangle meshes and are then converted into Manifold volumes.
 - The boolean result mesh is cached per DDS scene revision so repeated redraws render efficiently.
 
-## Retained Set-Operations and Affine Translation
+## Retained Set-Operations and Affine Transforms
 
 Current retained composition status:
 
-- `wxbgi_dds_translate()` is the first public affine helper. It creates a retained `Transform` node backed by a 4x4 matrix, so future rotate / scale / general matrix helpers can share the same node type.
+- `wxbgi_dds_translate()`, `wxbgi_dds_rotate_x/y/z_deg()`, `wxbgi_dds_rotate_x/y/z_rad()`, `wxbgi_dds_rotate_axis_deg/rad()`, `wxbgi_dds_scale_uniform()`, `wxbgi_dds_scale_xyz()`, and `wxbgi_dds_skew()` all create retained `Transform` nodes backed by 4x4 matrices.
 - `wxbgi_dds_union()`, `wxbgi_dds_intersection()`, and `wxbgi_dds_difference()` create first-class DDS nodes with their own IDs, labels, visibility, serialization, and later reusability as operands.
 - DDS render traversal now treats transform/set-operation children as **owned by their composite node** during replay. Referenced operands are skipped as standalone render roots, so the composed node renders as one entity.
+- Nested retained transform chains now accumulate the full matrix during replay and exact 3D Manifold boolean evaluation, not just translation.
 - `difference` is ordered: operand 0 is the base solid, operands 1..N are subtracted in sequence.
 - In C/C++, copy IDs returned by DDS getter functions immediately before making later DDS API calls; those APIs return borrowed `const char *` buffers.
 
@@ -115,6 +116,8 @@ Current compound-solid screenshots from `examples/cpp/wxbgi_set_operations_demo.
 ![Compound solids wireframe mode](images/set-operations-compound-solids-wireframe.png)
 
 See **[Object-Operation.md](./Object-Operation.md)** for the retained-composition workflow and **[DDS.md](./DDS.md)** for the scene-graph design details.
+
+The animated affine showcase lives in `examples/cpp/wxbgi_affine_transform_demo.cpp`. It runs a 30-second scripted perspective-camera sequence covering translation, rotation, scaling, and skewing, then hands orbit/zoom control to the user; `--test` keeps it alive for 10 more seconds before exiting automatically.
 
 ## Camera Reference
 

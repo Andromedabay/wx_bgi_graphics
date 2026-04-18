@@ -105,6 +105,44 @@ int main()
     require(contains(json, "\"type\": \"Transform\""), "JSON missing Transform object");
 
     // ---------------------------------------------------------------------
+    // Full affine API surface: rotate in Z, then translate.
+    // ---------------------------------------------------------------------
+    resetScene();
+    setcolor(bgi::WHITE);
+    line(0, 0, 20, 0);
+    const std::string rotLineId = lastId();
+    const std::string rotId = wxbgi_dds_rotate_z_deg(rotLineId.c_str(), 90.f);
+    require(!rotId.empty(), "wxbgi_dds_rotate_z_deg returned empty id");
+    require(wxbgi_dds_get_type(rotId.c_str()) == WXBGI_DDS_TRANSFORM,
+            "Rotate did not create a Transform object");
+    require(wxbgi_dds_get_child_count(rotId.c_str()) == 1,
+            "Rotate transform child count mismatch");
+    require(std::string(wxbgi_dds_get_child_at(rotId.c_str(), 0)) == rotLineId,
+            "Rotate transform child id mismatch");
+    const std::string rotTxId = wxbgi_dds_translate(rotId.c_str(), 80.f, 20.f, 0.f);
+    require(!rotTxId.empty(), "Translate after rotate returned empty id");
+
+    // ---------------------------------------------------------------------
+    // Full affine API surface: skew creates a transform wrapper too.
+    // ---------------------------------------------------------------------
+    resetScene();
+    setfillstyle(bgi::SOLID_FILL, bgi::LIGHTCYAN);
+    setcolor(bgi::LIGHTCYAN);
+    bar(20, 20, 40, 40);
+    const std::string skewBarId = lastId();
+    const std::string skewId = wxbgi_dds_skew(skewBarId.c_str(), 1.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+    require(!skewId.empty(), "wxbgi_dds_skew returned empty id");
+    require(wxbgi_dds_get_type(skewId.c_str()) == WXBGI_DDS_TRANSFORM,
+            "Skew did not create a Transform object");
+    require(wxbgi_dds_get_child_count(skewId.c_str()) == 1,
+            "Skew transform child count mismatch");
+    require(std::string(wxbgi_dds_get_child_at(skewId.c_str(), 0)) == skewBarId,
+            "Skew transform child id mismatch");
+
+    json = wxbgi_dds_to_json();
+    require(contains(json, "\"type\": \"Transform\""), "Affine JSON missing Transform object");
+
+    // ---------------------------------------------------------------------
     // Union via retained set-op node.
     // ---------------------------------------------------------------------
     resetScene();
@@ -277,6 +315,46 @@ int main()
             "3D difference missed the remaining annulus");
     require(getpixel(static_cast<int>(holeSx), static_cast<int>(holeSy)) == bgi::BLACK,
             "3D difference rendered the removed inner cylinder instead of a hole");
+
+    // ---------------------------------------------------------------------
+    // Exact 3D booleans must honor non-translation affine transforms.
+    // Scaling one operand down should leave a visible shell instead of
+    // collapsing to empty geometry.
+    // ---------------------------------------------------------------------
+    resetScene();
+    wxbgi_cam_create("csg_scale_top", WXBGI_CAM_ORTHO);
+    wxbgi_cam_set_eye("csg_scale_top", 0.f, 0.f, 200.f);
+    wxbgi_cam_set_target("csg_scale_top", 0.f, 0.f, 0.f);
+    wxbgi_cam_set_up("csg_scale_top", 0.f, 1.f, 0.f);
+    wxbgi_cam_set_ortho_auto("csg_scale_top", 120.f, -500.f, 500.f);
+    wxbgi_cam_set_screen_viewport("csg_scale_top", 0, 0, kW, kH);
+    wxbgi_cam_set_active("csg_scale_top");
+    wxbgi_solid_set_draw_mode(WXBGI_SOLID_SOLID);
+    wxbgi_solid_set_edge_color(bgi::WHITE);
+    wxbgi_solid_set_face_color(bgi::WHITE);
+    wxbgi_solid_box(0.f, 0.f, 0.f, 40.f, 40.f, 40.f);
+    const std::string shellOuter = lastId();
+    wxbgi_solid_box(0.f, 0.f, 0.f, 40.f, 40.f, 40.f);
+    const std::string shellInnerBase = lastId();
+    const std::string shellInner = wxbgi_dds_scale_uniform(shellInnerBase.c_str(), 0.5f);
+    require(!shellInner.empty(), "3D wxbgi_dds_scale_uniform returned empty id");
+    const char *shellIds[2] = {shellOuter.c_str(), shellInner.c_str()};
+    const std::string shellDiffId = wxbgi_dds_difference(2, shellIds);
+    require(!shellDiffId.empty(), "Scaled-box difference returned empty id");
+
+    float shellSx = -1.f, shellSy = -1.f;
+    float shellOutsideSx = -1.f, shellOutsideSy = -1.f;
+    require(wxbgi_cam_world_to_screen("csg_scale_top", 15.f, 0.f, 0.f, &shellSx, &shellSy) == 1,
+            "Failed to project scaled-shell sample point");
+    require(wxbgi_cam_world_to_screen("csg_scale_top", 30.f, 0.f, 0.f, &shellOutsideSx, &shellOutsideSy) == 1,
+            "Failed to project scaled-shell outside sample point");
+
+    cleardevice();
+    wxbgi_render_dds("csg_scale_top");
+    require(getpixel(static_cast<int>(shellSx), static_cast<int>(shellSy)) != bgi::BLACK,
+            "Exact boolean ignored scale transform on retained operand shell");
+    require(getpixel(static_cast<int>(shellOutsideSx), static_cast<int>(shellOutsideSy)) == bgi::BLACK,
+            "Exact boolean scaled-shell test polluted pixels outside the outer solid");
 
     wxbgi_set_legacy_gl_render(0);
     wxbgi_wx_close_after_ms(500);

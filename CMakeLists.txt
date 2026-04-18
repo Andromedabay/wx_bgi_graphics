@@ -668,6 +668,8 @@ if(BUILD_TESTING)
         set_tests_properties(wxbgi_openlb_live_demo PROPERTIES TIMEOUT 20)
         add_test(NAME wxbgi_set_operations_demo_cpp COMMAND $<TARGET_FILE:wxbgi_set_operations_demo_cpp> --test)
         set_tests_properties(wxbgi_set_operations_demo_cpp PROPERTIES TIMEOUT 20)
+        add_test(NAME wxbgi_affine_transform_demo_cpp COMMAND $<TARGET_FILE:wxbgi_affine_transform_demo_cpp> --test)
+        set_tests_properties(wxbgi_affine_transform_demo_cpp PROPERTIES TIMEOUT 55)
     endif()
 
     add_test(NAME test_dds_serialize     COMMAND $<TARGET_FILE:test_dds_serialize>)
@@ -1251,6 +1253,28 @@ if(WXBGI_ENABLE_WX)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_FILE:wx_bgi_opengl>
                 $<TARGET_FILE_DIR:wxbgi_set_operations_demo_cpp>
+    )
+
+    if(WIN32)
+        add_executable(wxbgi_affine_transform_demo_cpp WIN32
+            examples/cpp/wxbgi_affine_transform_demo.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wxbgi_affine_transform_demo_cpp MACOSX_BUNDLE
+            examples/cpp/wxbgi_affine_transform_demo.cpp)
+        set_target_properties(wxbgi_affine_transform_demo_cpp PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wxbgi_affine_transform_demo_cpp examples/cpp/wxbgi_affine_transform_demo.cpp)
+    endif()
+    target_link_libraries(wxbgi_affine_transform_demo_cpp PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wxbgi_affine_transform_demo_cpp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wxbgi_affine_transform_demo_cpp>
     )
 
     if(WXBGI_ENABLE_OPENLB)

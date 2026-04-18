@@ -13,6 +13,10 @@
 #include <mutex>
 #include <string>
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #include "bgi_dds.h"
 #include "bgi_gl.h"
 #include "bgi_state.h"
@@ -201,6 +205,45 @@ const char *createSetOp(int count, const char *const *ids)
     obj->faceColor = bgi::gState.solidFaceColor;
     result = bgi::gState.dds->append(obj)->id;
     return result.c_str();
+}
+
+static const char *createTransformNode(const char *id, const glm::mat4 &matrix)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (id == nullptr || id[0] == '\0')
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!bgi::gState.dds->findById(id))
+        return result.c_str();
+
+    auto obj = std::make_shared<bgi::DdsTransform>();
+    obj->children.push_back(id);
+    obj->matrix = matrix;
+    obj->style.color = bgi::gState.currentColor;
+    obj->style.bkColor = bgi::gState.bkColor;
+    obj->style.fillStyle = {bgi::gState.fillPattern, bgi::gState.fillColor};
+    obj->style.lineStyle = bgi::gState.lineSettings;
+    obj->style.textStyle = bgi::gState.textSettings;
+    obj->style.writeMode = bgi::gState.writeMode;
+    result = bgi::gState.dds->append(obj)->id;
+    return result.c_str();
+}
+
+static glm::mat4 skewMatrix(float xy, float xz,
+                            float yx, float yz,
+                            float zx, float zy)
+{
+    glm::mat4 m(1.f);
+    m[1][0] = xy;
+    m[2][0] = xz;
+    m[0][1] = yx;
+    m[2][1] = yz;
+    m[0][2] = zx;
+    m[1][2] = zy;
+    return m;
 }
 
 } // anonymous namespace
@@ -436,29 +479,83 @@ BGI_API void BGI_CALL wxbgi_dds_clear_all(void)
 
 BGI_API const char *BGI_CALL wxbgi_dds_translate(const char *id, float dx, float dy, float dz)
 {
-    static thread_local std::string result;
-    result.clear();
+    return createTransformNode(id, glm::translate(glm::mat4(1.f), glm::vec3(dx, dy, dz)));
+}
 
-    if (id == nullptr || id[0] == '\0')
-        return result.c_str();
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_x_deg(const char *id, float angleDeg)
+{
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), glm::radians(angleDeg), glm::vec3(1.f, 0.f, 0.f)));
+}
 
-    std::lock_guard<std::mutex> lock(bgi::gMutex);
-    if (!bgi::gState.dds->findById(id))
-        return result.c_str();
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_y_deg(const char *id, float angleDeg)
+{
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), glm::radians(angleDeg), glm::vec3(0.f, 1.f, 0.f)));
+}
 
-    auto obj = std::make_shared<bgi::DdsTransform>();
-    obj->children.push_back(id);
-    obj->matrix[3][0] = dx;
-    obj->matrix[3][1] = dy;
-    obj->matrix[3][2] = dz;
-    obj->style.color = bgi::gState.currentColor;
-    obj->style.bkColor = bgi::gState.bkColor;
-    obj->style.fillStyle = {bgi::gState.fillPattern, bgi::gState.fillColor};
-    obj->style.lineStyle = bgi::gState.lineSettings;
-    obj->style.textStyle = bgi::gState.textSettings;
-    obj->style.writeMode = bgi::gState.writeMode;
-    result = bgi::gState.dds->append(obj)->id;
-    return result.c_str();
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_z_deg(const char *id, float angleDeg)
+{
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), glm::radians(angleDeg), glm::vec3(0.f, 0.f, 1.f)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_x_rad(const char *id, float angleRad)
+{
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), angleRad, glm::vec3(1.f, 0.f, 0.f)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_y_rad(const char *id, float angleRad)
+{
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), angleRad, glm::vec3(0.f, 1.f, 0.f)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_z_rad(const char *id, float angleRad)
+{
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), angleRad, glm::vec3(0.f, 0.f, 1.f)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_axis_deg(const char *id,
+                                                        float axisX, float axisY, float axisZ,
+                                                        float angleDeg)
+{
+    const glm::vec3 axis(axisX, axisY, axisZ);
+    if (glm::length(axis) <= 1e-6f)
+        return "";
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), glm::radians(angleDeg), glm::normalize(axis)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_rotate_axis_rad(const char *id,
+                                                        float axisX, float axisY, float axisZ,
+                                                        float angleRad)
+{
+    const glm::vec3 axis(axisX, axisY, axisZ);
+    if (glm::length(axis) <= 1e-6f)
+        return "";
+    return createTransformNode(id,
+        glm::rotate(glm::mat4(1.f), angleRad, glm::normalize(axis)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_scale_uniform(const char *id, float factor)
+{
+    return createTransformNode(id, glm::scale(glm::mat4(1.f), glm::vec3(factor, factor, factor)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_scale_xyz(const char *id, float sx, float sy, float sz)
+{
+    return createTransformNode(id, glm::scale(glm::mat4(1.f), glm::vec3(sx, sy, sz)));
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_skew(const char *id,
+                                             float xy, float xz,
+                                             float yx, float yz,
+                                             float zx, float zy)
+{
+    return createTransformNode(id, skewMatrix(xy, xz, yx, yz, zx, zy));
 }
 
 BGI_API const char *BGI_CALL wxbgi_dds_union(int count, const char *const *ids)

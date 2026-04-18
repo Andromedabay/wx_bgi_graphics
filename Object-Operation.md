@@ -13,6 +13,11 @@ The current retained object-operation API in `wx_bgi_dds.h` is:
 | Function | Purpose |
 |----------|---------|
 | `wxbgi_dds_translate(id, dx, dy, dz)` | Create a retained affine-transform node that replays `id` with a translation offset |
+| `wxbgi_dds_rotate_x/y/z_deg(id, angleDeg)` | Create retained affine-transform nodes for axis-aligned rotation in degrees |
+| `wxbgi_dds_rotate_x/y/z_rad(id, angleRad)` | Create retained affine-transform nodes for axis-aligned rotation in radians |
+| `wxbgi_dds_rotate_axis_deg/rad(id, ax, ay, az, angle)` | Create retained affine-transform nodes for arbitrary-axis rotation |
+| `wxbgi_dds_scale_uniform(id, factor)` / `wxbgi_dds_scale_xyz(id, sx, sy, sz)` | Create retained affine-transform nodes for uniform or per-axis scaling |
+| `wxbgi_dds_skew(id, xy, xz, yx, yz, zx, zy)` | Create a retained affine-transform node from 3D shear factors |
 | `wxbgi_dds_union(count, ids)` | Create a retained set-union node over existing DDS object IDs |
 | `wxbgi_dds_intersection(count, ids)` | Create a retained set-intersection node over existing DDS object IDs |
 | `wxbgi_dds_difference(count, ids)` | Create a retained ordered set-difference node over existing DDS object IDs |
@@ -42,8 +47,8 @@ Three retained set operations are available:
 
 ### Current status
 
-- **Translate** is implemented today as the first public affine helper.
-- `Transform` nodes already carry a full 4x4 matrix internally; public rotate / scale / general matrix helpers can be added on the same node type later.
+- **Translate**, **rotate**, **scale**, and **skew** are implemented as retained affine helpers over the same `Transform` node type.
+- `Transform` nodes carry a full 4x4 matrix internally, and retained replay / exact 3D set operations now evaluate the full accumulated matrix chain instead of translation alone.
 - `Union`, `Intersection`, and `Difference` are first-class retained DDS node types with their own draw mode, colour, label, visibility, and serialisation state.
 - During retained rendering, operands referenced by transform/set-operation nodes are no longer replayed as standalone roots. The composed node owns the visible result.
 - For supported 3D solids the retained set-operation path evaluates closed Manifold volumes and caches the resulting display mesh per DDS scene revision.
@@ -103,36 +108,44 @@ that volumetric result, not the boolean model itself.
 
 The retained transform path is intentionally modeled as an **affine transformation** layer.
 
-The current public helper is:
+The public helpers are:
 
 ```cpp
 const std::string movedId = wxbgi_dds_translate(id.c_str(), dx, dy, dz);
+const std::string spinId  = wxbgi_dds_rotate_z_deg(id.c_str(), 45.f);
+const std::string scaleId = wxbgi_dds_scale_uniform(id.c_str(), 1.25f);
+const std::string skewId  = wxbgi_dds_skew(id.c_str(), 0.35f, 0.f, 0.f, 0.f, 0.f, 0.f);
 ```
 
-This creates a new retained transform node that references the original object and replays it with the requested offset. The original object remains unchanged.
+Each call creates a new retained transform node that references the original object and replays it through the requested matrix. The original object remains unchanged.
 
 ### Implemented today
 
-- **Translate** is implemented and stored as a retained `Transform` DDS object.
+- **Translate**
+- **Rotate** on X/Y/Z and arbitrary axes, in both degrees and radians
+- **Scale** with uniform or per-axis factors
+- **Skew / shear** with six independent factors
 
 ### Why this is an affine path
 
-Internally, the transform node carries a 4x4 matrix so the same retained-node model can later grow into additional affine helpers such as:
+Internally, the transform node carries a 4x4 matrix so the same retained-node model covers:
 
-- scale
-- rotate
-- skew
-- general matrix (`multmatrix`) transforms
+- translation
+- rotation
+- scaling
+- skew / shear
+- future general matrix (`multmatrix`) transforms
 
 That keeps the API consistent and lets transforms compose naturally with union and intersection nodes.
 
 ### High-level implementation design
 
 1. Source primitives are appended to the DDS as normal leaf nodes.
-2. `wxbgi_dds_translate(...)` wraps one existing ID in a retained `Transform` node that stores a translation inside its 4x4 matrix.
+2. `wxbgi_dds_translate(...)`, `wxbgi_dds_rotate_*()`, `wxbgi_dds_scale_*()`, and `wxbgi_dds_skew(...)` wrap one existing ID in a retained `Transform` node that stores the requested affine matrix.
 3. `wxbgi_dds_union(...)`, `wxbgi_dds_intersection(...)`, and `wxbgi_dds_difference(...)` create retained set-operation nodes that store operand IDs only.
 4. `wxbgi_render_dds(...)` starts from DDS render roots only. Any operand that is referenced by a transform or set-operation node is replayed through that owner instead of as an independent root.
-5. For supported 3D solids the set-operation node renders an exact closed-volume boolean result; for non-exact cases the node still participates in the same retained traversal and masking path.
+5. Retained traversal accumulates the full 4x4 matrix chain while replaying leaves and while evaluating exact 3D Manifold booleans.
+6. For supported 3D solids the set-operation node renders an exact closed-volume boolean result; for non-exact cases the node still participates in the same retained traversal and masking path.
 
 ---
 

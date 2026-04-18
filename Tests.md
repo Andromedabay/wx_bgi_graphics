@@ -10,7 +10,7 @@ See **[WxWidgets.md](./WxWidgets.md)** for the embedded canvas integration guide
 
 ## Test Summary
 
-The current suite contains **28** CTest targets.
+The current suite contains **29** CTest targets.
 
 | # | Test Name | Category | Source File | Notes |
 |---|-----------|----------|-------------|-------|
@@ -19,29 +19,30 @@ The current suite contains **28** CTest targets.
 | 3 | `test_field_vis` | C++ / field vis | `examples/cpp/test_field_vis.cpp` | Scalar grid, vector glyphs, legend helpers |
 | 4 | `wxbgi_openlb_live_demo` | C++ / wx standalone | `examples/cpp/wxbgi_openlb_live_demo.cpp` | OpenLB-style non-blocking live loop — `--test` flag |
 | 5 | `wxbgi_set_operations_demo_cpp` | C++ / DDS | `examples/cpp/wxbgi_set_operations_demo.cpp` | Demo smoke test for retained translate/union/intersection/difference scene construction |
-| 6 | `test_dds_serialize` | C++ / DDS | `examples/cpp/` | DDS JSON + YAML serialization |
-| 7 | `test_dds_deserialize` | C++ / DDS | `examples/cpp/` | DDS JSON + YAML deserialization |
-| 8 | `test_dds_clear` | C++ / DDS | `examples/cpp/` | DDS scene clear |
-| 9 | `test_dds_cam2d_yz` | C++ / DDS | `examples/cpp/` | 2-D camera in YZ plane |
-| 10 | `test_dds_cam3d_persp` | C++ / DDS | `examples/cpp/` | 3-D perspective camera |
-| 11 | `test_dds_csg` | C++ / DDS | `examples/cpp/test_dds_csg.cpp` | Retained Transform / SetUnion / SetIntersection / SetDifference nodes, draw-mode propagation, ordered difference, and exact 3D CSG regressions |
-| 12 | `test_multi_scene` | C++ / DDS | `examples/cpp/test_multi_scene.cpp` | Multi-CHDOP: scene lifecycle, camera→scene assignment, JSON round-trip |
-| 13 | `wxbgi_multi_scene_demo` | C++ / DDS | `examples/cpp/wxbgi_multi_scene_demo.cpp` | 3-panel multi-scene demo — `--test` flag |
-| 14 | `test_solids` | C++ / DDS | `examples/cpp/` | 3-D solid primitives (box, sphere, cylinder, cone, torus) |
-| 15 | `test_input_hooks` | C++ | `examples/cpp/` | Keyboard hook / input-inject (requires `WXBGI_ENABLE_TEST_SEAMS`) |
-| 16 | `test_input_bypass` | C++ | `examples/cpp/` | Input bypass + scroll hook |
-| 17 | `bgi_api_coverage_python` | Python | `examples/python/bgi_api_coverage.py` | ctypes BGI API coverage |
-| 18 | `bgi_api_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_api_coverage.pas` | FPC compile |
-| 19 | `bgi_api_coverage_pascal_run` | Pascal | same | GLFW → wx-standalone path |
-| 20 | `bgi_canvas_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_canvas_coverage.pas` | FPC compile |
-| 21 | `bgi_canvas_coverage_pascal_run` | Pascal | same | wx-only path (no GLFW) |
-| 22 | `test_input_hooks_pascal_build` | Pascal | `examples/demoFreePascal/test_input_hooks.pas` | FPC compile |
-| 23 | `test_input_hooks_pascal_run` | Pascal | same | Keyboard hook — Pascal |
-| 24 | `test_input_bypass_pascal_build` | Pascal | `examples/demoFreePascal/test_input_bypass.pas` | FPC compile |
-| 25 | `test_input_bypass_pascal_run` | Pascal | same | Input bypass — Pascal |
-| 26 | `wx_bgi_solids_test` | wxWidgets | `examples/wx/wx_bgi_solids_test.cpp` | 3-D solids in embedded canvas |
-| 27 | `wx_bgi_3d_orbit_test` | wxWidgets | `examples/wx/wx_bgi_3d_orbit_test.cpp` | 3-D orbit animation in embedded canvas |
-| 28 | `wx_bgi_canvas_coverage_test` | wxWidgets | `examples/wx/wx_bgi_canvas_coverage_test.cpp` | Full BGI API coverage — C++ embedded `WxBgiCanvas` |
+| 6 | `wxbgi_affine_transform_demo_cpp` | C++ / DDS | `examples/cpp/wxbgi_affine_transform_demo.cpp` | 30 s scripted affine demo plus 10 s `--test` exit window |
+| 7 | `test_dds_serialize` | C++ / DDS | `examples/cpp/` | DDS JSON + YAML serialization |
+| 8 | `test_dds_deserialize` | C++ / DDS | `examples/cpp/` | DDS JSON + YAML deserialization |
+| 9 | `test_dds_clear` | C++ / DDS | `examples/cpp/` | DDS scene clear |
+| 10 | `test_dds_cam2d_yz` | C++ / DDS | `examples/cpp/` | 2-D camera in YZ plane |
+| 11 | `test_dds_cam3d_persp` | C++ / DDS | `examples/cpp/` | 3-D perspective camera |
+| 12 | `test_dds_csg` | C++ / DDS | `examples/cpp/test_dds_csg.cpp` | Retained Transform / SetUnion / SetIntersection / SetDifference nodes, affine wrapper creation, draw-mode propagation, ordered difference, and exact 3D CSG regressions |
+| 13 | `test_multi_scene` | C++ / DDS | `examples/cpp/test_multi_scene.cpp` | Multi-CHDOP: scene lifecycle, camera→scene assignment, JSON round-trip |
+| 14 | `wxbgi_multi_scene_demo` | C++ / DDS | `examples/cpp/wxbgi_multi_scene_demo.cpp` | 3-panel multi-scene demo — `--test` flag |
+| 15 | `test_solids` | C++ / DDS | `examples/cpp/` | 3-D solid primitives (box, sphere, cylinder, cone, torus) |
+| 16 | `test_input_hooks` | C++ | `examples/cpp/` | Keyboard hook / input-inject (requires `WXBGI_ENABLE_TEST_SEAMS`) |
+| 17 | `test_input_bypass` | C++ | `examples/cpp/` | Input bypass + scroll hook |
+| 18 | `bgi_api_coverage_python` | Python | `examples/python/bgi_api_coverage.py` | ctypes BGI API coverage |
+| 19 | `bgi_api_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_api_coverage.pas` | FPC compile |
+| 20 | `bgi_api_coverage_pascal_run` | Pascal | same | GLFW → wx-standalone path |
+| 21 | `bgi_canvas_coverage_pascal_build` | Pascal | `examples/demoFreePascal/demo_bgi_canvas_coverage.pas` | FPC compile |
+| 22 | `bgi_canvas_coverage_pascal_run` | Pascal | same | wx-only path (no GLFW) |
+| 23 | `test_input_hooks_pascal_build` | Pascal | `examples/demoFreePascal/test_input_hooks.pas` | FPC compile |
+| 24 | `test_input_hooks_pascal_run` | Pascal | same | Keyboard hook — Pascal |
+| 25 | `test_input_bypass_pascal_build` | Pascal | `examples/demoFreePascal/test_input_bypass.pas` | FPC compile |
+| 26 | `test_input_bypass_pascal_run` | Pascal | same | Input bypass — Pascal |
+| 27 | `wx_bgi_solids_test` | wxWidgets | `examples/wx/wx_bgi_solids_test.cpp` | 3-D solids in embedded canvas |
+| 28 | `wx_bgi_3d_orbit_test` | wxWidgets | `examples/wx/wx_bgi_3d_orbit_test.cpp` | 3-D orbit animation in embedded canvas |
+| 29 | `wx_bgi_canvas_coverage_test` | wxWidgets | `examples/wx/wx_bgi_canvas_coverage_test.cpp` | Full BGI API coverage — C++ embedded `WxBgiCanvas` |
 
 Pascal tests (18–25) run only when a matching-architecture FreePascal compiler (`fpc`) is found at CMake configure time.
 
@@ -49,7 +50,7 @@ Pascal tests (18–25) run only when a matching-architecture FreePascal compiler
 
 ## Test Categories
 
-### C++ Core Tests (1–16)
+### C++ Core Tests (1–17)
 
 These tests link directly against `wx_bgi_opengl` (the DLL/shared library) and exercise the full API surface through a real graphics window.
 
@@ -60,12 +61,13 @@ These tests link directly against `wx_bgi_opengl` (the DLL/shared library) and e
 | `test_field_vis` | Scalar-grid, vector-grid, and legend helpers used for solver visualisation |
 | `wxbgi_openlb_live_demo` | OpenLB-style non-blocking render loop using the field-visualisation helpers |
 | `wxbgi_set_operations_demo_cpp` | Builds the retained translate / union / intersection / difference showcase scene and exits via `--test` |
+| `wxbgi_affine_transform_demo_cpp` | Runs the retained affine animation demo for 30 seconds, then keeps the camera alive for 10 more seconds in `--test` mode |
 | `test_dds_serialize` | `wxbgi_dds_save_json` / `wxbgi_dds_save_yaml` round-trip correctness |
 | `test_dds_deserialize` | `wxbgi_dds_load_json` / `wxbgi_dds_load_yaml` round-trip correctness |
 | `test_dds_clear` | `wxbgi_dds_clear` removes all scene objects |
 | `test_dds_cam2d_yz` | 2-D orthographic camera in the YZ plane; coordinate projection |
 | `test_dds_cam3d_persp` | 3-D perspective projection; worldToScreen math |
-| `test_dds_csg` | `wxbgi_dds_translate`, `wxbgi_dds_union`, `wxbgi_dds_intersection`, `wxbgi_dds_difference`, retained child references, JSON tokens for Transform / SetUnion / SetIntersection / SetDifference, draw-mode propagation to retained set-op nodes, a 2D ordered-difference case, and exact 3D union/intersection/difference regressions |
+| `test_dds_csg` | `wxbgi_dds_translate`, `wxbgi_dds_rotate_*`, `wxbgi_dds_scale_*`, `wxbgi_dds_skew`, `wxbgi_dds_union`, `wxbgi_dds_intersection`, `wxbgi_dds_difference`, retained child references, JSON tokens for Transform / SetUnion / SetIntersection / SetDifference, draw-mode propagation to retained set-op nodes, a 2D ordered-difference case, and exact 3D union/intersection/difference regressions including scaled retained operands |
 | `test_multi_scene` | Multi-CHDOP scene lifecycle: `wxbgi_dds_scene_create`, `wxbgi_dds_scene_exists`, `wxbgi_dds_scene_set_active`, `wxbgi_cam_set_scene`/`wxbgi_cam_get_scene`, scene isolation (objects in "secondary" do not appear in "default"), `wxbgi_dds_scene_destroy` (cameras fall back to "default"), JSON round-trip preserving scene assignment |
 | `wxbgi_multi_scene_demo` | Full 3-panel multi-scene demo in `--test` mode: builds "main" and "secondary" scene graphs, creates three cameras (two perspective + one pixel-space ortho), renders one frame via `wxbgi_render_dds`, exits cleanly |
 | `test_solids` | `wxbgi_solid_box`, `wxbgi_solid_sphere`, `wxbgi_solid_cylinder`, `wxbgi_solid_cone`, `wxbgi_solid_torus` — all draw modes |
@@ -138,7 +140,7 @@ context is fully initialised — including the DLL-local GLEW function pointer
 table — before the function returns.  This makes GL extension calls safe
 immediately after `wxbgi_wx_frame_create` on all platforms.
 
-### wxWidgets Canvas Tests (26–28)
+### wxWidgets Canvas Tests (27–29)
 
 These link against `wx_bgi_wx` (the static wx integration library) and use `WxBgiCanvas` embedded inside a `wxFrame`.  
 They are the C++ equivalents of the standalone wx demos.
@@ -206,7 +208,7 @@ ctest --test-dir build --output-on-failure
 > **FreePascal tests (18–25) on macOS:** Pascal CTest targets require a working
 > FPC Homebrew install with correct linker paths.  If FPC is installed to a
 > non-standard Homebrew prefix the linker may report `ld: library 'c' not found`.
-> All C++, Python, and wxWidgets tests (1–17, 26–28) pass regardless.
+> All C++, Python, and wxWidgets tests (1–18, 27–29) pass regardless.
 
 ### Single test
 
