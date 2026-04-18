@@ -5,7 +5,7 @@ A Camera2D in `wx_bgi_graphics` is **not a separate struct**.  It is a
 function works on a 2D camera, and the `wxbgi_cam2d_*` convenience functions
 are thin wrappers that manipulate only the 2D-specific fields.
 
-For the complete `Camera3D` field reference see [Camera3D_Map.md](Camera3D_Map.md).
+For the complete `Camera3D` field reference see [Camera3D_Map.md](./Camera3D_Map.md).
 
 ---
 
@@ -280,6 +280,6 @@ bgi_camera_api.cpp         (wxbgi_cam2d_* implementations)
 
 ## See also
 
-- [Camera3D_Map.md](Camera3D_Map.md) -- 3D camera math, full API, serialization
-- [DDS.md](DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation
-- [Tutorial.md](Tutorial.md) -- Animation loop and double-buffering
+- [Camera3D_Map.md](./Camera3D_Map.md) -- 3D camera math, full API, serialization
+- [DDS.md](../DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation
+- [Tutorial.md](../user-guide/Tutorial.md) -- Animation loop and double-buffering

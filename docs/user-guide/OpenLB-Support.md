@@ -138,7 +138,7 @@ This matches the current wx rendering model well:
 
 > `examples/cpp/wxbgi_openlb_live_demo.cpp`
 
-![OpenLB live demo](images/screenshot_openlb_live_demo.png)
+![OpenLB live demo](../../images/screenshot_openlb_live_demo.png)
 
 The demo shows the current viewer pattern: a live false-colour scalar field,
 decimated vector arrows, and a scalar legend rendered in real time inside the

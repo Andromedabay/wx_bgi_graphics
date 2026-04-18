@@ -15,4 +15,5 @@ build*
 *.pdb
 libimp*.a
 *.fpc
+*.res
 

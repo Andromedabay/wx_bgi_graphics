@@ -495,7 +495,7 @@ wxbgi_set_input_defaults(wxbgi_get_input_defaults() & ~WXBGI_DEFAULT_SCROLL_ACCU
 ```
 
 The `WXBGI_DEFAULT_*` bypass flags apply equally to wx mode and GLFW mode.
-See [InputsProcessing.md](InputsProcessing.md#bypass-mechanism) for the full
+See [InputsProcessing.md](./developer-guide/InputsProcessing.md#bypass-mechanism) for the full
 bypass API.
 
 ---
@@ -680,7 +680,7 @@ there is no need to re-submit geometry every frame.
 Source: `examples/wx/wx_multi_scene_demo.cpp`
 
 A full `wxIMPLEMENT_APP` application that demonstrates the
-[Multi-Scene Management](DDS.md#multi-scene-management-chdop-graph-registry)
+[Multi-Scene Management](./DDS.md#multi-scene-management-chdop-graph-registry)
 feature with a 3-panel split view, menubar, and statusbar.
 
 **Layout:**
@@ -804,4 +804,4 @@ automatically, `PreBlit` re-renders the DDS, and the scene reappears correctly.
 
 ---
 
-*See also: [README.md](README.md) · [InputsProcessing.md](InputsProcessing.md) · [DDS.md](DDS.md) · [VisualAids.md](VisualAids.md)*
+*See also: [README.md](../README.md) · [InputsProcessing.md](./developer-guide/InputsProcessing.md) · [DDS.md](./DDS.md) · [VisualAids.md](./user-guide/VisualAids.md)*

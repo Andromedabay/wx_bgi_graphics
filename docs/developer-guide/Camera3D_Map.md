@@ -231,6 +231,6 @@ bgi_camera_api.cpp   (public C API implementation)
 
 ## See also
 
-- [Camera2D_Map.md](Camera2D_Map.md) -- 2D camera convenience layer
-- [DDS.md](DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation
-- [Tutorial.md](Tutorial.md) -- Double-buffering and animation loop
+- [Camera2D_Map.md](./Camera2D_Map.md) -- 2D camera convenience layer
+- [DDS.md](../DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation
+- [Tutorial.md](../user-guide/Tutorial.md) -- Double-buffering and animation loop

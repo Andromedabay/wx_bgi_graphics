@@ -11,18 +11,23 @@ EXTRACT_STATIC         = NO
 EXTRACT_LOCAL_CLASSES  = NO
 
 INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
-                         "@CMAKE_SOURCE_DIR@/Building.md" \
-                         "@CMAKE_SOURCE_DIR@/Tests.md" \
-                         "@CMAKE_SOURCE_DIR@/Tutorial.md" \
-                         "@CMAKE_SOURCE_DIR@/WxWidgets.md" \
-                         "@CMAKE_SOURCE_DIR@/OpenLB-Support.md" \
-                         "@CMAKE_SOURCE_DIR@/DDS.md" \
-                         "@CMAKE_SOURCE_DIR@/Object-Operation.md" \
-                         "@CMAKE_SOURCE_DIR@/VisualAids.md" \
-                         "@CMAKE_SOURCE_DIR@/ScreenShots.md" \
-                         "@CMAKE_SOURCE_DIR@/Camera3D_Map.md" \
-                         "@CMAKE_SOURCE_DIR@/Camera2D_Map.md" \
-                         "@CMAKE_SOURCE_DIR@/InputsProcessing.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/user-guide/README.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/user-guide/getting-started.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/README.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/architecture-overview.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/documentation-pipeline.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Building.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Tests.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/user-guide/Tutorial.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/WxWidgets.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/user-guide/OpenLB-Support.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/DDS.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/Object-Operation.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/user-guide/VisualAids.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/user-guide/ScreenShots.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Camera3D_Map.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Camera2D_Map.md" \
+                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/InputsProcessing.md" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_ext.h" \
                          "@CMAKE_SOURCE_DIR@/src/wx_bgi_3d.h" \

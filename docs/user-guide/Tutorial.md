@@ -97,7 +97,7 @@ Call `closegraph()`.  Both software page buffers are freed and the GLFW window i
 destroyed.
 
   
-![Double-buffering minimum requirements](images/Minimum_Buffers_for_Double_buffering.png)
+![Double-buffering minimum requirements](../../images/Minimum_Buffers_for_Double_buffering.png)
   
 ---
 
@@ -119,7 +119,7 @@ end while
 shutdown_graphics()            // free buffers, close window
 ```
   
-![Double buffering explained](images/DoubleBuffering.png)
+![Double buffering explained](../../images/DoubleBuffering.png)
 
 ---
 

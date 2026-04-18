@@ -511,7 +511,7 @@ lines/circles/rectangles, 3D solids, and 3D surfaces. Depth ordering uses the ca
 to project candidate centroids and sort by Z-depth.
 
 Flash feedback for selected objects is driven by `gState.solidColorOverride` -- see
-**[VisualAids.md](./VisualAids.md)** for details.
+**[VisualAids.md](../user-guide/VisualAids.md)** for details.
 
 ---
 
@@ -1312,7 +1312,7 @@ bgi_state.h / bgi_state.cpp    <-- gState singleton, gMutex definition,
 ---
 
 *See also:*
-- **[VisualAids.md](./VisualAids.md)** -- selection flash feedback, overlay pick system, full selection API reference
+- **[VisualAids.md](../user-guide/VisualAids.md)** -- selection flash feedback, overlay pick system, full selection API reference
 - **[Camera3D_Map.md](./Camera3D_Map.md)** -- camera viewport math used by the click-to-pick pipeline
 - **`src/wx_bgi_ext.h`** -- complete public declarations with Doxygen doc-comments
 - **`examples/cpp/wxbgi_keyboard_queue.cpp`** -- live example of the keyboard queue API

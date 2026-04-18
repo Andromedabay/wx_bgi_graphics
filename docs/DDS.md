@@ -203,9 +203,9 @@ wxbgi_dds_set_label(diffId.c_str(), "sphere-torus-diff");
 
 ### Compound-solid reference images
 
-![Compound solids shaded mode](images/set-operations-compound-solids-shaded.png)
+![Compound solids shaded mode](../images/set-operations-compound-solids-shaded.png)
 
-![Compound solids wireframe mode](images/set-operations-compound-solids-wireframe.png)
+![Compound solids wireframe mode](../images/set-operations-compound-solids-wireframe.png)
 
 ---
 

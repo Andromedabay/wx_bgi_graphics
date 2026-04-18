@@ -4,7 +4,7 @@ This document describes the automated test suite for wx_BGI_Graphics.
 All tests are registered with CTest and run automatically in CI.
 
 See **[Building.md](./Building.md)** for build commands.  
-See **[WxWidgets.md](./WxWidgets.md)** for the embedded canvas integration guide.
+See **[WxWidgets.md](../WxWidgets.md)** for the embedded canvas integration guide.
 
 ---
 

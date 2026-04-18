@@ -555,6 +555,6 @@ wx_bgi_ext.h        (wxbgi_wx_render_overlays_for_camera public declaration)
 
 ## See also
 
-- [Camera3D_Map.md](Camera3D_Map.md) -- camera data, math, and API
-- [Camera2D_Map.md](Camera2D_Map.md) -- 2D camera convenience layer
-- [DDS.md](DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation
+- [Camera3D_Map.md](../developer-guide/Camera3D_Map.md) -- camera data, math, and API
+- [Camera2D_Map.md](../developer-guide/Camera2D_Map.md) -- 2D camera convenience layer
+- [DDS.md](../DDS.md) -- DDS / CHDOP / DDJ / DDY scene graph documentation

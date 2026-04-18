@@ -180,14 +180,14 @@ wxbgi_render_dds(NULL);
 
 These screenshots come from the current `wxbgi_set_operations_demo_cpp` scene and show retained translation + set-operation results rendered as compound solids:
 
-![Compound solids shaded mode](images/set-operations-compound-solids-shaded.png)
+![Compound solids shaded mode](../images/set-operations-compound-solids-shaded.png)
 
-![Compound solids wireframe mode](images/set-operations-compound-solids-wireframe.png)
+![Compound solids wireframe mode](../images/set-operations-compound-solids-wireframe.png)
 
 ---
 
 ## Related Pages
 
 - **[DDS.md](./DDS.md)** — retained scene graph, serialization, and CHDOP type list
-- **[Camera3D_Map.md](./Camera3D_Map.md)** — camera projection and world/screen mapping
-- **[Tests.md](./Tests.md)** — current automated coverage for retained transform and set operations
+- **[Camera3D_Map.md](./developer-guide/Camera3D_Map.md)** — camera projection and world/screen mapping
+- **[Tests.md](./developer-guide/Tests.md)** — current automated coverage for retained transform and set operations
