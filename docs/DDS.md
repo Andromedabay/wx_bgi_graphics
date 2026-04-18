@@ -53,6 +53,17 @@ Key design choices:
 | `wxbgi_dds_set_visible(id, visible)` | Show / hide an individual object without deleting it. |
 | `wxbgi_dds_get_visible(id)` | Returns 1 if visible, 0 if hidden. |
 
+### External Metadata
+
+| Function | Description |
+|----------|-------------|
+| `wxbgi_dds_set_external_attr(id, key, value)` | Set or replace one string-valued external attribute on any DDS object. |
+| `wxbgi_dds_get_external_attr(id, key)` | Read one external attribute value. |
+| `wxbgi_dds_clear_external_attr(id, key)` | Remove one external attribute key from the object. |
+| `wxbgi_dds_external_attr_count(id)` | Number of external attributes stored on the object. |
+| `wxbgi_dds_get_external_attr_key_at(id, index)` | Enumerate external-attribute keys by index. |
+| `wxbgi_dds_get_external_attr_value_at(id, index)` | Enumerate external-attribute values by index. |
+
 ### Scene Modification
 
 | Function | Description |
@@ -200,6 +211,50 @@ const char *ops[2] = { sphereId.c_str(), torusId.c_str() };
 const std::string diffId = wxbgi_dds_difference(2, ops);
 wxbgi_dds_set_label(diffId.c_str(), "sphere-torus-diff");
 ```
+
+## DDS External Attributes
+
+Each DDS object now carries a generic `externalAttributes` string map. This is
+intended for workflows that need to attach extra semantic information without
+changing the core geometry model. The first consumer is the OpenLB bridge, but
+the storage is deliberately generic.
+
+Typical OpenLB-facing keys include:
+
+| Key | Meaning |
+|---|---|
+| `openlb.role` | semantic role such as `fluid`, `solid`, or `boundary` |
+| `openlb.material` | explicit material id stored as a string |
+| `openlb.boundary` | boundary classification such as `wall` or `inlet` |
+| `openlb.priority` | overlap tie-breaker for classification |
+| `openlb.enabled` | on-off export flag |
+
+These attributes round-trip through both DDJ and DDY serialisation.
+
+## DDS as OpenLB Geometry Source
+
+The retained DDS scene is now also used as the geometry source for an
+OpenLB-oriented material-classification bridge. This is a geometry query layer,
+not a solver ABI.
+
+Current exported helpers live in `src/wx_bgi_openlb.h`:
+
+- `wxbgi_openlb_classify_point_material(...)`
+- `wxbgi_openlb_sample_materials_2d(...)`
+
+Current supported retained subset:
+
+- box
+- sphere
+- cylinder
+- cone
+- torus
+- transform chains
+- set-union, set-intersection, and set-difference nodes
+
+Unsupported DDS object types are currently treated as not contributing solver
+occupancy. This keeps the bridge explicit and predictable while the supported
+subset grows.
 
 ### Compound-solid reference images
 

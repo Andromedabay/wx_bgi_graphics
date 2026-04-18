@@ -142,6 +142,53 @@ BGI_API const char *BGI_CALL wxbgi_dds_get_label(const char *id);
 BGI_API void BGI_CALL wxbgi_dds_set_label(const char *id, const char *label);
 
 /**
+ * @brief Set one generic external metadata key/value pair on a DDS object.
+ *
+ * Passing NULL or empty @p value stores an empty string. Returns 1 on success,
+ * 0 if @p id or @p key is invalid or the object does not exist.
+ */
+BGI_API int BGI_CALL wxbgi_dds_set_external_attr(const char *id, const char *key, const char *value);
+
+/**
+ * @brief Get one external metadata value from a DDS object.
+ *
+ * Returns a pointer to an internal thread-local buffer valid until the next
+ * DDS string-returning API call from the same thread. Returns "" if the object
+ * or key is not found.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_get_external_attr(const char *id, const char *key);
+
+/**
+ * @brief Remove one external metadata key from a DDS object.
+ *
+ * Returns 1 if the key existed and was removed, otherwise 0.
+ */
+BGI_API int BGI_CALL wxbgi_dds_clear_external_attr(const char *id, const char *key);
+
+/**
+ * @brief Return the number of external metadata entries stored on a DDS object.
+ *
+ * Returns 0 if the object is missing.
+ */
+BGI_API int BGI_CALL wxbgi_dds_external_attr_count(const char *id);
+
+/**
+ * @brief Return the key at @p index within a DDS object's external metadata map.
+ *
+ * Iteration order is unspecified. Returns "" if @p id is invalid or @p index is
+ * out of range.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_get_external_attr_key_at(const char *id, int index);
+
+/**
+ * @brief Return the value at @p index within a DDS object's external metadata map.
+ *
+ * Iteration order is unspecified. Returns "" if @p id is invalid or @p index is
+ * out of range.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_get_external_attr_value_at(const char *id, int index);
+
+/**
  * @brief Returns the ID of the first non-deleted object with the given @p label,
  *        or "" if not found.
  *

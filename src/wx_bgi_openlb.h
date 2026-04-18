@@ -28,3 +28,16 @@ static inline int wxbgi_openlb_present(void)
     wxbgi_wx_refresh();
     return wxbgi_openlb_pump();
 }
+
+BGI_API int BGI_CALL wxbgi_openlb_classify_point_material(float x, float y, float z,
+                                                          int defaultFluidMaterial,
+                                                          int defaultSolidMaterial,
+                                                          int *outMatched);
+
+BGI_API int BGI_CALL wxbgi_openlb_sample_materials_2d(float minX, float minY, float z,
+                                                      int cols, int rows,
+                                                      float stepX, float stepY,
+                                                      int defaultFluidMaterial,
+                                                      int defaultSolidMaterial,
+                                                      int *outMaterials,
+                                                      int materialCount);

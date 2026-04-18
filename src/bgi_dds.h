@@ -75,6 +75,11 @@ struct DdsStyle
     int              bkColor{0};
 };
 
+struct DdsExternalAttributes
+{
+    std::unordered_map<std::string, std::string> values;
+};
+
 // =============================================================================
 // Object type discriminator
 // =============================================================================
@@ -137,6 +142,7 @@ public:
     bool          visible{true};
     bool          deleted{false}; ///< Soft-delete; object stays in index.
     DdsStyle      style;          ///< Baked draw state at creation time.
+    DdsExternalAttributes externalAttributes; ///< Generic external metadata for bridge/export workflows.
 
     virtual ~DdsObject() = default;
 };

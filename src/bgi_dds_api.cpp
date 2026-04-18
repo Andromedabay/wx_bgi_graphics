@@ -331,7 +331,127 @@ BGI_API void BGI_CALL wxbgi_dds_set_label(const char *id, const char *label)
     std::lock_guard<std::mutex> lock(bgi::gMutex);
     auto obj = bgi::gState.dds->findById(id);
     if (obj)
+    {
         obj->label = (label != nullptr) ? label : "";
+        ++bgi::gState.dds->revision;
+    }
+}
+
+BGI_API int BGI_CALL wxbgi_dds_set_external_attr(const char *id, const char *key, const char *value)
+{
+    if (id == nullptr || id[0] == '\0' || key == nullptr || key[0] == '\0')
+        return 0;
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj)
+        return 0;
+
+    obj->externalAttributes.values[key] = (value != nullptr) ? value : "";
+    ++bgi::gState.dds->revision;
+    return 1;
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_get_external_attr(const char *id, const char *key)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (id == nullptr || id[0] == '\0' || key == nullptr || key[0] == '\0')
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj)
+        return result.c_str();
+
+    auto it = obj->externalAttributes.values.find(key);
+    if (it != obj->externalAttributes.values.end())
+        result = it->second;
+    return result.c_str();
+}
+
+BGI_API int BGI_CALL wxbgi_dds_clear_external_attr(const char *id, const char *key)
+{
+    if (id == nullptr || id[0] == '\0' || key == nullptr || key[0] == '\0')
+        return 0;
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj)
+        return 0;
+
+    auto it = obj->externalAttributes.values.find(key);
+    if (it == obj->externalAttributes.values.end())
+        return 0;
+
+    obj->externalAttributes.values.erase(it);
+    ++bgi::gState.dds->revision;
+    return 1;
+}
+
+BGI_API int BGI_CALL wxbgi_dds_external_attr_count(const char *id)
+{
+    if (id == nullptr || id[0] == '\0')
+        return 0;
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj)
+        return 0;
+    return static_cast<int>(obj->externalAttributes.values.size());
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_get_external_attr_key_at(const char *id, int index)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (id == nullptr || id[0] == '\0' || index < 0)
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj)
+        return result.c_str();
+
+    int current = 0;
+    for (const auto &[key, value] : obj->externalAttributes.values)
+    {
+        (void) value;
+        if (current++ == index)
+        {
+            result = key;
+            break;
+        }
+    }
+    return result.c_str();
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_get_external_attr_value_at(const char *id, int index)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (id == nullptr || id[0] == '\0' || index < 0)
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj)
+        return result.c_str();
+
+    int current = 0;
+    for (const auto &[key, value] : obj->externalAttributes.values)
+    {
+        (void) key;
+        if (current++ == index)
+        {
+            result = value;
+            break;
+        }
+    }
+    return result.c_str();
 }
 
 // =============================================================================
@@ -363,7 +483,10 @@ BGI_API void BGI_CALL wxbgi_dds_set_visible(const char *id, int visible)
     std::lock_guard<std::mutex> lock(bgi::gMutex);
     auto obj = bgi::gState.dds->findById(id);
     if (obj)
+    {
         obj->visible = (visible != 0);
+        ++bgi::gState.dds->revision;
+    }
 }
 
 BGI_API int BGI_CALL wxbgi_dds_get_visible(const char *id)

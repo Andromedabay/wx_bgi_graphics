@@ -17,6 +17,7 @@ project is built, tested, documented, and organized internally.
 |---|---|
 | **[Architecture Overview](./architecture-overview.md)** | High-level map of the major subsystems and source files |
 | **[DDS.md](../DDS.md)** | Retained scene graph design, CHDOP types, serialization, and composition behavior |
+| **[OpenLB Bridge Plan](./openlb-bridge-plan.md)** | Current DDS-to-OpenLB plan, status, blocker, and Linux continuation checklist |
 | **[Camera3D_Map.md](./Camera3D_Map.md)** | Camera internals and 3D API/code map |
 | **[Camera2D_Map.md](./Camera2D_Map.md)** | 2D camera behavior and implementation map |
 | **[InputsProcessing.md](./InputsProcessing.md)** | Input model, queue semantics, hooks, and backend behavior |

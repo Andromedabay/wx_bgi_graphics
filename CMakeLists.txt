@@ -64,6 +64,7 @@ if(WXBGI_ENABLE_OPENLB)
     if(NOT EXISTS "${OPENLB_ROOT}/src/olb.h")
         message(FATAL_ERROR "OPENLB_ROOT does not appear to be an OpenLB release tree: expected ${OPENLB_ROOT}/src/olb.h")
     endif()
+    message(STATUS "Using OpenLB root: ${OPENLB_ROOT}")
 endif()
 
 message(STATUS "Fetching GLEW...")
@@ -282,6 +283,8 @@ set(SRCS
     src/bgi_dds_scene_api.cpp
     src/bgi_dds_serial.cpp
     src/bgi_dds_render.cpp
+    src/bgi_openlb_bridge.cpp
+    src/bgi_openlb_bridge_api.cpp
     src/bgi_solid_api.cpp
     src/bgi_solid_render.cpp
     src/bgi_export.cpp
@@ -366,6 +369,40 @@ if(WXBGI_ENABLE_WX)
                 $<TARGET_FILE:wx_bgi_opengl>
                 $<TARGET_FILE_DIR:wxbgi_openlb_live_demo>
     )
+
+    add_executable(wxbgi_openlb_material_preview_demo examples/cpp/wxbgi_openlb_material_preview_demo.cpp)
+    target_link_libraries(wxbgi_openlb_material_preview_demo PRIVATE wx_bgi_opengl)
+    add_custom_command(
+        TARGET wxbgi_openlb_material_preview_demo POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wxbgi_openlb_material_preview_demo>
+    )
+
+    if(WXBGI_ENABLE_OPENLB)
+        add_library(openlb_headers INTERFACE)
+        target_include_directories(openlb_headers INTERFACE
+            ${OPENLB_ROOT}/src
+            ${OPENLB_ROOT}/external/tinyxml
+            ${OPENLB_ROOT}/external/tinyxml2
+        )
+        target_compile_definitions(openlb_headers INTERFACE PLATFORM_CPU_SISD=1)
+        if(MSVC)
+            target_compile_options(openlb_headers INTERFACE
+                /Zc:__cplusplus
+                /FI"${CMAKE_SOURCE_DIR}/src/openlb_msvc_compat.h"
+            )
+        endif()
+
+        add_executable(wxbgi_openlb_coupled_smoke examples/cpp/wxbgi_openlb_coupled_smoke.cpp)
+        target_link_libraries(wxbgi_openlb_coupled_smoke PRIVATE wx_bgi_opengl openlb_headers)
+        add_custom_command(
+            TARGET wxbgi_openlb_coupled_smoke POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    $<TARGET_FILE_DIR:wxbgi_openlb_coupled_smoke>
+        )
+    endif()
 endif()
 
 
@@ -402,6 +439,24 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:test_dds_deserialize>
+)
+
+add_executable(test_dds_external_attrs examples/cpp/test_dds_external_attrs.cpp)
+target_link_libraries(test_dds_external_attrs PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_external_attrs POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_external_attrs>
+)
+
+add_executable(test_openlb_bridge_materialize_2d examples/cpp/test_openlb_bridge_materialize_2d.cpp)
+target_link_libraries(test_openlb_bridge_materialize_2d PRIVATE wx_bgi_opengl glm)
+add_custom_command(
+    TARGET test_openlb_bridge_materialize_2d POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_openlb_bridge_materialize_2d>
 )
 
 add_executable(test_dds_clear examples/cpp/test_dds_clear.cpp)
@@ -666,6 +721,12 @@ if(BUILD_TESTING)
         set_tests_properties(test_field_vis PROPERTIES TIMEOUT 20)
         add_test(NAME wxbgi_openlb_live_demo COMMAND $<TARGET_FILE:wxbgi_openlb_live_demo> --test)
         set_tests_properties(wxbgi_openlb_live_demo PROPERTIES TIMEOUT 20)
+        add_test(NAME wxbgi_openlb_material_preview_demo COMMAND $<TARGET_FILE:wxbgi_openlb_material_preview_demo> --test)
+        set_tests_properties(wxbgi_openlb_material_preview_demo PROPERTIES TIMEOUT 20)
+        if(WXBGI_ENABLE_OPENLB)
+            add_test(NAME wxbgi_openlb_coupled_smoke COMMAND $<TARGET_FILE:wxbgi_openlb_coupled_smoke> --test)
+            set_tests_properties(wxbgi_openlb_coupled_smoke PROPERTIES TIMEOUT 20)
+        endif()
         add_test(NAME wxbgi_set_operations_demo_cpp COMMAND $<TARGET_FILE:wxbgi_set_operations_demo_cpp> --test)
         set_tests_properties(wxbgi_set_operations_demo_cpp PROPERTIES TIMEOUT 20)
         add_test(NAME wxbgi_affine_transform_demo_cpp COMMAND $<TARGET_FILE:wxbgi_affine_transform_demo_cpp> --test)
@@ -677,6 +738,12 @@ if(BUILD_TESTING)
 
     add_test(NAME test_dds_deserialize   COMMAND $<TARGET_FILE:test_dds_deserialize>)
     set_tests_properties(test_dds_deserialize   PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_external_attrs COMMAND $<TARGET_FILE:test_dds_external_attrs>)
+    set_tests_properties(test_dds_external_attrs PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_openlb_bridge_materialize_2d COMMAND $<TARGET_FILE:test_openlb_bridge_materialize_2d>)
+    set_tests_properties(test_openlb_bridge_materialize_2d PROPERTIES TIMEOUT 20)
 
     add_test(NAME test_dds_clear         COMMAND $<TARGET_FILE:test_dds_clear>)
     set_tests_properties(test_dds_clear         PROPERTIES TIMEOUT 20)
@@ -1288,6 +1355,8 @@ if(WXBGI_ENABLE_WX)
                     ${CMAKE_SOURCE_DIR}/src/wx_bgi_ext.h
                     ${CMAKE_SOURCE_DIR}/src/wx_bgi_openlb.h
                     ${CMAKE_SOURCE_DIR}/examples/cpp/wxbgi_openlb_live_demo.cpp
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/wxbgi_openlb_material_preview_demo.cpp
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/wxbgi_openlb_coupled_smoke.cpp
                     ${CMAKE_BINARY_DIR}/openlb_bridge
             DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo
             COMMENT "Staging wx_bgi OpenLB bridge assets in ${CMAKE_BINARY_DIR}/openlb_bridge"

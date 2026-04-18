@@ -16,7 +16,7 @@ solids, embedded wxWidgets canvases, and optional OpenLB-oriented live viewing.
 3. Hide most OpenGL complexity behind a small and stable API surface.
 4. Provide both classic BGI calls and optional modern extension APIs.
 5. Support both lightweight standalone windows and richer wxWidgets embedding.
-6. Support [OpenLB](https://www.openlb.net/), multi-physics simulation tool, integration. OpenLB itself is not included in this shared-lib, but its integration is supported. 
+6. Support [OpenLB](https://www.openlb.net/) integration through DDS metadata, material-sampling helpers, and live visualization. OpenLB itself is not included in this shared-lib.
 
 ## Highlights
 
@@ -26,7 +26,7 @@ solids, embedded wxWidgets canvases, and optional OpenLB-oriented live viewing.
 - Retained DDS/CHDOP scene graph with JSON/YAML serialization via `src/wx_bgi_dds.h`
 - Retained affine transforms, set operations, and exact 3D Manifold booleans
 - 3D solid primitives, surfaces, overlays, and wxWidgets embedded canvas support
-- Optional OpenLB live-visualization bridge
+- Optional OpenLB live-visualization and DDS material-bridge support
 
 ## Dependencies
 
@@ -73,6 +73,7 @@ generated.
 
 - **[Developer Guide index](./docs/developer-guide/README.md)**
 - **[Architecture Overview](./docs/developer-guide/architecture-overview.md)**
+- **[OpenLB Bridge Plan](./docs/developer-guide/openlb-bridge-plan.md)**
 - **[Documentation Pipeline](./docs/developer-guide/documentation-pipeline.md)**
 
 ## Public Headers
@@ -83,7 +84,7 @@ generated.
 | `src/wx_bgi_ext.h` | Modern `wxbgi_*` extension helpers |
 | `src/wx_bgi_3d.h` | Cameras, UCS, world-coordinate drawing |
 | `src/wx_bgi_dds.h` | Retained DDS/CHDOP scene graph |
-| `src/wx_bgi_openlb.h` | Header-only OpenLB live-loop helpers |
+| `src/wx_bgi_openlb.h` | OpenLB live-loop helpers and DDS material-query bridge entry points |
 | `src/bgi_types.h` | Shared types, structs, and constants |
 
 ## Quick Orientation
@@ -92,7 +93,18 @@ generated.
 - For animation/page-buffer workflow, read **[Tutorial.md](./docs/user-guide/Tutorial.md)**.
 - For retained scenes and composition, read **[DDS.md](./docs/DDS.md)** and
   **[Object-Operation.md](./docs/Object-Operation.md)**.
+- For DDS-to-OpenLB authoring and viewer integration, read
+  **[OpenLB-Support.md](./docs/user-guide/OpenLB-Support.md)**.
 - For build, testing, and design internals, use the **Developer Guide**.
+
+## OpenLB Status
+
+The repository now supports DDS external attributes plus material-query helpers
+for OpenLB-oriented workflows. A DDS-only preview demo is included and works in
+the standard build. A real OpenLB-coupled smoke target is also wired when
+`WXBGI_ENABLE_OPENLB=ON`, but the current public OpenLB release does not compile
+cleanly under native Windows/MSVC in this environment, so full coupled
+validation currently requires a Linux, macOS, or WSL-style toolchain.
 
 ## Screenshot Gallery
 

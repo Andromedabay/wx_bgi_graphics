@@ -213,6 +213,32 @@ bgi::DdsStyle styleFromJ(const json &j)
     return s;
 }
 
+json externalAttrsToJ(const bgi::DdsExternalAttributes &attrs)
+{
+    json out = json::object();
+    for (const auto &[key, value] : attrs.values)
+        out[key] = value;
+    return out;
+}
+
+bgi::DdsExternalAttributes externalAttrsFromJ(const json &j)
+{
+    bgi::DdsExternalAttributes attrs;
+    if (!j.is_object())
+        return attrs;
+
+    for (const auto &[key, value] : j.items())
+    {
+        if (value.is_string())
+            attrs.values[key] = value.get<std::string>();
+        else if (value.is_null())
+            attrs.values[key] = "";
+        else
+            attrs.values[key] = value.dump();
+    }
+    return attrs;
+}
+
 // ---------------------------------------------------------------------------
 // Base object header (id, label, type, visible)
 // ---------------------------------------------------------------------------
@@ -223,6 +249,8 @@ void baseObjToJ(json &j, const bgi::DdsObject &o)
     j["label"]   = o.label;
     j["type"]    = typeStr(o.type);
     j["visible"] = o.visible;
+    if (!o.externalAttributes.values.empty())
+        j["externalAttributes"] = externalAttrsToJ(o.externalAttributes);
 }
 
 // ---------------------------------------------------------------------------
@@ -1058,6 +1086,8 @@ void sceneFromJson(const json &root)
             obj->id      = jo.value("id",      "");
             obj->label   = jo.value("label",   "");
             obj->visible = jo.value("visible", true);
+            if (jo.contains("externalAttributes"))
+                obj->externalAttributes = externalAttrsFromJ(jo["externalAttributes"]);
 
             if (obj->type == bgi::DdsObjectType::Camera) {
                 auto dc = std::static_pointer_cast<bgi::DdsCamera>(obj);
@@ -1227,12 +1257,46 @@ bgi::DdsStyle styleFromY(const YAML::Node &n)
     return s;
 }
 
+YAML::Node externalAttrsToY(const bgi::DdsExternalAttributes &attrs)
+{
+    YAML::Node n(YAML::NodeType::Map);
+    for (const auto &[key, value] : attrs.values)
+        n[key] = value;
+    return n;
+}
+
+bgi::DdsExternalAttributes externalAttrsFromY(const YAML::Node &n)
+{
+    bgi::DdsExternalAttributes attrs;
+    if (!n || !n.IsMap())
+        return attrs;
+
+    for (const auto &entry : n)
+    {
+        const std::string key = entry.first.as<std::string>();
+        const YAML::Node value = entry.second;
+        if (!value)
+            attrs.values[key] = "";
+        else if (value.IsScalar())
+            attrs.values[key] = value.as<std::string>();
+        else
+        {
+            YAML::Emitter emitter;
+            emitter << value;
+            attrs.values[key] = emitter.c_str();
+        }
+    }
+    return attrs;
+}
+
 void baseObjToY(YAML::Node &n, const bgi::DdsObject &o)
 {
     n["id"]      = o.id;
     n["label"]   = o.label;
     n["type"]    = typeStr(o.type);
     n["visible"] = o.visible;
+    if (!o.externalAttributes.values.empty())
+        n["externalAttributes"] = externalAttrsToY(o.externalAttributes);
 }
 
 YAML::Node objectToY(const bgi::DdsObject &obj)
@@ -1631,6 +1695,8 @@ std::shared_ptr<bgi::DdsObject> objectFromY(const YAML::Node &n)
         o.id      = id;
         o.label   = n["label"]   ? n["label"].as<std::string>()   : "";
         o.visible = n["visible"] ? n["visible"].as<bool>(true)     : true;
+        if (n["externalAttributes"])
+            o.externalAttributes = externalAttrsFromY(n["externalAttributes"]);
     };
 
     if (type == "Camera") {
