@@ -16,6 +16,7 @@ solids, embedded wxWidgets canvases, and optional OpenLB-oriented live viewing.
 3. Hide most OpenGL complexity behind a small and stable API surface.
 4. Provide both classic BGI calls and optional modern extension APIs.
 5. Support both lightweight standalone windows and richer wxWidgets embedding.
+6. Support (OpenLB)[https://www.openlb.net/], multi-physics simulation tool, integration. OpenLB itself is not included in this shared-lib, but its integration is supported. 
 
 ## Highlights
 
