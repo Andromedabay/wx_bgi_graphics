@@ -485,7 +485,7 @@ This repository is based on Open-Source Code from 9 different sources:
     5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
     6. JSON Library, from citation.APA="Lohmann, N. (2025). JSON for Modern C++ (Version 3.12.0) [Computer software]. https://github.com/nlohmann", MIT License  
     7. YAML Library, from https://github.com/jbeder/yaml-cpp , MIT License  
-    8. Manifold Library, from https://github.com/elalish/manifold , Apache 2.0 License
+    8. Manifold Library, from https://github.com/elalish/manifold , Apache 2.0 License  
     9. wxWidgets, from https://github.com/wxWidgets/wxWidgets, wxWindows Library Licence, Version 3.1  
     10. C/C++ template inspiration from Luke of devmindscapetutorials:
         - [www.onlyfastcode.com](https://www.onlyfastcode.com)

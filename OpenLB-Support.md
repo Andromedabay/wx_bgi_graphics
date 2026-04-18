@@ -15,8 +15,8 @@ OpenLB remains the simulation owner:
 ## What is OpenLB?
 
 [OpenLB](https://www.openlb.net/) is an open-source C++ framework for
-Lattice Boltzmann Method (LBM) simulation. It is aimed at CFD and related
-transport problems, with strong emphasis on:
+Lattice Boltzmann Method (LBM) simulation. It is aimed at Computational Fluid Dynamics (CFD) and related
+transport problems, involving multiple physics(physical) systems, with strong emphasis on:
 
 - batch / HPC workflows
 - MPI / OpenMP / GPU-capable simulation backends
