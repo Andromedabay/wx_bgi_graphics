@@ -101,6 +101,41 @@ vector arrows, and `wxbgi_field_draw_scalar_legend()` draws the live legend.
 
 ---
 
+## Set-Operations Demo -- Compound Solids (Shaded)
+
+> `examples/cpp/wxbgi_set_operations_demo.cpp`
+
+![Set-operations compound solids shaded](images/set-operations-compound-solids-shaded.png)
+
+This shaded capture summarizes the current retained composition status:
+
+- translated-box union rendered as one merged cuboid
+- box/box intersection
+- cylinder/cylinder ordered difference
+- sphere/torus ordered difference
+- cone/sphere intersection
+
+All of these are retained DDS nodes created from source-object IDs and replayed
+through `wxbgi_render_dds()`.
+
+---
+
+## Set-Operations Demo -- Compound Solids (Wireframe)
+
+> Same scene in wireframe mode
+
+![Set-operations compound solids wireframe](images/set-operations-compound-solids-wireframe.png)
+
+The wireframe capture is useful for validating retained composition semantics:
+
+- set-operation nodes follow the DDS solid draw mode
+- operands referenced by transform/set-operation nodes are not replayed as
+  standalone roots during retained rendering
+- compound results remain selectable, labelable, and serializable as their own
+  DDS nodes
+
+---
+
 ## Generating Screenshots Yourself
 
 After building the project:

@@ -72,7 +72,12 @@ cmake -S . -B build -DWXBGI_ENABLE_TEST_SEAMS=ON
 cmake -S . -B build `
   -DWXBGI_ENABLE_OPENLB=ON `
   -DOPENLB_ROOT=C:\path\to\openlb\release
+
 ```
+
+Retained 3D DDS booleans use the built-in Manifold backend. Supported solid
+primitives are evaluated as closed volumes, and the rendered triangle result is
+cached per scene revision for redraw performance.
 
 ### Linux (GCC / Clang, single-config)
 
@@ -197,6 +202,12 @@ bgi_types.h     Shared types, structs, BGI constants, Camera3D
 ## Generating API Documentation
 
 Documentation requires **Doxygen** to be installed and on `PATH`.
+
+The documentation build is driven from `docs/Doxyfile.in`. That Doxygen input
+includes the top-level Markdown guides (`README.md`, `DDS.md`,
+`Object-Operation.md`, `ScreenShots.md`, etc.) and uses `images/` as the image
+search path, so markdown-embedded screenshots are carried through into both the
+generated HTML and PDF outputs.
 
 ```powershell
 # HTML only

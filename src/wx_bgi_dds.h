@@ -64,6 +64,10 @@
 #define WXBGI_DDS_PARAM_SURFACE  24
 // Phase 6 — 2D→3D Extrusion
 #define WXBGI_DDS_EXTRUSION      25
+#define WXBGI_DDS_TRANSFORM      26
+#define WXBGI_DDS_SET_UNION      27
+#define WXBGI_DDS_SET_INTERSECTION 28
+#define WXBGI_DDS_SET_DIFFERENCE 29
 #define WXBGI_DDS_UNKNOWN        -1
 
 // Parametric surface formula constants
@@ -159,6 +163,15 @@ BGI_API void BGI_CALL wxbgi_dds_set_visible(const char *id, int visible);
 BGI_API int BGI_CALL wxbgi_dds_get_visible(const char *id);
 
 /**
+ * @brief Sets the face fill colour for an existing DDS object identified by @p id.
+ *
+ * Currently supported for 3D solid leaf objects and retained set-operation
+ * nodes (`SetUnion`, `SetIntersection`, `SetDifference`). Returns 1 on
+ * success, 0 if the object is missing or does not expose a face colour.
+ */
+BGI_API int BGI_CALL wxbgi_object_set_face_color(const char *id, int color);
+
+/**
  * @brief Soft-deletes the object identified by @p id.
  *
  * The object is marked deleted and excluded from future traversals; its memory
@@ -184,6 +197,63 @@ BGI_API void BGI_CALL wxbgi_dds_clear(void);
  * library remains in a usable state.  The screen is NOT cleared.
  */
 BGI_API void BGI_CALL wxbgi_dds_clear_all(void);
+
+// =============================================================================
+// Retained composition helpers
+// =============================================================================
+
+/**
+ * @brief Creates a retained transform node that translates the object/subtree
+ *        identified by @p id by (@p dx, @p dy, @p dz).
+ *
+ * The original object is left unchanged. The returned ID belongs to the new
+ * Transform object stored in the active DDS scene.
+ *
+ * Returns a pointer to an internal thread-local buffer. Returns "" on error.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_translate(const char *id, float dx, float dy, float dz);
+
+/**
+ * @brief Creates a retained SetUnion node over @p count operand IDs.
+ *
+ * Operands are referenced by ID; they are not copied. Returns the new DDS ID,
+ * or "" on error.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_union(int count, const char *const *ids);
+
+/**
+ * @brief Creates a retained SetIntersection node over @p count operand IDs.
+ *
+ * Operands are referenced by ID; they are not copied. Returns the new DDS ID,
+ * or "" on error.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_intersection(int count, const char *const *ids);
+
+/**
+ * @brief Creates a retained SetDifference node over @p count operand IDs.
+ *
+ * Difference is ordered: the first operand is used as the base and each
+ * remaining operand is subtracted from it in sequence. Operands are referenced
+ * by ID; they are not copied. Returns the new DDS ID, or "" on error.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_difference(int count, const char *const *ids);
+
+/**
+ * @brief Returns the number of direct child IDs referenced by a retained
+ *        Transform / SetUnion / SetIntersection / SetDifference object.
+ *
+ * Returns 0 for leaf objects and for invalid IDs.
+ */
+BGI_API int BGI_CALL wxbgi_dds_get_child_count(const char *id);
+
+/**
+ * @brief Returns the direct child ID at @p index for a retained Transform /
+ *        SetUnion / SetIntersection / SetDifference object.
+ *
+ * Returns "" if @p id is invalid, the object is not a retained composition
+ * node, or @p index is out of range.
+ */
+BGI_API const char *BGI_CALL wxbgi_dds_get_child_at(const char *id, int index);
 
 // =============================================================================
 // Serialization — JSON (DDJ) and YAML (DDY)

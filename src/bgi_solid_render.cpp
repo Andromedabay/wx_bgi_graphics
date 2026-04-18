@@ -44,13 +44,7 @@ constexpr float kPi = 3.14159265358979323846f;
 // Triangle — the fundamental rendering unit
 // ---------------------------------------------------------------------------
 
-struct Triangle
-{
-    glm::vec3 v[3];   ///< world-space vertices
-    int       faceColor;
-    int       edgeColor;
-    glm::vec3 vn[3];  ///< per-vertex normals (computed by computeVertexNormals for smooth mode)
-};
+using Triangle = bgi::SolidTriangle;
 
 // ---------------------------------------------------------------------------
 // Vertex normal computation (smooth shading)
@@ -690,42 +684,48 @@ static void collectSmoothVerts(const std::vector<Triangle> &tris,
     }
 }
 
-void renderSolid3D(const Camera3D &cam, const DdsObject &baseObj)
+bool tessellateSolid3D(const DdsObject &baseObj, std::vector<Triangle> &tris)
 {
-    std::vector<Triangle> tris;
     const DdsSolid3D &s = static_cast<const DdsSolid3D &>(baseObj);
     const glm::vec3 cen = resolveOrigin(s);
-    const SolidDrawMode mode = s.drawMode;
 
     switch (baseObj.type)
     {
     case DdsObjectType::Box:
         tessBox(static_cast<const DdsBox &>(baseObj), cen, tris);
-        break;
+        return true;
     case DdsObjectType::Sphere:
         tessSphere(static_cast<const DdsSphere &>(baseObj), cen, tris);
-        break;
+        return true;
     case DdsObjectType::Cylinder:
         tessCylinder(static_cast<const DdsCylinder &>(baseObj), cen, tris);
-        break;
+        return true;
     case DdsObjectType::Cone:
         tessCone(static_cast<const DdsCone &>(baseObj), cen, tris);
-        break;
+        return true;
     case DdsObjectType::Torus:
         tessTorus(static_cast<const DdsTorus &>(baseObj), cen, tris);
-        break;
+        return true;
     case DdsObjectType::HeightMap:
         tessHeightMap(static_cast<const DdsHeightMap &>(baseObj), tris);
-        break;
+        return true;
     case DdsObjectType::ParamSurface:
         tessParamSurface(static_cast<const DdsParamSurface &>(baseObj), cen, tris);
-        break;
+        return true;
     case DdsObjectType::Extrusion:
         tessExtrusion(static_cast<const DdsExtrusion &>(baseObj), tris);
-        break;
+        return true;
     default:
-        return;
+        return false;
     }
+}
+
+void renderSolidTriangles(const Camera3D &cam,
+                          std::vector<Triangle> &tris,
+                          SolidDrawMode mode)
+{
+    if (tris.empty())
+        return;
 
     // GL Phong / wireframe-HSR path: collect vertices into gState.pendingGl for
     // the render pass.  In legacy (pre-GL3.3) mode fall through to the software
@@ -751,6 +751,15 @@ void renderSolid3D(const Camera3D &cam, const DdsObject &baseObj)
     }
 
     renderTriangles(cam, tris, mode);
+}
+
+void renderSolid3D(const Camera3D &cam, const DdsObject &baseObj)
+{
+    std::vector<Triangle> tris;
+    if (!tessellateSolid3D(baseObj, tris))
+        return;
+    const DdsSolid3D &s = static_cast<const DdsSolid3D &>(baseObj);
+    renderSolidTriangles(cam, tris, s.drawMode);
 }
 
 } // namespace bgi

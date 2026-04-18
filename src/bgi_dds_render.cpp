@@ -27,11 +27,15 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <queue>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "bgi_camera.h"
@@ -44,6 +48,7 @@
 #include "bgi_solid_render.h"
 #include "bgi_state.h"
 #include "bgi_ucs.h"
+#include <manifold/manifold.h>
 
 // =============================================================================
 // Internal helpers  (anonymous namespace — not part of the public API)
@@ -736,10 +741,70 @@ void renderImage(const bgi::Camera3D &cam, const bgi::DdsImage &obj)
 // Main per-object dispatch
 // ---------------------------------------------------------------------------
 
-void renderObject(const bgi::Camera3D &cam, const bgi::DdsObject &obj, int colorOverride = -1)
+glm::vec3 translationFromMatrix(const glm::mat4 &m)
+{
+    return {m[3][0], m[3][1], m[3][2]};
+}
+
+bool isLeafObject(bgi::DdsObjectType t)
+{
+    return t != bgi::DdsObjectType::Camera &&
+           t != bgi::DdsObjectType::Ucs &&
+           t != bgi::DdsObjectType::WorldExtentsObj &&
+           t != bgi::DdsObjectType::Transform &&
+           t != bgi::DdsObjectType::SetUnion &&
+           t != bgi::DdsObjectType::SetIntersection &&
+           t != bgi::DdsObjectType::SetDifference;
+}
+
+bool isSolid3DType(bgi::DdsObjectType t)
+{
+    switch (t)
+    {
+    case bgi::DdsObjectType::Box:
+    case bgi::DdsObjectType::Sphere:
+    case bgi::DdsObjectType::Cylinder:
+    case bgi::DdsObjectType::Cone:
+    case bgi::DdsObjectType::Torus:
+    case bgi::DdsObjectType::HeightMap:
+    case bgi::DdsObjectType::ParamSurface:
+    case bgi::DdsObjectType::Extrusion:
+        return true;
+    default:
+        return false;
+    }
+}
+
+const std::vector<std::string> *childIds(const bgi::DdsObject &obj)
+{
+    switch (obj.type)
+    {
+    case bgi::DdsObjectType::Transform:
+        return &static_cast<const bgi::DdsTransform &>(obj).children;
+    case bgi::DdsObjectType::SetUnion:
+        return &static_cast<const bgi::DdsSetUnion &>(obj).operands;
+    case bgi::DdsObjectType::SetIntersection:
+        return &static_cast<const bgi::DdsSetIntersection &>(obj).operands;
+    case bgi::DdsObjectType::SetDifference:
+        return &static_cast<const bgi::DdsSetDifference &>(obj).operands;
+    default:
+        return nullptr;
+    }
+}
+
+void translatePoints(std::vector<glm::vec3> &pts, const glm::vec3 &delta)
+{
+    for (auto &p : pts)
+        p += delta;
+}
+
+void renderObject(const bgi::Camera3D &cam,
+                  const bgi::DdsObject &obj,
+                  int colorOverride = -1,
+                  const bgi::DdsStyle *styleOverride = nullptr)
 {
     // Temporarily apply the baked draw state for this object.
-    applyStyle(obj.style);
+    applyStyle(styleOverride ? *styleOverride : obj.style);
     if (colorOverride >= 0)
     {
         bgi::gState.currentColor = colorOverride;
@@ -794,6 +859,832 @@ void renderObject(const bgi::Camera3D &cam, const bgi::DdsObject &obj, int color
     }
 }
 
+void renderTranslatedLeaf(const bgi::Camera3D &cam,
+                          const bgi::DdsObject &obj,
+                          const glm::vec3 &delta,
+                          int colorOverride,
+                          const bgi::DdsStyle *styleOverride)
+{
+    if (delta == glm::vec3(0.f))
+    {
+        renderObject(cam, obj, colorOverride, styleOverride);
+        return;
+    }
+
+    switch (obj.type)
+    {
+    case bgi::DdsObjectType::Point: {
+        auto copy = static_cast<const bgi::DdsPoint &>(obj);
+        copy.pos += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Line: {
+        auto copy = static_cast<const bgi::DdsLine &>(obj);
+        copy.p1 += delta;
+        copy.p2 += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Circle: {
+        auto copy = static_cast<const bgi::DdsCircle &>(obj);
+        copy.centre += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Arc: {
+        auto copy = static_cast<const bgi::DdsArc &>(obj);
+        copy.centre += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Ellipse: {
+        auto copy = static_cast<const bgi::DdsEllipse &>(obj);
+        copy.centre += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::FillEllipse: {
+        auto copy = static_cast<const bgi::DdsFillEllipse &>(obj);
+        copy.centre += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::PieSlice: {
+        auto copy = static_cast<const bgi::DdsPieSlice &>(obj);
+        copy.centre += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Sector: {
+        auto copy = static_cast<const bgi::DdsSector &>(obj);
+        copy.centre += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Rectangle: {
+        auto copy = static_cast<const bgi::DdsRectangle &>(obj);
+        copy.p1 += delta;
+        copy.p2 += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Bar: {
+        auto copy = static_cast<const bgi::DdsBar &>(obj);
+        copy.p1 += delta;
+        copy.p2 += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Bar3D: {
+        auto copy = static_cast<const bgi::DdsBar3D &>(obj);
+        copy.p1 += delta;
+        copy.p2 += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Polygon: {
+        auto copy = static_cast<const bgi::DdsPolygon &>(obj);
+        translatePoints(copy.pts, delta);
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::FillPoly: {
+        auto copy = static_cast<const bgi::DdsFillPoly &>(obj);
+        translatePoints(copy.pts, delta);
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Text: {
+        auto copy = static_cast<const bgi::DdsText &>(obj);
+        copy.pos += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Image: {
+        auto copy = static_cast<const bgi::DdsImage &>(obj);
+        copy.pos += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Box: {
+        auto copy = static_cast<const bgi::DdsBox &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Sphere: {
+        auto copy = static_cast<const bgi::DdsSphere &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Cylinder: {
+        auto copy = static_cast<const bgi::DdsCylinder &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Cone: {
+        auto copy = static_cast<const bgi::DdsCone &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Torus: {
+        auto copy = static_cast<const bgi::DdsTorus &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::HeightMap: {
+        auto copy = static_cast<const bgi::DdsHeightMap &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::ParamSurface: {
+        auto copy = static_cast<const bgi::DdsParamSurface &>(obj);
+        copy.origin += delta;
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    case bgi::DdsObjectType::Extrusion: {
+        auto copy = static_cast<const bgi::DdsExtrusion &>(obj);
+        copy.origin += delta;
+        translatePoints(copy.baseProfile, delta);
+        renderObject(cam, copy, colorOverride, styleOverride);
+        break;
+    }
+    default:
+        renderObject(cam, obj, colorOverride, styleOverride);
+        break;
+    }
+}
+
+void renderMaskOntoActive(const std::vector<std::uint8_t> &mask, std::uint8_t color)
+{
+    auto &dst = bgi::activePageBuffer();
+    const std::size_t n = std::min(dst.size(), mask.size());
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (mask[i] != 0)
+            dst[i] = color;
+    }
+}
+
+manifold::MeshGL meshFromTriangles(const std::vector<bgi::SolidTriangle> &tris)
+{
+    manifold::MeshGL mesh;
+    mesh.numProp = 3;
+    mesh.vertProperties.reserve(tris.size() * 9);
+    mesh.triVerts.reserve(tris.size() * 3);
+
+    std::uint32_t idx = 0;
+    for (const auto &tri : tris)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            mesh.vertProperties.push_back(tri.v[i].x);
+            mesh.vertProperties.push_back(tri.v[i].y);
+            mesh.vertProperties.push_back(tri.v[i].z);
+            mesh.triVerts.push_back(idx++);
+        }
+    }
+    mesh.Merge();
+    return mesh;
+}
+
+struct ExactSetOpCacheKey
+{
+    std::string   id;
+    std::uint32_t txBits{0};
+    std::uint32_t tyBits{0};
+    std::uint32_t tzBits{0};
+
+    bool operator==(const ExactSetOpCacheKey &other) const
+    {
+        return id == other.id &&
+               txBits == other.txBits &&
+               tyBits == other.tyBits &&
+               tzBits == other.tzBits;
+    }
+};
+
+struct ExactSetOpCacheKeyHash
+{
+    std::size_t operator()(const ExactSetOpCacheKey &key) const
+    {
+        std::size_t h = std::hash<std::string>{}(key.id);
+        h ^= static_cast<std::size_t>(key.txBits) + 0x9e3779b9u + (h << 6) + (h >> 2);
+        h ^= static_cast<std::size_t>(key.tyBits) + 0x9e3779b9u + (h << 6) + (h >> 2);
+        h ^= static_cast<std::size_t>(key.tzBits) + 0x9e3779b9u + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
+struct ExactSetOpCacheEntry
+{
+    std::vector<glm::vec3> vertices;
+    bool                   empty{false};
+};
+
+struct ExactSetOpCacheState
+{
+    const bgi::DdsScene *scene{nullptr};
+    std::uint64_t        revision{0};
+    std::unordered_map<ExactSetOpCacheKey, ExactSetOpCacheEntry, ExactSetOpCacheKeyHash> entries;
+};
+
+std::uint32_t floatBits(float value)
+{
+    if (value == 0.f)
+        value = 0.f;
+    return std::bit_cast<std::uint32_t>(value);
+}
+
+ExactSetOpCacheKey makeExactSetOpCacheKey(const bgi::DdsObject &obj, const glm::vec3 &translation)
+{
+    return {obj.id, floatBits(translation.x), floatBits(translation.y), floatBits(translation.z)};
+}
+
+ExactSetOpCacheState &exactSetOpCache(const bgi::DdsScene &scene)
+{
+    static ExactSetOpCacheState cache;
+    if (cache.scene != &scene || cache.revision != scene.revision)
+    {
+        cache.scene = &scene;
+        cache.revision = scene.revision;
+        cache.entries.clear();
+    }
+    return cache;
+}
+
+std::vector<glm::vec3> cachedVerticesFromMesh(const manifold::MeshGL &mesh)
+{
+    std::vector<glm::vec3> verts;
+    verts.reserve(mesh.triVerts.size());
+    for (std::size_t i = 0; i < mesh.triVerts.size(); ++i)
+    {
+        const auto vi = static_cast<std::size_t>(mesh.triVerts[i]) * mesh.numProp;
+        verts.emplace_back(mesh.vertProperties[vi + 0],
+                           mesh.vertProperties[vi + 1],
+                           mesh.vertProperties[vi + 2]);
+    }
+    return verts;
+}
+
+std::vector<bgi::SolidTriangle> trianglesFromCachedVertices(const std::vector<glm::vec3> &verts,
+                                                            int faceColor,
+                                                            int edgeColor)
+{
+    std::vector<bgi::SolidTriangle> tris;
+    tris.reserve(verts.size() / 3);
+    for (std::size_t i = 0; i + 2 < verts.size(); i += 3)
+    {
+        bgi::SolidTriangle tri{};
+        tri.faceColor = faceColor;
+        tri.edgeColor = edgeColor;
+        tri.v[0] = verts[i + 0];
+        tri.v[1] = verts[i + 1];
+        tri.v[2] = verts[i + 2];
+        tri.vn[0] = glm::vec3(0.f, 0.f, 1.f);
+        tri.vn[1] = glm::vec3(0.f, 0.f, 1.f);
+        tri.vn[2] = glm::vec3(0.f, 0.f, 1.f);
+        tris.push_back(tri);
+    }
+    return tris;
+}
+
+std::vector<bgi::SolidTriangle> trianglesFromMesh(const manifold::MeshGL &mesh,
+                                                  int faceColor,
+                                                  int edgeColor)
+{
+    std::vector<bgi::SolidTriangle> tris;
+    tris.reserve(mesh.triVerts.size() / 3);
+    for (std::size_t i = 0; i + 2 < mesh.triVerts.size(); i += 3)
+    {
+        bgi::SolidTriangle tri{};
+        tri.faceColor = faceColor;
+        tri.edgeColor = edgeColor;
+        for (int c = 0; c < 3; ++c)
+        {
+            const auto vi = static_cast<std::size_t>(mesh.triVerts[i + c]) * mesh.numProp;
+            tri.v[c] = glm::vec3(mesh.vertProperties[vi + 0],
+                                 mesh.vertProperties[vi + 1],
+                                 mesh.vertProperties[vi + 2]);
+            tri.vn[c] = glm::vec3(0.f, 0.f, 1.f);
+        }
+        tris.push_back(tri);
+    }
+    return tris;
+}
+
+bool manifoldFromAnalyticSolid(const bgi::DdsObject &obj,
+                               const glm::vec3 &translation,
+                               manifold::Manifold &out)
+{
+    switch (obj.type)
+    {
+    case bgi::DdsObjectType::Box: {
+        const auto &box = static_cast<const bgi::DdsBox &>(obj);
+        out = manifold::Manifold::Cube({box.width, box.depth, box.height}, true)
+                  .Translate({box.origin.x + translation.x,
+                              box.origin.y + translation.y,
+                              box.origin.z + translation.z});
+        return out.Status() == manifold::Manifold::Error::NoError;
+    }
+    case bgi::DdsObjectType::Sphere: {
+        const auto &sphere = static_cast<const bgi::DdsSphere &>(obj);
+        const int segs = std::max(8, std::max(sphere.slices, sphere.stacks * 2));
+        out = manifold::Manifold::Sphere(sphere.radius, segs)
+                  .Translate({sphere.origin.x + translation.x,
+                              sphere.origin.y + translation.y,
+                              sphere.origin.z + translation.z});
+        return out.Status() == manifold::Manifold::Error::NoError;
+    }
+    case bgi::DdsObjectType::Cylinder: {
+        const auto &cyl = static_cast<const bgi::DdsCylinder &>(obj);
+        if (!cyl.caps)
+            return false;
+        out = manifold::Manifold::Cylinder(cyl.height, cyl.radius, cyl.radius,
+                                           std::max(3, cyl.slices), true)
+                  .Translate({cyl.origin.x + translation.x,
+                              cyl.origin.y + translation.y,
+                              cyl.origin.z + translation.z});
+        return out.Status() == manifold::Manifold::Error::NoError;
+    }
+    case bgi::DdsObjectType::Cone: {
+        const auto &cone = static_cast<const bgi::DdsCone &>(obj);
+        if (!cone.cap)
+            return false;
+        out = manifold::Manifold::Cylinder(cone.height, cone.radius, 0.0,
+                                           std::max(3, cone.slices), false)
+                  .Translate({cone.origin.x + translation.x,
+                              cone.origin.y + translation.y,
+                              cone.origin.z + translation.z});
+        return out.Status() == manifold::Manifold::Error::NoError;
+    }
+    default:
+        return false;
+    }
+}
+
+enum class ExactEvalState
+{
+    Invalid,
+    Empty,
+    Solid
+};
+
+struct ExactEvalResult
+{
+    ExactEvalState      state{ExactEvalState::Invalid};
+    manifold::Manifold  manifold;
+};
+
+ExactEvalResult makeExactEvalResult(manifold::Manifold mf)
+{
+    if (mf.Status() != manifold::Manifold::Error::NoError)
+        return {};
+    if (mf.IsEmpty())
+        return {ExactEvalState::Empty, manifold::Manifold()};
+    return {ExactEvalState::Solid, std::move(mf)};
+}
+
+ExactEvalResult applyUnion3D(const std::vector<ExactEvalResult> &children)
+{
+    struct QueueItem
+    {
+        manifold::Manifold manifold;
+        std::size_t        triCount;
+        std::size_t        order;
+    };
+    struct QueueItemGreater
+    {
+        bool operator()(const QueueItem &lhs, const QueueItem &rhs) const
+        {
+            return (lhs.triCount > rhs.triCount) ||
+                   (lhs.triCount == rhs.triCount && lhs.order > rhs.order);
+        }
+    };
+
+    std::priority_queue<QueueItem, std::vector<QueueItem>, QueueItemGreater> q;
+    std::size_t order = 0;
+    for (const auto &child : children)
+    {
+        if (child.state == ExactEvalState::Invalid)
+            return {};
+        if (child.state != ExactEvalState::Solid)
+            continue;
+        q.push({child.manifold, child.manifold.NumTri(), order++});
+    }
+
+    while (q.size() > 1)
+    {
+        auto lhs = q.top();
+        q.pop();
+        auto rhs = q.top();
+        q.pop();
+        auto combined = lhs.manifold + rhs.manifold;
+        auto result = makeExactEvalResult(std::move(combined));
+        if (result.state == ExactEvalState::Invalid)
+            return {};
+        if (result.state == ExactEvalState::Solid)
+        {
+            const auto triCount = result.manifold.NumTri();
+            q.push({std::move(result.manifold), triCount, order++});
+        }
+    }
+
+    if (q.empty())
+        return {ExactEvalState::Empty, manifold::Manifold()};
+    return makeExactEvalResult(q.top().manifold);
+}
+
+ExactEvalResult exactEvalFromNode(const bgi::DdsScene &scene,
+                                  const bgi::DdsObject &obj,
+                                  const glm::vec3 &translation,
+                                  std::unordered_set<std::string> &visiting);
+
+ExactEvalResult applyOperator3D(const bgi::DdsScene &scene,
+                                const std::vector<std::string> &children,
+                                bgi::DdsObjectType opType,
+                                const glm::vec3 &translation,
+                                std::unordered_set<std::string> &visiting)
+{
+    ExactEvalResult current;
+    bool foundFirst = false;
+
+    for (const auto &childId : children)
+    {
+        auto child = scene.findById(childId);
+        if (!child)
+            return {};
+
+        auto childEval = exactEvalFromNode(scene, *child, translation, visiting);
+        if (childEval.state == ExactEvalState::Invalid)
+            return {};
+
+        if (!foundFirst)
+        {
+            current = std::move(childEval);
+            foundFirst = true;
+            continue;
+        }
+
+        if (childEval.state == ExactEvalState::Empty)
+        {
+            if (opType == bgi::DdsObjectType::SetIntersection)
+                current = {ExactEvalState::Empty, manifold::Manifold()};
+            continue;
+        }
+
+        if (current.state != ExactEvalState::Solid)
+            continue;
+
+        manifold::Manifold next;
+        switch (opType)
+        {
+        case bgi::DdsObjectType::SetIntersection:
+            next = current.manifold ^ childEval.manifold;
+            break;
+        case bgi::DdsObjectType::SetDifference:
+            next = current.manifold - childEval.manifold;
+            break;
+        default:
+            return {};
+        }
+        current = makeExactEvalResult(std::move(next));
+        if (current.state == ExactEvalState::Invalid)
+            return {};
+    }
+
+    if (!foundFirst)
+        return {ExactEvalState::Empty, manifold::Manifold()};
+    return current;
+}
+
+ExactEvalResult exactEvalFromNode(const bgi::DdsScene &scene,
+                                  const bgi::DdsObject &obj,
+                                  const glm::vec3 &translation,
+                                  std::unordered_set<std::string> &visiting)
+{
+    if (!obj.id.empty() && !visiting.insert(obj.id).second)
+        return {};
+
+    ExactEvalResult result;
+    switch (obj.type)
+    {
+    case bgi::DdsObjectType::Transform: {
+        const auto &tx = static_cast<const bgi::DdsTransform &>(obj);
+        const glm::vec3 nextTranslation = translation + translationFromMatrix(tx.matrix);
+        std::vector<ExactEvalResult> childResults;
+        childResults.reserve(tx.children.size());
+        for (const auto &childId : tx.children)
+        {
+            auto child = scene.findById(childId);
+            if (!child)
+            {
+                result = {};
+                goto finish_exact_eval;
+            }
+            childResults.push_back(exactEvalFromNode(scene, *child, nextTranslation, visiting));
+            if (childResults.back().state == ExactEvalState::Invalid)
+            {
+                result = {};
+                goto finish_exact_eval;
+            }
+        }
+        result = applyUnion3D(childResults);
+        break;
+    }
+    case bgi::DdsObjectType::SetUnion: {
+        const auto *children = childIds(obj);
+        if (!children)
+        {
+            result = {ExactEvalState::Empty, manifold::Manifold()};
+            break;
+        }
+        std::vector<ExactEvalResult> childResults;
+        childResults.reserve(children->size());
+        for (const auto &childId : *children)
+        {
+            auto child = scene.findById(childId);
+            if (!child)
+            {
+                result = {};
+                goto finish_exact_eval;
+            }
+            childResults.push_back(exactEvalFromNode(scene, *child, translation, visiting));
+            if (childResults.back().state == ExactEvalState::Invalid)
+            {
+                result = {};
+                goto finish_exact_eval;
+            }
+        }
+        result = applyUnion3D(childResults);
+        break;
+    }
+    case bgi::DdsObjectType::SetIntersection:
+    case bgi::DdsObjectType::SetDifference: {
+        const auto *children = childIds(obj);
+        if (!children)
+        {
+            result = {ExactEvalState::Empty, manifold::Manifold()};
+            break;
+        }
+        result = applyOperator3D(scene, *children, obj.type, translation, visiting);
+        break;
+    }
+    default:
+        if (isSolid3DType(obj.type))
+        {
+            manifold::Manifold mf;
+            if (manifoldFromAnalyticSolid(obj, translation, mf))
+            {
+                result = makeExactEvalResult(std::move(mf));
+                break;
+            }
+            std::vector<bgi::SolidTriangle> tris;
+            if (bgi::tessellateSolid3D(obj, tris))
+            {
+                for (auto &tri : tris)
+                    for (auto &v : tri.v)
+                        v += translation;
+                result = makeExactEvalResult(manifold::Manifold(meshFromTriangles(tris)));
+                break;
+            }
+        }
+        result = {};
+        break;
+    }
+
+finish_exact_eval:
+    if (!obj.id.empty())
+        visiting.erase(obj.id);
+    return result;
+}
+
+bool renderExactSetOperation3D(const bgi::Camera3D &cam,
+                               const bgi::DdsScene &scene,
+                               const bgi::DdsObject &obj,
+                               const glm::vec3 &translation,
+                               int colorOverride)
+{
+    int faceColor = obj.style.fillStyle.color;
+    int edgeColor = obj.style.color;
+    bgi::SolidDrawMode mode = bgi::SolidDrawMode::Flat;
+    if (obj.type == bgi::DdsObjectType::SetUnion)
+    {
+        const auto &setObj = static_cast<const bgi::DdsSetUnion &>(obj);
+        faceColor = setObj.faceColor;
+        edgeColor = setObj.edgeColor;
+        mode      = static_cast<bgi::SolidDrawMode>(setObj.drawMode);
+    }
+    else if (obj.type == bgi::DdsObjectType::SetIntersection)
+    {
+        const auto &setObj = static_cast<const bgi::DdsSetIntersection &>(obj);
+        faceColor = setObj.faceColor;
+        edgeColor = setObj.edgeColor;
+        mode      = static_cast<bgi::SolidDrawMode>(setObj.drawMode);
+    }
+    else if (obj.type == bgi::DdsObjectType::SetDifference)
+    {
+        const auto &setObj = static_cast<const bgi::DdsSetDifference &>(obj);
+        faceColor = setObj.faceColor;
+        edgeColor = setObj.edgeColor;
+        mode      = static_cast<bgi::SolidDrawMode>(setObj.drawMode);
+    }
+
+    const bool canCache = !obj.id.empty();
+    ExactSetOpCacheKey cacheKey;
+    ExactSetOpCacheEntry *cachedEntry = nullptr;
+    if (canCache)
+    {
+        auto &cache = exactSetOpCache(scene);
+        cacheKey = makeExactSetOpCacheKey(obj, translation);
+        auto it = cache.entries.find(cacheKey);
+        if (it != cache.entries.end())
+        {
+            if (it->second.empty)
+                return true;
+            auto tris = trianglesFromCachedVertices(it->second.vertices, faceColor, edgeColor);
+            const int savedOverride = bgi::gState.solidColorOverride;
+            bgi::gState.solidColorOverride = colorOverride;
+            bgi::renderSolidTriangles(cam, tris, mode);
+            bgi::gState.solidColorOverride = savedOverride;
+            return true;
+        }
+        cachedEntry = &cache.entries[cacheKey];
+    }
+
+    std::unordered_set<std::string> evalVisiting;
+    auto eval = exactEvalFromNode(scene, obj, translation, evalVisiting);
+    if (eval.state == ExactEvalState::Invalid)
+        return false;
+    if (eval.state == ExactEvalState::Empty)
+    {
+        if (cachedEntry)
+            cachedEntry->empty = true;
+        return true;
+    }
+
+    auto &mf = eval.manifold;
+    const auto mesh = mf.GetMeshGL();
+    if (cachedEntry)
+        cachedEntry->vertices = cachedVerticesFromMesh(mesh);
+    auto tris = trianglesFromMesh(mesh, faceColor, edgeColor);
+    const int savedOverride = bgi::gState.solidColorOverride;
+    bgi::gState.solidColorOverride = colorOverride;
+    bgi::renderSolidTriangles(cam, tris, mode);
+    bgi::gState.solidColorOverride = savedOverride;
+    return true;
+}
+
+void renderNodeRecursive(const bgi::Camera3D &cam,
+                         const bgi::DdsScene &scene,
+                         const bgi::DdsObject &obj,
+                         const glm::vec3 &translation,
+                         int colorOverride,
+                         const bgi::DdsStyle *styleOverride,
+                         std::unordered_set<std::string> &visiting);
+
+std::vector<std::uint8_t> renderNodeToMask(const bgi::Camera3D &cam,
+                                           const bgi::DdsScene &scene,
+                                           const bgi::DdsObject &obj,
+                                           const glm::vec3 &translation,
+                                           const bgi::DdsStyle *styleOverride,
+                                           std::unordered_set<std::string> &visiting)
+{
+    constexpr std::uint8_t kMaskColor = 255;
+    auto &buffer = bgi::activePageBuffer();
+    const auto savedBuffer = buffer;
+    const auto savedPending = bgi::gState.pendingGl;
+    const auto savedLegacy = bgi::gState.legacyGlRender;
+    std::fill(buffer.begin(), buffer.end(), 0);
+    bgi::gState.pendingGl.clear();
+    bgi::gState.legacyGlRender = true;
+
+    renderNodeRecursive(cam, scene, obj, translation, kMaskColor, styleOverride, visiting);
+
+    std::vector<std::uint8_t> mask(buffer.size(), 0);
+    for (std::size_t i = 0; i < buffer.size(); ++i)
+        mask[i] = (buffer[i] == kMaskColor) ? 1u : 0u;
+
+    buffer = savedBuffer;
+    bgi::gState.pendingGl = savedPending;
+    bgi::gState.legacyGlRender = savedLegacy;
+    return mask;
+}
+
+void renderSetOperation(const bgi::Camera3D &cam,
+                         const bgi::DdsScene &scene,
+                         const bgi::DdsObject &obj,
+                         const std::vector<std::string> &operands,
+                         bgi::DdsObjectType opType,
+                         const glm::vec3 &translation,
+                         int colorOverride,
+                         std::unordered_set<std::string> &visiting)
+{
+    if (operands.empty())
+        return;
+
+    if (renderExactSetOperation3D(cam, scene, obj, translation, colorOverride))
+        return;
+
+    std::vector<std::uint8_t> combined;
+    bool haveCombined = false;
+    for (const auto &childId : operands)
+    {
+        auto child = scene.findById(childId);
+        if (!child)
+            continue;
+        auto mask = renderNodeToMask(cam, scene, *child, translation, &obj.style, visiting);
+        if (!haveCombined)
+        {
+            combined = std::move(mask);
+            haveCombined = true;
+            continue;
+        }
+
+        const std::size_t n = std::min(combined.size(), mask.size());
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            switch (opType)
+            {
+            case bgi::DdsObjectType::SetIntersection:
+                combined[i] = static_cast<std::uint8_t>(combined[i] && mask[i]);
+                break;
+            case bgi::DdsObjectType::SetDifference:
+                combined[i] = static_cast<std::uint8_t>(combined[i] && !mask[i]);
+                break;
+            default:
+                combined[i] = static_cast<std::uint8_t>(combined[i] || mask[i]);
+                break;
+            }
+        }
+    }
+
+    if (!haveCombined)
+        return;
+
+    const int drawColor = (colorOverride >= 0) ? colorOverride : obj.style.fillStyle.color;
+    renderMaskOntoActive(combined, static_cast<std::uint8_t>(std::clamp(drawColor, 0, 255)));
+}
+
+void renderNodeRecursive(const bgi::Camera3D &cam,
+                         const bgi::DdsScene &scene,
+                         const bgi::DdsObject &obj,
+                         const glm::vec3 &translation,
+                         int colorOverride,
+                         const bgi::DdsStyle *styleOverride,
+                         std::unordered_set<std::string> &visiting)
+{
+    if (!obj.id.empty())
+    {
+        if (!visiting.insert(obj.id).second)
+            return;
+    }
+
+    switch (obj.type)
+    {
+    case bgi::DdsObjectType::Transform: {
+        const auto &tx = static_cast<const bgi::DdsTransform &>(obj);
+        const glm::vec3 nextTranslation = translation + translationFromMatrix(tx.matrix);
+        for (const auto &childId : tx.children)
+        {
+            auto child = scene.findById(childId);
+            if (child)
+                renderNodeRecursive(cam, scene, *child, nextTranslation, colorOverride, styleOverride, visiting);
+        }
+        break;
+    }
+    case bgi::DdsObjectType::SetUnion:
+        renderSetOperation(cam, scene, obj,
+                           static_cast<const bgi::DdsSetUnion &>(obj).operands,
+                           bgi::DdsObjectType::SetUnion, translation, colorOverride, visiting);
+        break;
+    case bgi::DdsObjectType::SetIntersection:
+        renderSetOperation(cam, scene, obj,
+                           static_cast<const bgi::DdsSetIntersection &>(obj).operands,
+                           bgi::DdsObjectType::SetIntersection, translation, colorOverride, visiting);
+        break;
+    case bgi::DdsObjectType::SetDifference:
+        renderSetOperation(cam, scene, obj,
+                           static_cast<const bgi::DdsSetDifference &>(obj).operands,
+                           bgi::DdsObjectType::SetDifference, translation, colorOverride, visiting);
+        break;
+    default:
+        if (isLeafObject(obj.type))
+            renderTranslatedLeaf(cam, obj, translation, colorOverride, styleOverride);
+        break;
+    }
+
+    if (!obj.id.empty())
+        visiting.erase(obj.id);
+}
+
 } // anonymous namespace
 
 // =============================================================================
@@ -840,12 +1731,15 @@ BGI_API void BGI_CALL wxbgi_render_dds(const char *camName)
     if (sceneIt == bgi::gState.ddsRegistry.end())
         return; // should never happen
 
-    sceneIt->second->forEachDrawing([&](const bgi::DdsObject &obj) {
+    sceneIt->second->forEachRenderRoot([&](const bgi::DdsObject &obj) {
         if (!obj.visible)
             return;
         const bool selected = !selIds.empty() &&
             std::find(selIds.begin(), selIds.end(), obj.id) != selIds.end();
-        renderObject(cam, obj, (selected && flashPhase == 1) ? flashColor : -1);
+        std::unordered_set<std::string> visiting;
+        renderNodeRecursive(cam, *sceneIt->second, obj, glm::vec3(0.f),
+                            (selected && flashPhase == 1) ? flashColor : -1,
+                            nullptr, visiting);
     });
 
     restoreStyle(savedStyle);

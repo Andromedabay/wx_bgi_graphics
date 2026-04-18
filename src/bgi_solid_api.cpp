@@ -43,6 +43,7 @@ BGI_API void BGI_CALL wxbgi_dds_set_solid_draw_mode(int mode)
 {
     const auto dm = static_cast<bgi::SolidDrawMode>(mode);
     std::lock_guard<std::mutex> lock(bgi::gMutex);
+    bgi::gState.solidDrawMode = mode;
     for (const auto &id : bgi::gState.dds->order)
     {
         auto it = bgi::gState.dds->index.find(id);
@@ -59,6 +60,15 @@ BGI_API void BGI_CALL wxbgi_dds_set_solid_draw_mode(int mode)
         case bgi::DdsObjectType::ParamSurface:
         case bgi::DdsObjectType::Extrusion:
             static_cast<bgi::DdsSolid3D *>(it->second.get())->drawMode = dm;
+            break;
+        case bgi::DdsObjectType::SetUnion:
+            static_cast<bgi::DdsSetUnion *>(it->second.get())->drawMode = mode;
+            break;
+        case bgi::DdsObjectType::SetIntersection:
+            static_cast<bgi::DdsSetIntersection *>(it->second.get())->drawMode = mode;
+            break;
+        case bgi::DdsObjectType::SetDifference:
+            static_cast<bgi::DdsSetDifference *>(it->second.get())->drawMode = mode;
             break;
         default:
             break;

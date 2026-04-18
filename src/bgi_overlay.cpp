@@ -700,7 +700,7 @@ void overlayPerformPick(int mx, int my, bool multiSelect)
 
         const float threshold = static_cast<float>(gState.selectionPickRadiusPx);
 
-        gState.dds->forEachDrawing([&](const DdsObject &obj) {
+        gState.dds->forEachRenderRoot([&](const DdsObject &obj) {
             float depth = 0.f;
             const float d = screenDistToObject(cam, viewMat, obj, mx, my, depth);
             if (d <= threshold)

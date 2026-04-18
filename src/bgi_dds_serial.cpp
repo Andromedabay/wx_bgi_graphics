@@ -75,6 +75,10 @@ const char *typeStr(bgi::DdsObjectType t)
         case bgi::DdsObjectType::Camera:          return "Camera";
         case bgi::DdsObjectType::Ucs:             return "Ucs";
         case bgi::DdsObjectType::WorldExtentsObj: return "WorldExtents";
+        case bgi::DdsObjectType::Transform:       return "Transform";
+        case bgi::DdsObjectType::SetUnion:        return "SetUnion";
+        case bgi::DdsObjectType::SetIntersection: return "SetIntersection";
+        case bgi::DdsObjectType::SetDifference:   return "SetDifference";
         case bgi::DdsObjectType::Point:           return "Point";
         case bgi::DdsObjectType::Line:            return "Line";
         case bgi::DdsObjectType::Circle:          return "Circle";
@@ -125,6 +129,28 @@ json vec4ToJ(float a, float b,
 glm::vec3 vec3FromJ(const json &j)
 {
     return {j[0].get<float>(), j[1].get<float>(), j[2].get<float>()};
+}
+
+json mat4ToJ(const glm::mat4 &m)
+{
+    auto out = json::array();
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r)
+            out.push_back(m[c][r]);
+    return out;
+}
+
+glm::mat4 mat4FromJ(const json &j)
+{
+    glm::mat4 out(1.f);
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r)
+        {
+            const int idx = c * 4 + r;
+            if (idx < static_cast<int>(j.size()))
+                out[c][r] = j[idx].get<float>();
+        }
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +405,41 @@ json objectToJ(const bgi::DdsObject &obj)
 
     case bgi::DdsObjectType::WorldExtentsObj:
         return extentsToJ(static_cast<const bgi::DdsWorldExtentsObj&>(obj));
+
+    case bgi::DdsObjectType::Transform: {
+        const auto &o = static_cast<const bgi::DdsTransform &>(obj);
+        j["style"]    = styleToJ(o.style);
+        j["matrix"]   = mat4ToJ(o.matrix);
+        j["children"] = o.children;
+        break;
+    }
+    case bgi::DdsObjectType::SetUnion: {
+        const auto &o = static_cast<const bgi::DdsSetUnion &>(obj);
+        j["style"]    = styleToJ(o.style);
+        j["drawMode"] = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["operands"] = o.operands;
+        break;
+    }
+    case bgi::DdsObjectType::SetIntersection: {
+        const auto &o = static_cast<const bgi::DdsSetIntersection &>(obj);
+        j["style"]    = styleToJ(o.style);
+        j["drawMode"] = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["operands"] = o.operands;
+        break;
+    }
+    case bgi::DdsObjectType::SetDifference: {
+        const auto &o = static_cast<const bgi::DdsSetDifference &>(obj);
+        j["style"]    = styleToJ(o.style);
+        j["drawMode"] = static_cast<int>(o.drawMode);
+        j["edgeColor"] = o.edgeColor;
+        j["faceColor"] = o.faceColor;
+        j["operands"] = o.operands;
+        break;
+    }
 
     case bgi::DdsObjectType::Point: {
         const auto &o = static_cast<const bgi::DdsPoint&>(obj);
@@ -651,6 +712,50 @@ std::shared_ptr<bgi::DdsObject> objectFromJ(const json &j)
     auto getCS  = [&]() { return coordSpaceFromStr(j.value("coordSpace", "BgiPixel")); };
     auto getUcs = [&]() { return j.value("ucsName", std::string{}); };
     auto getSty = [&]() { return j.contains("style") ? styleFromJ(j["style"]) : bgi::DdsStyle{}; };
+
+    if (typeStr == "Transform") {
+        auto o = std::make_shared<bgi::DdsTransform>();
+        o->style = getSty();
+        if (j.contains("matrix") && j["matrix"].is_array())
+            o->matrix = mat4FromJ(j["matrix"]);
+        if (j.contains("children") && j["children"].is_array())
+            for (const auto &child : j["children"])
+                o->children.push_back(child.get<std::string>());
+        return o;
+    }
+    if (typeStr == "SetUnion") {
+        auto o = std::make_shared<bgi::DdsSetUnion>();
+        o->style = getSty();
+        o->drawMode = j.value("drawMode", 1);
+        o->edgeColor = j.value("edgeColor", 15);
+        o->faceColor = j.value("faceColor", 7);
+        if (j.contains("operands") && j["operands"].is_array())
+            for (const auto &child : j["operands"])
+                o->operands.push_back(child.get<std::string>());
+        return o;
+    }
+    if (typeStr == "SetIntersection") {
+        auto o = std::make_shared<bgi::DdsSetIntersection>();
+        o->style = getSty();
+        o->drawMode = j.value("drawMode", 1);
+        o->edgeColor = j.value("edgeColor", 15);
+        o->faceColor = j.value("faceColor", 7);
+        if (j.contains("operands") && j["operands"].is_array())
+            for (const auto &child : j["operands"])
+                o->operands.push_back(child.get<std::string>());
+        return o;
+    }
+    if (typeStr == "SetDifference") {
+        auto o = std::make_shared<bgi::DdsSetDifference>();
+        o->style = getSty();
+        o->drawMode = j.value("drawMode", 1);
+        o->edgeColor = j.value("edgeColor", 15);
+        o->faceColor = j.value("faceColor", 7);
+        if (j.contains("operands") && j["operands"].is_array())
+            for (const auto &child : j["operands"])
+                o->operands.push_back(child.get<std::string>());
+        return o;
+    }
 
     if (typeStr == "Point") {
         auto o = std::make_shared<bgi::DdsPoint>();
@@ -1042,9 +1147,31 @@ YAML::Node vec3ToY(const glm::vec3 &v)
     return n;
 }
 
+YAML::Node mat4ToY(const glm::mat4 &m)
+{
+    YAML::Node n(YAML::NodeType::Sequence);
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r)
+            n.push_back(m[c][r]);
+    return n;
+}
+
 glm::vec3 vec3FromY(const YAML::Node &n)
 {
     return {n[0].as<float>(0.f), n[1].as<float>(0.f), n[2].as<float>(0.f)};
+}
+
+glm::mat4 mat4FromY(const YAML::Node &n)
+{
+    glm::mat4 out(1.f);
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r)
+        {
+            const int idx = c * 4 + r;
+            if (n[idx])
+                out[c][r] = n[idx].as<float>(0.f);
+        }
+    return out;
 }
 
 YAML::Node styleToY(const bgi::DdsStyle &s)
@@ -1157,6 +1284,48 @@ YAML::Node objectToY(const bgi::DdsObject &obj)
         n["hasData"] = we.extents.hasData;
         n["min"]     = vec3ToY({we.extents.minX, we.extents.minY, we.extents.minZ});
         n["max"]     = vec3ToY({we.extents.maxX, we.extents.maxY, we.extents.maxZ});
+        break;
+    }
+    case bgi::DdsObjectType::Transform: {
+        const auto &o = static_cast<const bgi::DdsTransform &>(obj);
+        n["style"]  = styleToY(o.style);
+        n["matrix"] = mat4ToY(o.matrix);
+        YAML::Node children(YAML::NodeType::Sequence);
+        for (const auto &id : o.children) children.push_back(id);
+        n["children"] = children;
+        break;
+    }
+    case bgi::DdsObjectType::SetUnion: {
+        const auto &o = static_cast<const bgi::DdsSetUnion &>(obj);
+        n["style"] = styleToY(o.style);
+        n["drawMode"] = static_cast<int>(o.drawMode);
+        n["edgeColor"] = o.edgeColor;
+        n["faceColor"] = o.faceColor;
+        YAML::Node operands(YAML::NodeType::Sequence);
+        for (const auto &id : o.operands) operands.push_back(id);
+        n["operands"] = operands;
+        break;
+    }
+    case bgi::DdsObjectType::SetIntersection: {
+        const auto &o = static_cast<const bgi::DdsSetIntersection &>(obj);
+        n["style"] = styleToY(o.style);
+        n["drawMode"] = static_cast<int>(o.drawMode);
+        n["edgeColor"] = o.edgeColor;
+        n["faceColor"] = o.faceColor;
+        YAML::Node operands(YAML::NodeType::Sequence);
+        for (const auto &id : o.operands) operands.push_back(id);
+        n["operands"] = operands;
+        break;
+    }
+    case bgi::DdsObjectType::SetDifference: {
+        const auto &o = static_cast<const bgi::DdsSetDifference &>(obj);
+        n["style"] = styleToY(o.style);
+        n["drawMode"] = static_cast<int>(o.drawMode);
+        n["edgeColor"] = o.edgeColor;
+        n["faceColor"] = o.faceColor;
+        YAML::Node operands(YAML::NodeType::Sequence);
+        for (const auto &id : o.operands) operands.push_back(id);
+        n["operands"] = operands;
         break;
     }
     case bgi::DdsObjectType::Point: {
@@ -1515,6 +1684,52 @@ std::shared_ptr<bgi::DdsObject> objectFromY(const YAML::Node &n)
         if (n["min"]) { auto v = vec3FromY(n["min"]); we->extents.minX=v.x; we->extents.minY=v.y; we->extents.minZ=v.z; }
         if (n["max"]) { auto v = vec3FromY(n["max"]); we->extents.maxX=v.x; we->extents.maxY=v.y; we->extents.maxZ=v.z; }
         return std::static_pointer_cast<bgi::DdsObject>(we);
+    }
+    if (type == "Transform") {
+        auto o = std::make_shared<bgi::DdsTransform>();
+        baseLoad(*o);
+        if (n["style"])  o->style = styleFromY(n["style"]);
+        if (n["matrix"] && n["matrix"].IsSequence()) o->matrix = mat4FromY(n["matrix"]);
+        if (n["children"] && n["children"].IsSequence())
+            for (const auto &child : n["children"])
+                o->children.push_back(child.as<std::string>());
+        return std::static_pointer_cast<bgi::DdsObject>(o);
+    }
+    if (type == "SetUnion") {
+        auto o = std::make_shared<bgi::DdsSetUnion>();
+        baseLoad(*o);
+        if (n["style"])  o->style = styleFromY(n["style"]);
+        o->drawMode = n["drawMode"] ? n["drawMode"].as<int>(1) : 1;
+        o->edgeColor = n["edgeColor"] ? n["edgeColor"].as<int>(15) : 15;
+        o->faceColor = n["faceColor"] ? n["faceColor"].as<int>(7) : 7;
+        if (n["operands"] && n["operands"].IsSequence())
+            for (const auto &child : n["operands"])
+                o->operands.push_back(child.as<std::string>());
+        return std::static_pointer_cast<bgi::DdsObject>(o);
+    }
+    if (type == "SetIntersection") {
+        auto o = std::make_shared<bgi::DdsSetIntersection>();
+        baseLoad(*o);
+        if (n["style"])  o->style = styleFromY(n["style"]);
+        o->drawMode = n["drawMode"] ? n["drawMode"].as<int>(1) : 1;
+        o->edgeColor = n["edgeColor"] ? n["edgeColor"].as<int>(15) : 15;
+        o->faceColor = n["faceColor"] ? n["faceColor"].as<int>(7) : 7;
+        if (n["operands"] && n["operands"].IsSequence())
+            for (const auto &child : n["operands"])
+                o->operands.push_back(child.as<std::string>());
+        return std::static_pointer_cast<bgi::DdsObject>(o);
+    }
+    if (type == "SetDifference") {
+        auto o = std::make_shared<bgi::DdsSetDifference>();
+        baseLoad(*o);
+        if (n["style"])  o->style = styleFromY(n["style"]);
+        o->drawMode = n["drawMode"] ? n["drawMode"].as<int>(1) : 1;
+        o->edgeColor = n["edgeColor"] ? n["edgeColor"].as<int>(15) : 15;
+        o->faceColor = n["faceColor"] ? n["faceColor"].as<int>(7) : 7;
+        if (n["operands"] && n["operands"].IsSequence())
+            for (const auto &child : n["operands"])
+                o->operands.push_back(child.as<std::string>());
+        return std::static_pointer_cast<bgi::DdsObject>(o);
     }
 
     // Drawing objects — build a minimal JSON fragment and reuse objectFromJ

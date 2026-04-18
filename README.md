@@ -28,11 +28,12 @@ The download URLs above always point to the newest tagged GitHub Release asset w
 | Document | Contents |
 |----------|----------|
 | **[Building.md](./Building.md)** | Dependencies, compile requirements, CMake flags, build commands for Windows / Linux / macOS, running examples |
-| **[Tests.md](./Tests.md)** | All 26 CTest targets, how to run them, test categories, test seam security policy, CI integration |
+| **[Tests.md](./Tests.md)** | All 28 CTest targets, how to run them, test categories, retained set-operation coverage, test seam security policy, CI integration |
 | **[Tutorial.md](./Tutorial.md)** | BGI double-buffering deep dive: page buffers, `setactivepage`, `swapbuffers`, animation loops |
 | **[WxWidgets.md](./WxWidgets.md)** | wxWidgets embedded canvas guide: `WxBgiCanvas`, standalone wx API, event routing, 3D in wx mode |
 | **[OpenLB-Support.md](./OpenLB-Support.md)** | What OpenLB is, how wx_bgi integrates with it, optional build/staging support, and the live demo workflow |
 | **[DDS.md](./DDS.md)** | Drawing Description Data Structure: scene graph, CHDOP hierarchy, `wxbgi_dds_*` API, JSON/YAML serialization |
+| **[Object-Operation.md](./Object-Operation.md)** | Retained set operations and affine-transform workflow: union, intersection, translate, and composition usage |
 | **[Camera3D_Map.md](./Camera3D_Map.md)** | 3-D camera code map: `Camera3D` struct, GLM math, `wxbgi_cam_*` API |
 | **[Camera2D_Map.md](./Camera2D_Map.md)** | 2-D overhead camera: pan/zoom/rotation, `wxbgi_cam2d_*` API |
 | **[InputsProcessing.md](./InputsProcessing.md)** | Keyboard and mouse event handling, keyboard queue, DOS-style extended keys, input hooks |
@@ -53,6 +54,7 @@ The library now includes classic BGI-style support for:
 - additive 3-D/2-D camera + UCS + world-coordinate helpers via `wxbgi_cam_*`, `wxbgi_cam2d_*`, `wxbgi_ucs_*`, and `wxbgi_world_*`
 - retained-mode scene graph (DDS / DDDS) with JSON and YAML serialisation via `wxbgi_dds_*`
 - **multi-scene CHDOP graph registry**: create and manage named scene graphs; route any camera to any scene; multiple cameras can share one scene (1 scene → many cameras), each camera is assigned to exactly one scene (1 camera → 1 scene) — see [DDS.md §Multi-Scene](./DDS.md#multi-scene-management-chdop-graph-registry)
+- retained DDS composition nodes for **translate**, **union**, **intersection**, and **difference** (`wxbgi_dds_translate`, `wxbgi_dds_union`, `wxbgi_dds_intersection`, `wxbgi_dds_difference`); for supported 3D solids the exact retained backend evaluates **closed Manifold volumes**, then caches the rendered triangle result per scene revision
 - 3D solid primitives (box, sphere, cylinder, cone, torus) with wireframe and filled draw modes via `wxbgi_solid_*`
 - Phong lighting model (key + fill lights, ambient/diffuse/specular) configured via `wxbgi_solid_set_light_*`
 - wxWidgets embedded canvas (`wx_bgi_wx`) with OpenGL 3.3 texture-quad compositing and automatic legacy fallback
@@ -67,6 +69,52 @@ Public API declarations are available in:
 - `src/wx_bgi_dds.h` (Drawing Description Data Structure -- DDS/CHDOP/DDJ/DDY)
 
 See **[DDS.md](./DDS.md)** for a full explanation of the DDS acronyms, the CHDOP object hierarchy, all `wxbgi_dds_*` functions, and usage examples.
+
+## Exact 3D Boolean Backend
+
+Retained DDS **union / intersection / difference** stay on the fast Manifold-based
+path in this library.
+
+- Supported 3D solids are treated as **closed volumes**, not as display-only surface shells.
+- Core primitives (`Box`, `Sphere`, `Cylinder`, `Cone`) are converted to analytic `manifold::Manifold` solids before boolean evaluation.
+- Other supported solids fall back to closed triangle meshes and are then converted into Manifold volumes.
+- The boolean result mesh is cached per DDS scene revision so repeated redraws render efficiently.
+
+## Retained Set-Operations and Affine Translation
+
+Current retained composition status:
+
+- `wxbgi_dds_translate()` is the first public affine helper. It creates a retained `Transform` node backed by a 4x4 matrix, so future rotate / scale / general matrix helpers can share the same node type.
+- `wxbgi_dds_union()`, `wxbgi_dds_intersection()`, and `wxbgi_dds_difference()` create first-class DDS nodes with their own IDs, labels, visibility, serialization, and later reusability as operands.
+- DDS render traversal now treats transform/set-operation children as **owned by their composite node** during replay. Referenced operands are skipped as standalone render roots, so the composed node renders as one entity.
+- `difference` is ordered: operand 0 is the base solid, operands 1..N are subtracted in sequence.
+- In C/C++, copy IDs returned by DDS getter functions immediately before making later DDS API calls; those APIs return borrowed `const char *` buffers.
+
+Minimal C++ usage pattern:
+
+```cpp
+wxbgi_solid_box(0.f, 70.f, 0.f, 20.f, 20.f, 20.f);
+const std::string boxA = wxbgi_dds_get_id_at(wxbgi_dds_object_count() - 1);
+
+wxbgi_solid_box(10.f, 70.f, 0.f, 20.f, 20.f, 20.f);
+const std::string boxB = wxbgi_dds_get_id_at(wxbgi_dds_object_count() - 1);
+
+const std::string movedB = wxbgi_dds_translate(boxB.c_str(), 5.f, 0.f, 0.f);
+const char *ops[2] = { boxA.c_str(), movedB.c_str() };
+const std::string merged = wxbgi_dds_union(2, ops);
+
+wxbgi_dds_set_label(merged.c_str(), "translated-box-union");
+cleardevice();
+wxbgi_render_dds("cam3d");
+```
+
+Current compound-solid screenshots from `examples/cpp/wxbgi_set_operations_demo.cpp`:
+
+![Compound solids shaded mode](images/set-operations-compound-solids-shaded.png)
+
+![Compound solids wireframe mode](images/set-operations-compound-solids-wireframe.png)
+
+See **[Object-Operation.md](./Object-Operation.md)** for the retained-composition workflow and **[DDS.md](./DDS.md)** for the scene-graph design details.
 
 ## Camera Reference
 
@@ -427,7 +475,7 @@ See **[Tests.md — CI Integration](./Tests.md#ci-integration)** for the full CI
 
 This code is Open Source and Free to use with no warranties or claims.
   
-This repository is based on Open-Source Code from 8 different sources:  
+This repository is based on Open-Source Code from 9 different sources:  
     1. Hammad Rauf, rauf.hammad@gmail.com, MIT License  
          - Supervised usage and prompting of: Github Copilot Pro (Claude-Sonnet 4.6), free Trial.  
          - Techniques mentioned at URL [https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html](https://lisyarus.github.io/blog/posts/implementing-a-tiny-cpu-rasterizer-part-5.html).  
@@ -437,9 +485,9 @@ This repository is based on Open-Source Code from 8 different sources:
     5. glm Library, from https://github.com/g-truc/glm, Happy Bunny License (Custom MIT License)  
     6. JSON Library, from citation.APA="Lohmann, N. (2025). JSON for Modern C++ (Version 3.12.0) [Computer software]. https://github.com/nlohmann", MIT License  
     7. YAML Library, from https://github.com/jbeder/yaml-cpp , MIT License  
-    8. wxWidgets, from https://github.com/wxWidgets/wxWidgets, wxWindows Library Licence, Version 3.1  
-
-Depends on C/C++ Template created by Luke of devmindscapetutorilas:
- - [www.onlyfastcode.com](https://www.onlyfastcode.com)
- - [https://devmindscape.com/](https://devmindscape.com/)
- - [https://www.youtube.com/@devmindscapetutorials](https://www.youtube.com/@devmindscapetutorials)
+    8. Manifold Library, from https://github.com/elalish/manifold , Apache 2.0 License
+    9. wxWidgets, from https://github.com/wxWidgets/wxWidgets, wxWindows Library Licence, Version 3.1  
+    10. C/C++ template inspiration from Luke of devmindscapetutorials:
+        - [www.onlyfastcode.com](https://www.onlyfastcode.com)
+        - [https://devmindscape.com/](https://devmindscape.com/)
+        - [https://www.youtube.com/@devmindscapetutorials](https://www.youtube.com/@devmindscapetutorials)

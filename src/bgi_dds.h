@@ -30,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -84,6 +85,12 @@ enum class DdsObjectType
     Camera,
     Ucs,
     WorldExtentsObj,
+
+    // Retained composition objects ────────────────────────────────────────────
+    Transform,
+    SetUnion,
+    SetIntersection,
+    SetDifference,
 
     // Drawing-primitive objects ───────────────────────────────────────────────
     Point,
@@ -175,6 +182,48 @@ public:
     WorldExtents extents;
 
     DdsWorldExtentsObj() { type = DdsObjectType::WorldExtentsObj; }
+};
+
+class DdsTransform : public DdsObject
+{
+public:
+    glm::mat4                matrix{1.f};
+    std::vector<std::string> children;
+
+    DdsTransform() { type = DdsObjectType::Transform; }
+};
+
+class DdsSetUnion : public DdsObject
+{
+public:
+    int                      drawMode{1};
+    int                      edgeColor{15};
+    int                      faceColor{7};
+    std::vector<std::string> operands;
+
+    DdsSetUnion() { type = DdsObjectType::SetUnion; }
+};
+
+class DdsSetIntersection : public DdsObject
+{
+public:
+    int                      drawMode{1};
+    int                      edgeColor{15};
+    int                      faceColor{7};
+    std::vector<std::string> operands;
+
+    DdsSetIntersection() { type = DdsObjectType::SetIntersection; }
+};
+
+class DdsSetDifference : public DdsObject
+{
+public:
+    int                      drawMode{1};
+    int                      edgeColor{15};
+    int                      faceColor{7};
+    std::vector<std::string> operands;
+
+    DdsSetDifference() { type = DdsObjectType::SetDifference; }
 };
 
 // =============================================================================
@@ -551,12 +600,69 @@ public:
         }
     }
 
+    /**
+     * Calls @p fn(DdsObject&) for top-level render roots only.
+     *
+     * Any object referenced as a child/operand of Transform / SetUnion /
+     * SetIntersection / SetDifference is skipped here and is expected to render
+     * through its owning composite node instead of as an independent root.
+     */
+    template <typename Fn>
+    void forEachRenderRoot(Fn &&fn) const
+    {
+        std::unordered_set<std::string> referenced;
+        referenced.reserve(order.size());
+
+        for (const auto &id : order)
+        {
+            auto it = index.find(id);
+            if (it == index.end() || it->second->deleted)
+                continue;
+
+            const auto *children = [&]() -> const std::vector<std::string> * {
+                switch (it->second->type)
+                {
+                case DdsObjectType::Transform:
+                    return &static_cast<const DdsTransform &>(*it->second).children;
+                case DdsObjectType::SetUnion:
+                    return &static_cast<const DdsSetUnion &>(*it->second).operands;
+                case DdsObjectType::SetIntersection:
+                    return &static_cast<const DdsSetIntersection &>(*it->second).operands;
+                case DdsObjectType::SetDifference:
+                    return &static_cast<const DdsSetDifference &>(*it->second).operands;
+                default:
+                    return nullptr;
+                }
+            }();
+
+            if (!children)
+                continue;
+            for (const auto &childId : *children)
+                referenced.insert(childId);
+        }
+
+        for (const auto &id : order)
+        {
+            auto it = index.find(id);
+            if (it == index.end() || it->second->deleted)
+                continue;
+            const auto t = it->second->type;
+            if (t == DdsObjectType::Camera || t == DdsObjectType::Ucs ||
+                t == DdsObjectType::WorldExtentsObj)
+                continue;
+            if (referenced.find(id) != referenced.end())
+                continue;
+            fn(*it->second);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Data members (public for direct access by bgi_state.cpp only)
     // -------------------------------------------------------------------------
     std::vector<std::string>                                    order;
     std::unordered_map<std::string, std::shared_ptr<DdsObject>> index;
     uint64_t                                                    nextId{1};
+    uint64_t                                                    revision{1};
 
 private:
     std::string genId() { return std::to_string(nextId++); }

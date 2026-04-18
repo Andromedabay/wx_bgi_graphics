@@ -60,6 +60,13 @@ Key design choices:
 | `wxbgi_dds_remove(id)` | Remove one object by ID. |
 | `wxbgi_dds_clear()` | Remove all drawing objects; keeps cameras and UCS frames. |
 | `wxbgi_dds_clear_all()` | Remove every object including cameras and UCS frames. |
+| `wxbgi_dds_translate(id, dx, dy, dz)` | Create a retained Transform node that references `id` and replays it with a translation offset. |
+| `wxbgi_dds_union(count, ids)` | Create a retained SetUnion node over existing DDS object IDs. |
+| `wxbgi_dds_intersection(count, ids)` | Create a retained SetIntersection node over existing DDS object IDs. |
+| `wxbgi_dds_difference(count, ids)` | Create a retained ordered SetDifference node over existing DDS object IDs. |
+| `wxbgi_object_set_face_color(id, color)` | Update the face colour of an existing 3D solid DDS object or retained set-operation node. |
+| `wxbgi_dds_get_child_count(id)` | Number of direct child IDs referenced by a Transform / SetUnion / SetIntersection / SetDifference node. |
+| `wxbgi_dds_get_child_at(id, index)` | Return one direct child ID from a retained composition node. |
 
 ### Retained-Mode Rendering
 
@@ -119,6 +126,82 @@ The following constants identify the concrete CHDOP sub-type of each DDS entry:
 | `WXBGI_DDS_HEIGHTMAP` | 23 | `wxbgi_surface_heightmap` (surface) |
 | `WXBGI_DDS_PARAM_SURFACE` | 24 | `wxbgi_surface_parametric` (surface) |
 | `WXBGI_DDS_EXTRUSION` | 25 | `wxbgi_extrude_polygon` (extrusion) |
+| `WXBGI_DDS_TRANSFORM` | 26 | Retained affine-transform wrapper (translation is implemented first) |
+| `WXBGI_DDS_SET_UNION` | 27 | Retained set-operation node performing a union over referenced DDS objects |
+| `WXBGI_DDS_SET_INTERSECTION` | 28 | Retained set-operation node performing an intersection over referenced DDS objects |
+| `WXBGI_DDS_SET_DIFFERENCE` | 29 | Retained set-operation node performing ordered subtraction over referenced DDS objects |
+
+## Retained Composition Nodes
+
+The DDS/CHDOP graph now supports a small retained composition layer on top of
+leaf primitives:
+
+- **Transform** nodes reference one or more child IDs and carry a 4x4 affine
+  matrix. The first public helper is `wxbgi_dds_translate(...)`.
+- **SetUnion**, **SetIntersection**, and **SetDifference** nodes reference
+  existing DDS object IDs and render them as a single composed result.
+- **SetDifference** is ordered: operand 0 is the base, operands 1..N are
+  subtracted from it in sequence.
+- For supported 3D solid DDS leaves (`Box`, `Sphere`, `Cylinder`, `Cone`,
+  `Torus`, `HeightMap`, `ParamSurface`, `Extrusion`), retained **union**,
+  **intersection**, and **difference** are currently evaluated via the exact
+  Manifold-based boolean path before rendering.
+
+These nodes are first-class DDS entries: they have their own IDs, participate in
+JSON/YAML serialisation, can be hidden or labelled, and can themselves be
+referenced by later composition nodes.
+
+The exact retained boolean backend stays on Manifold in this library. Supported
+3D solids are converted into closed volumes before boolean evaluation, and the
+resulting mesh is cached per DDS scene revision for efficient redraws.
+
+### Current status
+
+- Public affine helper today: **translate** via `wxbgi_dds_translate(...)`
+- Public retained set operations today: **union**, **intersection**, **difference**
+- Render ownership is enforced by DDS traversal: an object referenced by a `Transform`, `SetUnion`, `SetIntersection`, or `SetDifference` is skipped as a standalone render root and is expected to appear through its owning composed node
+- Supported 3D solids use the exact Manifold boolean path; unsupported analytic cases fall back to closed triangle meshes before boolean evaluation
+- `wxbgi_dds_set_solid_draw_mode(...)` propagates draw-mode changes to both leaf solids and retained set-operation nodes
+
+### High-level implementation design
+
+1. Leaf primitives are stored in `DdsScene::index` / `order` like any other DDS object.
+2. `Transform` and `Set*` nodes store only referenced child IDs plus node-local state (style, matrix, draw mode, labels, visibility).
+3. `DdsScene::forEachRenderRoot()` computes which IDs are referenced by composition nodes and suppresses those IDs as top-level roots during `wxbgi_render_dds(...)`.
+4. `renderNodeRecursive(...)` traverses from each render root. Leaf objects render directly; transform nodes update the translation; set-operation nodes evaluate or mask-combine their operands.
+5. For supported 3D solids, `renderExactSetOperation3D(...)` evaluates a closed-volume Manifold result, caches the generated triangles per DDS scene revision, and replays that cached mesh on later frames.
+
+### Safe usage note for DDS IDs
+
+Getter functions such as `wxbgi_dds_get_id_at(...)` return borrowed `const char *`
+buffers. In C++ code, copy them immediately:
+
+```cpp
+const std::string id = wxbgi_dds_get_id_at(wxbgi_dds_object_count() - 1);
+```
+
+That avoids later DDS API calls overwriting the buffer before you build a
+transform or set-operation node.
+
+### Retained composition example
+
+```cpp
+wxbgi_solid_sphere(38.f, 95.f, 0.f, 12.f, sphSl, sphSt);
+const std::string sphereId = wxbgi_dds_get_id_at(wxbgi_dds_object_count() - 1);
+
+wxbgi_solid_torus(42.f, 95.f, 2.f, 10.f, 4.5f, torTu, torSi);
+const std::string torusId = wxbgi_dds_get_id_at(wxbgi_dds_object_count() - 1);
+
+const char *ops[2] = { sphereId.c_str(), torusId.c_str() };
+const std::string diffId = wxbgi_dds_difference(2, ops);
+wxbgi_dds_set_label(diffId.c_str(), "sphere-torus-diff");
+```
+
+### Compound-solid reference images
+
+![Compound solids shaded mode](images/set-operations-compound-solids-shaded.png)
+
+![Compound solids wireframe mode](images/set-operations-compound-solids-wireframe.png)
 
 ---
 

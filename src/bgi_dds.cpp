@@ -19,6 +19,7 @@ std::shared_ptr<DdsObject> DdsScene::appendWithId(std::shared_ptr<DdsObject> obj
     // Caller has already set obj->id; just insert.
     order.push_back(obj->id);
     index[obj->id] = obj;
+    ++revision;
     // Keep nextId ahead of any restored numeric id.
     try
     {
@@ -39,6 +40,7 @@ std::shared_ptr<DdsObject> DdsScene::append(std::shared_ptr<DdsObject> obj)
     obj->id = genId();
     order.push_back(obj->id);
     index[obj->id] = obj;
+    ++revision;
     return obj;
 }
 
@@ -91,6 +93,7 @@ bool DdsScene::remove(const std::string &id)
     if (it == index.end())
         return false;
     it->second->deleted = true;
+    ++revision;
     return true;
 }
 
@@ -115,6 +118,7 @@ void DdsScene::clearDrawingObjects()
         }
     }
     compact();
+    ++revision;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +130,7 @@ void DdsScene::clearAll()
     order.clear();
     index.clear();
     nextId = 1;
+    ++revision;
 }
 
 // ---------------------------------------------------------------------------

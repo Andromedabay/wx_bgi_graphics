@@ -160,6 +160,25 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yaml-cpp)
 
+message(STATUS "Fetching Manifold...")
+
+set(MANIFOLD_CROSS_SECTION ON CACHE BOOL "" FORCE)
+set(MANIFOLD_TEST OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_PYBIND OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_CBIND OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_JSBIND OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_PAR OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_DOWNLOADS ON CACHE BOOL "" FORCE)
+set(MANIFOLD_STRICT OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    manifold
+    GIT_REPOSITORY https://github.com/elalish/manifold.git
+    GIT_TAG        v3.4.1
+    GIT_SHALLOW    ON
+)
+FetchContent_MakeAvailable(manifold)
+
 # ---------------------------------------------------------------------------
 # wxWidgets — unified interface target `wx_bgi_wx_iface`
 #
@@ -283,7 +302,7 @@ add_library(wx_bgi_opengl SHARED ${SRCS})
 
 target_include_directories(wx_bgi_opengl PUBLIC src)
 target_compile_definitions(wx_bgi_opengl PRIVATE GLEW_STATIC)
-target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp)
+target_link_libraries(wx_bgi_opengl PRIVATE GLEW::GLEW glfw OpenGL::GL glm::glm nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp manifold)
 
 if(WXBGI_ENABLE_WX)
     target_link_libraries(wx_bgi_opengl PRIVATE wx_bgi_wx_iface)
@@ -410,6 +429,15 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:wx_bgi_opengl>
             $<TARGET_FILE_DIR:test_dds_cam3d_persp>
+)
+
+add_executable(test_dds_csg examples/cpp/test_dds_csg.cpp)
+target_link_libraries(test_dds_csg PRIVATE wx_bgi_opengl)
+add_custom_command(
+    TARGET test_dds_csg POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:wx_bgi_opengl>
+            $<TARGET_FILE_DIR:test_dds_csg>
 )
 
 add_executable(test_multi_scene examples/cpp/test_multi_scene.cpp)
@@ -638,6 +666,8 @@ if(BUILD_TESTING)
         set_tests_properties(test_field_vis PROPERTIES TIMEOUT 20)
         add_test(NAME wxbgi_openlb_live_demo COMMAND $<TARGET_FILE:wxbgi_openlb_live_demo> --test)
         set_tests_properties(wxbgi_openlb_live_demo PROPERTIES TIMEOUT 20)
+        add_test(NAME wxbgi_set_operations_demo_cpp COMMAND $<TARGET_FILE:wxbgi_set_operations_demo_cpp> --test)
+        set_tests_properties(wxbgi_set_operations_demo_cpp PROPERTIES TIMEOUT 20)
     endif()
 
     add_test(NAME test_dds_serialize     COMMAND $<TARGET_FILE:test_dds_serialize>)
@@ -654,6 +684,9 @@ if(BUILD_TESTING)
 
     add_test(NAME test_dds_cam3d_persp   COMMAND $<TARGET_FILE:test_dds_cam3d_persp>)
     set_tests_properties(test_dds_cam3d_persp   PROPERTIES TIMEOUT 20)
+
+    add_test(NAME test_dds_csg           COMMAND $<TARGET_FILE:test_dds_csg>)
+    set_tests_properties(test_dds_csg           PROPERTIES TIMEOUT 20)
 
     add_test(NAME test_multi_scene       COMMAND $<TARGET_FILE:test_multi_scene>)
     set_tests_properties(test_multi_scene       PROPERTIES TIMEOUT 20)
@@ -1194,6 +1227,30 @@ if(WXBGI_ENABLE_WX)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_FILE:wx_bgi_opengl>
                 $<TARGET_FILE_DIR:wxbgi_camera_demo_cpp>
+    )
+
+    # set operations demo — proper wxApp with 1 WxBgiCanvas panels,
+    # rendering one named camera into the same "scene_3d" DDS scene graph.
+    if(WIN32)
+        add_executable(wxbgi_set_operations_demo_cpp WIN32
+            examples/cpp/wxbgi_set_operations_demo.cpp
+            main.exe.manifest
+            resources.rc
+        )
+    elseif(APPLE)
+        add_executable(wxbgi_set_operations_demo_cpp MACOSX_BUNDLE
+            examples/cpp/wxbgi_set_operations_demo.cpp)
+        set_target_properties(wxbgi_set_operations_demo_cpp PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Info.plist)
+    else()
+        add_executable(wxbgi_set_operations_demo_cpp examples/cpp/wxbgi_set_operations_demo.cpp)
+    endif()
+    target_link_libraries(wxbgi_set_operations_demo_cpp PRIVATE wx_bgi_wx)
+    add_custom_command(
+        TARGET wxbgi_set_operations_demo_cpp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:wx_bgi_opengl>
+                $<TARGET_FILE_DIR:wxbgi_set_operations_demo_cpp>
     )
 
     if(WXBGI_ENABLE_OPENLB)

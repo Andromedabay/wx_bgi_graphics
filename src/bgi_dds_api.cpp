@@ -32,6 +32,10 @@ static int typeToInt(bgi::DdsObjectType t)
         case bgi::DdsObjectType::Camera:          return WXBGI_DDS_CAMERA;
         case bgi::DdsObjectType::Ucs:             return WXBGI_DDS_UCS;
         case bgi::DdsObjectType::WorldExtentsObj: return WXBGI_DDS_WORLD_EXTENTS;
+        case bgi::DdsObjectType::Transform:       return WXBGI_DDS_TRANSFORM;
+        case bgi::DdsObjectType::SetUnion:        return WXBGI_DDS_SET_UNION;
+        case bgi::DdsObjectType::SetIntersection: return WXBGI_DDS_SET_INTERSECTION;
+        case bgi::DdsObjectType::SetDifference:   return WXBGI_DDS_SET_DIFFERENCE;
         case bgi::DdsObjectType::Point:           return WXBGI_DDS_POINT;
         case bgi::DdsObjectType::Line:            return WXBGI_DDS_LINE;
         case bgi::DdsObjectType::Circle:          return WXBGI_DDS_CIRCLE;
@@ -66,7 +70,11 @@ static int coordSpaceToInt(const bgi::DdsObject &obj)
     const auto t = obj.type;
     if (t == bgi::DdsObjectType::Camera ||
         t == bgi::DdsObjectType::Ucs    ||
-        t == bgi::DdsObjectType::WorldExtentsObj)
+        t == bgi::DdsObjectType::WorldExtentsObj ||
+        t == bgi::DdsObjectType::Transform ||
+        t == bgi::DdsObjectType::SetUnion ||
+        t == bgi::DdsObjectType::SetIntersection ||
+        t == bgi::DdsObjectType::SetDifference)
         return -1;
 
     // All drawing primitives store coordSpace as their second data member.
@@ -110,6 +118,89 @@ static int coordSpaceToInt(const bgi::DdsObject &obj)
         case bgi::CoordSpace::UcsLocal: return WXBGI_COORD_UCS_LOCAL;
         default:                        return WXBGI_COORD_BGI_PIXEL;
     }
+}
+
+const std::vector<std::string> *childIds(const bgi::DdsObject &obj)
+{
+    switch (obj.type)
+    {
+        case bgi::DdsObjectType::Transform:
+            return &static_cast<const bgi::DdsTransform &>(obj).children;
+        case bgi::DdsObjectType::SetUnion:
+            return &static_cast<const bgi::DdsSetUnion &>(obj).operands;
+        case bgi::DdsObjectType::SetIntersection:
+            return &static_cast<const bgi::DdsSetIntersection &>(obj).operands;
+        case bgi::DdsObjectType::SetDifference:
+            return &static_cast<const bgi::DdsSetDifference &>(obj).operands;
+        default:
+            return nullptr;
+    }
+}
+
+bool setFaceColor(bgi::DdsObject &obj, int color)
+{
+    switch (obj.type)
+    {
+        case bgi::DdsObjectType::Box:
+        case bgi::DdsObjectType::Sphere:
+        case bgi::DdsObjectType::Cylinder:
+        case bgi::DdsObjectType::Cone:
+        case bgi::DdsObjectType::Torus:
+        case bgi::DdsObjectType::HeightMap:
+        case bgi::DdsObjectType::ParamSurface:
+        case bgi::DdsObjectType::Extrusion:
+            static_cast<bgi::DdsSolid3D &>(obj).faceColor = color;
+            obj.style.fillStyle.color = color;
+            return true;
+        case bgi::DdsObjectType::SetUnion:
+            static_cast<bgi::DdsSetUnion &>(obj).faceColor = color;
+            obj.style.fillStyle.color = color;
+            return true;
+        case bgi::DdsObjectType::SetIntersection:
+            static_cast<bgi::DdsSetIntersection &>(obj).faceColor = color;
+            obj.style.fillStyle.color = color;
+            return true;
+        case bgi::DdsObjectType::SetDifference:
+            static_cast<bgi::DdsSetDifference &>(obj).faceColor = color;
+            obj.style.fillStyle.color = color;
+            return true;
+        default:
+            return false;
+    }
+}
+
+template <typename TSetOp>
+const char *createSetOp(int count, const char *const *ids)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (count < 1 || ids == nullptr)
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = std::make_shared<TSetOp>();
+    for (int i = 0; i < count; ++i)
+    {
+        if (ids[i] == nullptr || ids[i][0] == '\0')
+            continue;
+        if (bgi::gState.dds->findById(ids[i]))
+            obj->operands.emplace_back(ids[i]);
+    }
+    if (obj->operands.empty())
+        return result.c_str();
+
+    obj->style.color = bgi::gState.currentColor;
+    obj->style.bkColor = bgi::gState.bkColor;
+    obj->style.fillStyle = {bgi::gState.fillPattern, bgi::gState.fillColor};
+    obj->style.lineStyle = bgi::gState.lineSettings;
+    obj->style.textStyle = bgi::gState.textSettings;
+    obj->style.writeMode = bgi::gState.writeMode;
+    obj->drawMode = bgi::gState.solidDrawMode;
+    obj->edgeColor = bgi::gState.solidEdgeColor;
+    obj->faceColor = bgi::gState.solidFaceColor;
+    result = bgi::gState.dds->append(obj)->id;
+    return result.c_str();
 }
 
 } // anonymous namespace
@@ -242,6 +333,18 @@ BGI_API int BGI_CALL wxbgi_dds_get_visible(const char *id)
     return (obj && obj->visible) ? 1 : 0;
 }
 
+BGI_API int BGI_CALL wxbgi_object_set_face_color(const char *id, int color)
+{
+    if (id == nullptr || id[0] == '\0')
+        return 0;
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    if (!obj || obj->deleted)
+        return 0;
+    return setFaceColor(*obj, color) ? 1 : 0;
+}
+
 // =============================================================================
 // wxbgi_dds_remove
 // =============================================================================
@@ -325,6 +428,80 @@ BGI_API void BGI_CALL wxbgi_dds_clear_all(void)
         bgi::gState.dds->append(du);
         bgi::gState.ucsSystems["world"] = du;
     }
+}
+
+// =============================================================================
+// Retained composition helpers
+// =============================================================================
+
+BGI_API const char *BGI_CALL wxbgi_dds_translate(const char *id, float dx, float dy, float dz)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (id == nullptr || id[0] == '\0')
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    if (!bgi::gState.dds->findById(id))
+        return result.c_str();
+
+    auto obj = std::make_shared<bgi::DdsTransform>();
+    obj->children.push_back(id);
+    obj->matrix[3][0] = dx;
+    obj->matrix[3][1] = dy;
+    obj->matrix[3][2] = dz;
+    obj->style.color = bgi::gState.currentColor;
+    obj->style.bkColor = bgi::gState.bkColor;
+    obj->style.fillStyle = {bgi::gState.fillPattern, bgi::gState.fillColor};
+    obj->style.lineStyle = bgi::gState.lineSettings;
+    obj->style.textStyle = bgi::gState.textSettings;
+    obj->style.writeMode = bgi::gState.writeMode;
+    result = bgi::gState.dds->append(obj)->id;
+    return result.c_str();
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_union(int count, const char *const *ids)
+{
+    return createSetOp<bgi::DdsSetUnion>(count, ids);
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_intersection(int count, const char *const *ids)
+{
+    return createSetOp<bgi::DdsSetIntersection>(count, ids);
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_difference(int count, const char *const *ids)
+{
+    return createSetOp<bgi::DdsSetDifference>(count, ids);
+}
+
+BGI_API int BGI_CALL wxbgi_dds_get_child_count(const char *id)
+{
+    if (id == nullptr || id[0] == '\0')
+        return 0;
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    const auto *children = obj ? childIds(*obj) : nullptr;
+    return children ? static_cast<int>(children->size()) : 0;
+}
+
+BGI_API const char *BGI_CALL wxbgi_dds_get_child_at(const char *id, int index)
+{
+    static thread_local std::string result;
+    result.clear();
+
+    if (id == nullptr || id[0] == '\0' || index < 0)
+        return result.c_str();
+
+    std::lock_guard<std::mutex> lock(bgi::gMutex);
+    auto obj = bgi::gState.dds->findById(id);
+    const auto *children = obj ? childIds(*obj) : nullptr;
+    if (!children || index >= static_cast<int>(children->size()))
+        return result.c_str();
+    result = (*children)[static_cast<std::size_t>(index)];
+    return result.c_str();
 }
 
 // =============================================================================
