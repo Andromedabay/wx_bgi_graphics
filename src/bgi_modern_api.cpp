@@ -102,6 +102,7 @@ BGI_API int BGI_CALL wxbgi_poll_events(void)
         else
         {
             glfwPollEvents();
+            bgi::syncGlfwWindowSize();
             bgi::gState.lastResult = bgi::grOk;
             return 0;
         }

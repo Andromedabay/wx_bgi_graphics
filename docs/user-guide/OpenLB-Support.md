@@ -48,7 +48,7 @@ for live rendering of:
 - vector arrows
 - legends and HUD overlays
 
-### 2. Header-only live-loop wrappers and bridge entry points
+### 2. Header-only live-loop wrappers, bridge entry points, and materialization helpers
 
 Declared in `src/wx_bgi_openlb.h`:
 
@@ -57,6 +57,8 @@ Declared in `src/wx_bgi_openlb.h`:
 - `wxbgi_openlb_present()`
 - `wxbgi_openlb_classify_point_material(...)`
 - `wxbgi_openlb_sample_materials_2d(...)`
+- `wxbgi_openlb_materialize_super_geometry_2d(...)` *(C++ helper template)*
+- `wxbgi_openlb_materialize_super_geometry_3d(...)` *(C++ helper template)*
 
 These wrappers support an **OpenLB-style non-blocking main loop** where the
 simulation remains in charge and `wx_bgi` only handles rendering and event
@@ -72,12 +74,21 @@ The two material-query functions form the current DDS-to-OpenLB bridge MVP:
 The bridge reads generic DDS metadata from `externalAttributes` rather than
 hard-coding OpenLB-only fields into the core DDS type.
 
+The C++ helper templates `wxbgi_openlb_materialize_super_geometry_2d(...)` and
+`wxbgi_openlb_materialize_super_geometry_3d(...)` keep OpenLB-specific types out
+of the stable C ABI while still letting OpenLB-side code stamp DDS-authored
+materials directly onto OpenLB `SuperGeometry<T,2>` and `SuperGeometry<T,3>`
+instances.
+
 ### 3. Interactive demos
 
 The repository now includes:
 
 - `examples/cpp/wxbgi_openlb_live_demo.cpp`
 - `examples/cpp/wxbgi_openlb_material_preview_demo.cpp`
+- `examples/cpp/wxbgi_openlb_coupled_smoke.cpp`
+- `examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp`
+- `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh`
 
 `wxbgi_openlb_live_demo.cpp` uses a mock live field, but it demonstrates the
 intended integration pattern for a real OpenLB solver:
@@ -103,6 +114,31 @@ workflow:
 3. render the exact retained 3D scene through a perspective camera
 4. sample a 2D material grid and preview it with `wxbgi_field_draw_scalar_grid`
 
+`wxbgi_openlb_coupled_smoke.cpp` demonstrates the fully coupled 2D Linux path:
+
+1. author a retained DDS obstacle and tag it with `openlb.material=5`
+2. materialize that DDS obstacle onto an OpenLB `SuperGeometry<T,2>`
+3. run a compact OpenLB channel-flow solve
+4. render live velocity magnitude and vector arrows with `wxbgi_field_*`
+
+`examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp` demonstrates a fully
+coupled 3D DDS/OpenLB duct case:
+
+1. author a retained rectangular pipe scene with a perforated sieve inlet plate
+2. materialize the DDS sieve geometry onto an OpenLB `SuperGeometry<T,3>`
+3. run a compact 3D duct-flow solve with an outlet and one side vent
+4. render a longitudinal velocity slice while a second panel shows a 360-degree
+   orbit view of the DDS geometry
+5. switch the geometry panel between `--wireframe`, `--flat`, and `--smooth`
+   from the keyboard with `1`, `2`, and `3`
+6. keep the demo running until the user presses `Esc` or closes the window
+
+`examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh` bootstraps the same demo
+on Debian, Ubuntu, and Debian/Ubuntu-based WSL2 environments. It can install
+the needed packages, clone the latest public OpenLB release tree into `/tmp`,
+configure a temporary OpenLB-enabled build, and then run either the interactive
+demo or the demo's short `--test` mode.
+
 ### 4. Optional build and staging support
 
 OpenLB support is **opt-in**:
@@ -112,15 +148,38 @@ WXBGI_ENABLE_OPENLB=ON
 OPENLB_ROOT=<path to local OpenLB release tree>
 ```
 
+For the latest public OpenLB version, clone the public GitLab release tree and
+point `OPENLB_ROOT` at that checkout:
+
+```bash
+git clone https://gitlab.com/openlb/release.git openlb-release
+cmake -S . -B build_openlb \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DWXBGI_ENABLE_OPENLB=ON \
+  -DOPENLB_ROOT=/path/to/openlb-release
+```
+
 When enabled, the build adds:
 
 - OpenLB option validation (`OPENLB_ROOT\src\olb.h` must exist)
 - `openlb_bridge_package` target
-- an optional OpenLB-coupled smoke target for local validation
+- optional OpenLB-coupled demo targets for local validation
 
 That staging target collects the current shared library, headers, and demo into
 `build/openlb_bridge` so they can be referenced from an OpenLB checkout or demo
 workflow.
+
+For the one-command Linux bootstrap path, run:
+
+```bash
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh
+```
+
+For a short build-and-smoke-check instead of the indefinite interactive run:
+
+```bash
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --test
+```
 
 ---
 
@@ -182,17 +241,38 @@ Use `wx_bgi` as the interactive visualization frontend:
 
 1. author retained solver geometry in DDS
 2. tag solids and set-operation nodes with `openlb.*` metadata
-3. classify lattice cell centres from DDS using the bridge helpers
+3. materialize lattice cells from DDS using
+   `wxbgi_openlb_materialize_super_geometry_2d(...)` or
+   `wxbgi_openlb_materialize_super_geometry_3d(...)`
 4. advance OpenLB in your own control loop
 5. publish reduced scalar/vector data for display
 6. draw using the `wxbgi_field_*` helpers
 7. keep the GUI responsive with `wxbgi_openlb_pump()` / `wxbgi_openlb_present()`
+
+If you only need offline classification rather than direct `SuperGeometry`
+materialization, the lower-level C bridge functions
+`wxbgi_openlb_classify_point_material(...)` and
+`wxbgi_openlb_sample_materials_2d(...)` remain available.
 
 This matches the current wx rendering model well:
 
 - rendering stays on the GUI side
 - the simulation loop stays under user control
 - no blocking `wxIMPLEMENT_APP`-managed application loop is required
+
+## Linux status
+
+The latest public OpenLB GitLab release tree now builds successfully with the
+OpenLB-facing helper layer and the real coupled smoke demo on Linux in this
+repository.
+
+Focused validation currently covers:
+
+- `test_dds_external_attrs`
+- `test_openlb_bridge_materialize_2d`
+- `wxbgi_openlb_material_preview_demo`
+- `wxbgi_openlb_coupled_smoke`
+- `wxbgi_openlb_pipe_3d_demo`
 
 ## Windows / MSVC status
 
@@ -223,8 +303,8 @@ Observed results so far:
 Practical consequence:
 
 - DDS metadata, bridge helpers, and the DDS-side preview demo work on Windows
-- the real OpenLB-coupled smoke build is currently blocked on upstream/toolchain
-  compatibility
+- the real OpenLB-coupled smoke build is still blocked on upstream/toolchain
+  compatibility under native MSVC
 - for full coupled validation today, prefer a Linux, macOS, or WSL-based OpenLB
   toolchain
 

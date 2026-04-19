@@ -193,6 +193,15 @@ namespace bgi
         gState.viewport = {0, 0, gState.width - 1, gState.height - 1, false};
         gState.currentX = 0;
         gState.currentY = 0;
+
+        auto defaultCamIt = gState.cameras.find("default");
+        if (defaultCamIt != gState.cameras.end())
+        {
+            defaultCamIt->second->camera.orthoLeft = 0.f;
+            defaultCamIt->second->camera.orthoRight = static_cast<float>(gState.width);
+            defaultCamIt->second->camera.orthoBottom = static_cast<float>(gState.height);
+            defaultCamIt->second->camera.orthoTop = 0.f;
+        }
     }
 
     std::vector<std::uint8_t> &activePageBuffer()

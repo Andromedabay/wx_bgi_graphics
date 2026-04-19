@@ -380,27 +380,60 @@ if(WXBGI_ENABLE_WX)
     )
 
     if(WXBGI_ENABLE_OPENLB)
-        add_library(openlb_headers INTERFACE)
-        target_include_directories(openlb_headers INTERFACE
+        set(OPENLB_VERSION_STRING "")
+        execute_process(
+            COMMAND git -C "${OPENLB_ROOT}" describe --always --dirty --tags
+            OUTPUT_VARIABLE OPENLB_VERSION_STRING
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(OPENLB_VERSION_STRING STREQUAL "")
+            get_filename_component(OPENLB_VERSION_STRING "${OPENLB_ROOT}" NAME)
+        endif()
+
+        find_package(Threads REQUIRED)
+        find_package(ZLIB REQUIRED)
+
+        add_library(openlb_support STATIC
+            ${OPENLB_ROOT}/src/core/expr.cpp
+            ${OPENLB_ROOT}/src/core/olbInit.cpp
+            ${OPENLB_ROOT}/src/io/ostreamManager.cpp
+            ${OPENLB_ROOT}/src/communication/mpiManager.cpp
+            ${OPENLB_ROOT}/external/tinyxml2/tinyxml2.cpp
+        )
+        target_include_directories(openlb_support PUBLIC
             ${OPENLB_ROOT}/src
             ${OPENLB_ROOT}/external/tinyxml
             ${OPENLB_ROOT}/external/tinyxml2
         )
-        target_compile_definitions(openlb_headers INTERFACE PLATFORM_CPU_SISD=1)
+        target_compile_definitions(openlb_support PUBLIC
+            PLATFORM_CPU_SISD=1
+            OLB_VERSION="${OPENLB_VERSION_STRING}"
+        )
+        target_link_libraries(openlb_support PUBLIC ZLIB::ZLIB Threads::Threads)
         if(MSVC)
-            target_compile_options(openlb_headers INTERFACE
+            target_compile_options(openlb_support PUBLIC
                 /Zc:__cplusplus
                 /FI"${CMAKE_SOURCE_DIR}/src/openlb_msvc_compat.h"
             )
         endif()
 
         add_executable(wxbgi_openlb_coupled_smoke examples/cpp/wxbgi_openlb_coupled_smoke.cpp)
-        target_link_libraries(wxbgi_openlb_coupled_smoke PRIVATE wx_bgi_opengl openlb_headers)
+        target_link_libraries(wxbgi_openlb_coupled_smoke PRIVATE wx_bgi_opengl openlb_support)
         add_custom_command(
             TARGET wxbgi_openlb_coupled_smoke POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     $<TARGET_FILE:wx_bgi_opengl>
                     $<TARGET_FILE_DIR:wxbgi_openlb_coupled_smoke>
+        )
+
+        add_executable(wxbgi_openlb_pipe_3d_demo examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp)
+        target_link_libraries(wxbgi_openlb_pipe_3d_demo PRIVATE wx_bgi_opengl openlb_support)
+        add_custom_command(
+            TARGET wxbgi_openlb_pipe_3d_demo POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    $<TARGET_FILE_DIR:wxbgi_openlb_pipe_3d_demo>
         )
     endif()
 endif()
@@ -726,6 +759,8 @@ if(BUILD_TESTING)
         if(WXBGI_ENABLE_OPENLB)
             add_test(NAME wxbgi_openlb_coupled_smoke COMMAND $<TARGET_FILE:wxbgi_openlb_coupled_smoke> --test)
             set_tests_properties(wxbgi_openlb_coupled_smoke PROPERTIES TIMEOUT 20)
+            add_test(NAME wxbgi_openlb_pipe_3d_demo COMMAND $<TARGET_FILE:wxbgi_openlb_pipe_3d_demo> --test)
+            set_tests_properties(wxbgi_openlb_pipe_3d_demo PROPERTIES TIMEOUT 30)
         endif()
         add_test(NAME wxbgi_set_operations_demo_cpp COMMAND $<TARGET_FILE:wxbgi_set_operations_demo_cpp> --test)
         set_tests_properties(wxbgi_set_operations_demo_cpp PROPERTIES TIMEOUT 20)
@@ -1347,6 +1382,7 @@ if(WXBGI_ENABLE_WX)
     if(WXBGI_ENABLE_OPENLB)
         add_custom_target(openlb_bridge_package
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/openlb_bridge
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/openlb_bridge/openlb-demo
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     $<TARGET_FILE:wx_bgi_opengl>
                     ${CMAKE_BINARY_DIR}/openlb_bridge
@@ -1358,7 +1394,11 @@ if(WXBGI_ENABLE_WX)
                     ${CMAKE_SOURCE_DIR}/examples/cpp/wxbgi_openlb_material_preview_demo.cpp
                     ${CMAKE_SOURCE_DIR}/examples/cpp/wxbgi_openlb_coupled_smoke.cpp
                     ${CMAKE_BINARY_DIR}/openlb_bridge
-            DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh
+                    ${CMAKE_BINARY_DIR}/openlb_bridge/openlb-demo
+            DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo wxbgi_openlb_pipe_3d_demo
             COMMENT "Staging wx_bgi OpenLB bridge assets in ${CMAKE_BINARY_DIR}/openlb_bridge"
         )
     endif()

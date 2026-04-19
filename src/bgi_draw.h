@@ -15,6 +15,7 @@ namespace bgi
     std::array<std::uint8_t, kPatternRows> makeFillPatternMask(int pattern);
 
     bool isReady();
+    bool syncGlfwWindowSize();
     bool useFillAt(int x, int y);
     bool toDeviceCoordinates(int x, int y, int &screenX, int &screenY);
 

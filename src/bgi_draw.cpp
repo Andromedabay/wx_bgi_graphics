@@ -220,6 +220,24 @@ namespace bgi
         return true;
     }
 
+    bool syncGlfwWindowSize()
+    {
+        if (gState.wxEmbedded || gState.window == nullptr)
+            return false;
+
+        int winW = 0;
+        int winH = 0;
+        glfwGetWindowSize(gState.window, &winW, &winH);
+        if (winW <= 0 || winH <= 0)
+            return false;
+
+        if (winW == gState.width && winH == gState.height)
+            return false;
+
+        resizePixelBuffer(winW, winH);
+        return true;
+    }
+
     bool useFillAt(int x, int y)
     {
         const auto row = gState.fillMask[static_cast<std::size_t>(y & 7)];
@@ -362,6 +380,7 @@ namespace bgi
 
         glfwMakeContextCurrent(gState.window);
         glfwPollEvents();
+        syncGlfwWindowSize();
 
         // Query actual framebuffer dimensions — these differ from the logical
         // window/page size on HiDPI/Retina displays (typically 2× on macOS).
