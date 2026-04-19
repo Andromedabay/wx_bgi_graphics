@@ -89,6 +89,7 @@ The repository now includes:
 - `examples/cpp/wxbgi_openlb_coupled_smoke.cpp`
 - `examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp`
 - `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh`
+- `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh`
 
 `wxbgi_openlb_live_demo.cpp` uses a mock live field, but it demonstrates the
 intended integration pattern for a real OpenLB solver:
@@ -139,6 +140,10 @@ the needed packages, clone the latest public OpenLB release tree into `/tmp`,
 configure a temporary OpenLB-enabled build, and then run either the interactive
 demo or the demo's short `--test` mode.
 
+`examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh` does the same job on
+macOS, using Homebrew-provided `wxwidgets` and `glfw` instead of FetchContent
+for the windowing dependencies.
+
 ### 4. Optional build and staging support
 
 OpenLB support is **opt-in**:
@@ -179,6 +184,18 @@ For a short build-and-smoke-check instead of the indefinite interactive run:
 
 ```bash
 examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --test
+```
+
+On macOS, use:
+
+```bash
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh
+```
+
+Or the short validation mode:
+
+```bash
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --test
 ```
 
 ---

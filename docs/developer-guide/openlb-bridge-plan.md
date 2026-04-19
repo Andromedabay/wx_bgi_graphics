@@ -85,6 +85,7 @@ Optional but recommended next steps:
 | `examples/cpp/wxbgi_openlb_coupled_smoke.cpp` | real OpenLB-coupled 2D channel + obstacle demo |
 | `examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp` | real OpenLB-coupled 3D duct + orbit preview demo |
 | `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh` | Debian/Ubuntu/WSL2 bootstrap script for the 3D OpenLB demo |
+| `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh` | macOS/Homebrew bootstrap script for the 3D OpenLB demo |
 | `examples/cpp/test_openlb_bridge_materialize_2d.cpp` | current bridge regression test |
 | `docs/user-guide/OpenLB-Support.md` | user-facing workflow and platform status |
 
@@ -127,6 +128,12 @@ Or use the repo-tracked bootstrap script:
 
 ```bash
 examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --test
+```
+
+On macOS, use the Homebrew-oriented companion script:
+
+```bash
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --test
 ```
 
 If one coupled OpenLB target needs focused iteration, build it directly:

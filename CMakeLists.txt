@@ -1397,6 +1397,7 @@ if(WXBGI_ENABLE_WX)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp
                     ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh
                     ${CMAKE_BINARY_DIR}/openlb_bridge/openlb-demo
             DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo wxbgi_openlb_pipe_3d_demo
             COMMENT "Staging wx_bgi OpenLB bridge assets in ${CMAKE_BINARY_DIR}/openlb_bridge"

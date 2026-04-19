@@ -16,4 +16,4 @@ build*
 libimp*.a
 *.fpc
 *.res
-/tmp
+**/tmp
