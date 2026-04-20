@@ -40,15 +40,14 @@ constexpr T kPipeHeight      = 0.24;
 constexpr T kWallThickness   = 0.03;
 constexpr T kSieveX          = 0.15;
 constexpr T kSieveThickness  = 0.03;
-constexpr T kSieveHoleDiameter = 0.018;
-constexpr int kSieveHoleCols = 10;
-constexpr int kSieveHoleRows = 6;
+constexpr T kSieveHoleDiameterDefault = 0.018;
+constexpr T kSievePitchFactor = 2.0;
 constexpr T kVentCenterX     = 0.95;
 constexpr T kVentWidthX      = 0.14;
 constexpr T kVentHeightZ     = 0.08;
 constexpr T kVentCenterZ     = kPipeHeight * 0.5;
 constexpr T kCharPhysLength  = 0.10;
-constexpr T kCharPhysVelocity = 0.06;
+constexpr T kCharPhysVelocityDefault = 0.06;
 constexpr T kPhysViscosity   = 0.0006;
 constexpr T kPhysDensity     = 1.0;
 constexpr T kCharLatticeU    = 0.02;
@@ -63,6 +62,7 @@ constexpr int kFlowPanelHeight = 220;
 constexpr int kHudPanelWidth  = 320;
 constexpr int kLegendWidthPx = 18;
 constexpr std::size_t kRampSteps = 180;
+constexpr std::size_t kVtkExportDefaultIterations = 100;
 constexpr T kInflowPeakFactor = 1.5;
 constexpr int kModeWireframe = WXBGI_SOLID_WIREFRAME;
 constexpr int kModeFlat      = WXBGI_SOLID_FLAT;
@@ -76,6 +76,11 @@ struct SieveLayout
 {
     std::vector<float> holeYs;
     std::vector<float> holeZs;
+    T requestedHoleDiameter = kSieveHoleDiameterDefault;
+    T effectiveHoleY = kSieveHoleDiameterDefault;
+    T effectiveHoleZ = kSieveHoleDiameterDefault;
+    T solidSampleY = 0.0;
+    T solidSampleZ = 0.0;
 };
 
 struct DemoLayout
@@ -108,6 +113,40 @@ struct InputLatch
     bool sliceMinus = false;
 };
 
+struct VtkExportState
+{
+    SuperVTMwriter<T, 3> writer;
+    SuperLatticePhysPressure3D<T, DESCRIPTOR> pressure;
+    SuperLatticePhysVelocity3D<T, DESCRIPTOR> velocity;
+    bool enabled = false;
+    std::size_t maxIterations = 0;
+
+    VtkExportState(SuperLattice<T, DESCRIPTOR> &lattice,
+                   const UnitConverter<T, DESCRIPTOR> &converter,
+                   bool enableExport,
+                   std::size_t maxExportIterations)
+        : writer("wxbgi_openlb_pipe_3d"),
+          pressure(lattice, converter),
+          velocity(lattice, converter),
+          enabled(enableExport),
+          maxIterations(maxExportIterations)
+    {
+        if (!enabled)
+            return;
+
+        writer.addFunctor(pressure, "pressure");
+        writer.addFunctor(velocity, "velocity");
+        writer.createMasterFile();
+    }
+
+    void write(std::size_t completedIteration)
+    {
+        if (!enabled || completedIteration == 0 || completedIteration > maxIterations)
+            return;
+        writer.write(static_cast<int>(completedIteration));
+    }
+};
+
 void fail(const char *msg)
 {
     std::fprintf(stderr, "FAIL [wxbgi_openlb_pipe_3d_demo]: %s\n", msg);
@@ -118,6 +157,28 @@ void require(bool condition, const char *msg)
 {
     if (!condition)
         fail(msg);
+}
+
+std::size_t parsePositiveSizeArg(const char *value, const char *option)
+{
+    require(value != nullptr && *value != '\0', option);
+
+    char *end = nullptr;
+    const unsigned long long parsed = std::strtoull(value, &end, 10);
+    require(end != nullptr && *end == '\0', option);
+    require(parsed > 0, option);
+    return static_cast<std::size_t>(parsed);
+}
+
+T parsePositiveRealArg(const char *value, const char *option)
+{
+    require(value != nullptr && *value != '\0', option);
+
+    char *end = nullptr;
+    const double parsed = std::strtod(value, &end);
+    require(end != nullptr && *end == '\0', option);
+    require(std::isfinite(parsed) && parsed > 0.0, option);
+    return static_cast<T>(parsed);
 }
 
 std::string lastId()
@@ -161,11 +222,13 @@ std::string createUnion(const std::vector<std::string> &ids, const char *label)
     return unionId;
 }
 
-SieveLayout buildDdsPipeScene(const UnitConverter<T, DESCRIPTOR> &converter)
+SieveLayout buildDdsPipeScene(const UnitConverter<T, DESCRIPTOR> &converter,
+                              T requestedHoleDiameter)
 {
     wxbgi_dds_scene_set_active("default");
     wxbgi_dds_clear();
     SieveLayout layout;
+    layout.requestedHoleDiameter = requestedHoleDiameter;
 
     const float outerCx = static_cast<float>(kPipeLength * 0.5);
     const float outerCy = static_cast<float>(kPipeWidth * 0.5);
@@ -191,34 +254,56 @@ SieveLayout buildDdsPipeScene(const UnitConverter<T, DESCRIPTOR> &converter)
     require(wxbgi_dds_set_external_attr(shellId.c_str(), "openlb.enabled", "0") == 1,
             "Failed to disable pipe shell for OpenLB export");
 
-    const T requestedHole = kSieveHoleDiameter;
-    const T holeY = std::min(requestedHole, kPipeWidth / static_cast<T>(kSieveHoleCols + 1));
-    const T holeZ = std::min(requestedHole, kPipeHeight / static_cast<T>(kSieveHoleRows + 1));
-    const T barY = (kPipeWidth - static_cast<T>(kSieveHoleCols) * holeY) /
-                   static_cast<T>(kSieveHoleCols + 1);
-    const T barZ = (kPipeHeight - static_cast<T>(kSieveHoleRows) * holeZ) /
-                   static_cast<T>(kSieveHoleRows + 1);
-    require(barY > 0.0 && barZ > 0.0, "Sieve hole diameter is too large for the selected grid");
+    const T dx = converter.getPhysDeltaX();
+    const auto sieveCountForAxis = [dx](T requested, T extent) -> int
+    {
+        const int maxCount = std::max(1, static_cast<int>(std::floor(extent / dx - 1e-6)) - 1);
+        const int scaledCount = std::max(1, static_cast<int>(std::floor(extent /
+                                                                         (requested * kSievePitchFactor))));
+        return std::clamp(scaledCount, 1, maxCount);
+    };
+    const auto snappedHoleForAxis = [dx](T requested, T extent, int holeCount) -> T
+    {
+        const T cellsAcross = extent / dx;
+        const int maxHoleCells = std::max(1, static_cast<int>(std::floor((cellsAcross - 1e-6) /
+                                                                          static_cast<T>(holeCount))));
+        const int requestedHoleCells = std::max(1, static_cast<int>(std::llround(requested / dx)));
+        return static_cast<T>(std::clamp(requestedHoleCells, 1, maxHoleCells)) * dx;
+    };
+
+    const int sieveHoleCols = sieveCountForAxis(requestedHoleDiameter, kPipeWidth);
+    const int sieveHoleRows = sieveCountForAxis(requestedHoleDiameter, kPipeHeight);
+    const T holeY = snappedHoleForAxis(requestedHoleDiameter, kPipeWidth, sieveHoleCols);
+    const T holeZ = snappedHoleForAxis(requestedHoleDiameter, kPipeHeight, sieveHoleRows);
+    layout.effectiveHoleY = holeY;
+    layout.effectiveHoleZ = holeZ;
+    const T barY = (kPipeWidth - static_cast<T>(sieveHoleCols) * holeY) /
+                   static_cast<T>(sieveHoleCols + 1);
+    const T barZ = (kPipeHeight - static_cast<T>(sieveHoleRows) * holeZ) /
+                   static_cast<T>(sieveHoleRows + 1);
+    require(barY > 0.0 && barZ > 0.0, "Sieve lattice alignment produced a non-positive bar width");
+    layout.solidSampleY = barY * 0.5;
+    layout.solidSampleZ = barZ * 0.5;
 
     std::vector<std::string> sieveBars;
-    sieveBars.reserve(static_cast<std::size_t>(kSieveHoleCols + kSieveHoleRows + 2));
+    sieveBars.reserve(static_cast<std::size_t>(sieveHoleCols + sieveHoleRows + 2));
 
     T yCursor = barY;
-    for (int i = 0; i < kSieveHoleCols; ++i)
+    for (int i = 0; i < sieveHoleCols; ++i)
     {
         layout.holeYs.push_back(static_cast<float>(yCursor + holeY * 0.5));
         yCursor += holeY + barY;
     }
 
     T zCursor = barZ;
-    for (int i = 0; i < kSieveHoleRows; ++i)
+    for (int i = 0; i < sieveHoleRows; ++i)
     {
         layout.holeZs.push_back(static_cast<float>(zCursor + holeZ * 0.5));
         zCursor += holeZ + barZ;
     }
 
     T barCenterY = barY * 0.5;
-    for (int i = 0; i <= kSieveHoleCols; ++i)
+    for (int i = 0; i <= sieveHoleCols; ++i)
     {
         sieveBars.push_back(createBox(static_cast<float>(kSieveX),
                                       static_cast<float>(barCenterY),
@@ -230,7 +315,7 @@ SieveLayout buildDdsPipeScene(const UnitConverter<T, DESCRIPTOR> &converter)
     }
 
     T barCenterZ = barZ * 0.5;
-    for (int i = 0; i <= kSieveHoleRows; ++i)
+    for (int i = 0; i <= sieveHoleRows; ++i)
     {
         sieveBars.push_back(createBox(static_cast<float>(kSieveX),
                                       static_cast<float>(kPipeWidth * 0.5),
@@ -662,10 +747,11 @@ void drawHud(int sliceZ,
               int hudHeight,
               float maxMagnitude,
               float maxPhysVelocity,
+              float requestedFlowVelocity,
               std::size_t steps,
-               const WxbgiOpenLbMaterializeStats &materializeStats,
-               int renderMode,
-               const SieveLayout &sieveLayout)
+                const WxbgiOpenLbMaterializeStats &materializeStats,
+                int renderMode,
+                const SieveLayout &sieveLayout)
 {
     const int lineStep = 22;
     int lineY = hudTop;
@@ -721,8 +807,12 @@ void drawHud(int sliceZ,
                   static_cast<int>(sieveLayout.holeYs.size()),
                   static_cast<int>(sieveLayout.holeZs.size()));
     drawBullet(line, WHITE);
-    std::snprintf(line, sizeof(line), "hole dia %.1f mm",
-                  static_cast<double>(kSieveHoleDiameter * 1000.0));
+    std::snprintf(line, sizeof(line), "hole req %.1f mm",
+                  static_cast<double>(sieveLayout.requestedHoleDiameter * 1000.0));
+    drawBullet(line);
+    std::snprintf(line, sizeof(line), "hole eff %.1f x %.1f mm",
+                  static_cast<double>(sieveLayout.effectiveHoleY * 1000.0),
+                  static_cast<double>(sieveLayout.effectiveHoleZ * 1000.0));
     drawBullet(line);
     std::snprintf(line, sizeof(line), "DDS hits %d",
                   materializeStats.matched);
@@ -735,6 +825,8 @@ void drawHud(int sliceZ,
     drawBullet("bottom orbit I/J/K/L", WHITE);
     drawBullet("Esc quits demo");
     drawBullet("one wall vent");
+    std::snprintf(line, sizeof(line), "flow req %.3f m/s", requestedFlowVelocity);
+    drawBullet(line);
     std::snprintf(line, sizeof(line), "steps %zu", steps);
     drawBullet(line);
     std::snprintf(line, sizeof(line), "slice max %.5f", maxMagnitude);
@@ -749,6 +841,10 @@ int main(int argc, char **argv)
 {
     bool testMode = false;
     int solidMode = kModeSmooth;
+    bool vtkExportEnabled = false;
+    std::size_t vtkExportIterations = kVtkExportDefaultIterations;
+    T sieveHoleDiameter = kSieveHoleDiameterDefault;
+    T charPhysVelocity = kCharPhysVelocityDefault;
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--test") == 0)
@@ -759,6 +855,54 @@ int main(int argc, char **argv)
             solidMode = kModeFlat;
         else if (std::strcmp(argv[i], "--shaded") == 0 || std::strcmp(argv[i], "--smooth") == 0)
             solidMode = kModeSmooth;
+        else if (std::strcmp(argv[i], "--vtk") == 0)
+            vtkExportEnabled = true;
+        else if (std::strncmp(argv[i], "--vtk=", 6) == 0)
+        {
+            vtkExportEnabled = true;
+            vtkExportIterations = parsePositiveSizeArg(argv[i] + 6,
+                                                       "--vtk expects a positive integer iteration count");
+        }
+        else if (std::strcmp(argv[i], "--vtk-iterations") == 0)
+        {
+            require(i + 1 < argc, "--vtk-iterations requires a positive integer argument");
+            vtkExportEnabled = true;
+            vtkExportIterations = parsePositiveSizeArg(argv[++i],
+                                                       "--vtk-iterations requires a positive integer argument");
+        }
+        else if (std::strncmp(argv[i], "--vtk-iterations=", 17) == 0)
+        {
+            vtkExportEnabled = true;
+            vtkExportIterations = parsePositiveSizeArg(argv[i] + 17,
+                                                       "--vtk-iterations expects a positive integer value");
+        }
+        else if (std::strcmp(argv[i], "--sieve-hole-mm") == 0)
+        {
+            require(i + 1 < argc, "--sieve-hole-mm requires a positive numeric argument");
+            sieveHoleDiameter = parsePositiveRealArg(argv[++i],
+                                                     "--sieve-hole-mm requires a positive numeric argument") / 1000.0;
+        }
+        else if (std::strncmp(argv[i], "--sieve-hole-mm=", 16) == 0)
+        {
+            sieveHoleDiameter = parsePositiveRealArg(argv[i] + 16,
+                                                     "--sieve-hole-mm expects a positive numeric value") / 1000.0;
+        }
+        else if (std::strcmp(argv[i], "--flow-velocity-ms") == 0 || std::strcmp(argv[i], "--flow-ms") == 0)
+        {
+            require(i + 1 < argc, "--flow-velocity-ms requires a positive numeric argument");
+            charPhysVelocity = parsePositiveRealArg(argv[++i],
+                                                    "--flow-velocity-ms requires a positive numeric argument");
+        }
+        else if (std::strncmp(argv[i], "--flow-velocity-ms=", 19) == 0)
+        {
+            charPhysVelocity = parsePositiveRealArg(argv[i] + 19,
+                                                    "--flow-velocity-ms expects a positive numeric value");
+        }
+        else if (std::strncmp(argv[i], "--flow-ms=", 10) == 0)
+        {
+            charPhysVelocity = parsePositiveRealArg(argv[i] + 10,
+                                                    "--flow-ms expects a positive numeric value");
+        }
     }
 
     initialize(&argc, &argv);
@@ -768,7 +912,7 @@ int main(int argc, char **argv)
         kResolution,
         kCharLatticeU,
         kCharPhysLength,
-        kCharPhysVelocity,
+        charPhysVelocity,
         kPhysViscosity,
         kPhysDensity);
 
@@ -784,7 +928,7 @@ int main(int argc, char **argv)
     wxbgi_openlb_begin_session(windowW, windowH, "wx_bgi OpenLB 3D Duct Demo");
     setbkcolor(BLACK);
     cleardevice();
-    const SieveLayout sieveLayout = buildDdsPipeScene(converter);
+    const SieveLayout sieveLayout = buildDdsPipeScene(converter, sieveHoleDiameter);
     wxbgi_cam_create("pipe3d_preview", WXBGI_CAM_PERSPECTIVE);
     wxbgi_cam_set_scene("pipe3d_preview", "default");
     wxbgi_dds_scene_create("flow3d");
@@ -805,12 +949,13 @@ int main(int argc, char **argv)
     CuboidDecomposition<T, 3> cuboidDecomposition(duct, converter.getPhysDeltaX(), 1);
     HeuristicLoadBalancer<T> loadBalancer(cuboidDecomposition);
     SuperGeometry<T, 3> geometry(cuboidDecomposition, loadBalancer);
+    geometry.setWriteIncrementalVTK(false);
 
     WxbgiOpenLbMaterializeStats materializeStats;
     prepareGeometry(converter, geometry, materializeStats);
 
     require(materializeStats.matched > 0, "3D sieve did not hit any lattice cells");
-    require(sampleMaterialAt(geometry, kSieveX, 0.03, 0.03) == kMatSieve,
+    require(sampleMaterialAt(geometry, kSieveX, sieveLayout.solidSampleY, sieveLayout.solidSampleZ) == kMatSieve,
             "3D sieve solid sample did not materialize");
     require(sampleMaterialAt(geometry, kSieveX, sieveLayout.holeYs.front(), sieveLayout.holeZs.front()) == kMatFluid,
             "3D sieve hole sample should stay fluid");
@@ -819,6 +964,7 @@ int main(int argc, char **argv)
 
     SuperLattice<T, DESCRIPTOR> lattice(converter, geometry);
     prepareLattice(converter, geometry, lattice);
+    VtkExportState vtkExport(lattice, converter, vtkExportEnabled && !testMode, vtkExportIterations);
 
     const int sliceCols = lattice.getBlock(0).getNx();
     const int sliceRows = lattice.getBlock(0).getNy();
@@ -861,6 +1007,7 @@ int main(int argc, char **argv)
             }
             updateBoundaryValues(iT, converter, geometry, lattice);
             lattice.collideAndStream();
+            vtkExport.write(iT + 1);
         }
 
         const float sliceValueMax = std::max(sampleLongitudinalSection(lattice,
@@ -915,7 +1062,8 @@ int main(int argc, char **argv)
                                            WXBGI_FIELD_PALETTE_TURBO,
                                            "speed");
             wxbgi_render_dds("pipe3d_flow3d");
-            drawHud(sliceZ, sliceZPhys, sliceIndexMin, sliceIndexMax, layout.hudLeft, layout.hudTop, layout.hudH, sliceValueMax, maxPhysVelocity, iT,
+            drawHud(sliceZ, sliceZPhys, sliceIndexMin, sliceIndexMax, layout.hudLeft, layout.hudTop, layout.hudH, sliceValueMax, maxPhysVelocity,
+                    static_cast<float>(charPhysVelocity), iT,
                     materializeStats, solidMode, sieveLayout);
 
             if (!wxbgi_openlb_present())

@@ -13,6 +13,10 @@ Assumes Homebrew is already installed.
 
 Options:
   --test                  Build and run the demo's short validation mode.
+  --vtk[=N]               Enable VTK export for the first N iterations (default: 100).
+  --vtk-iterations N      Set the VTK export iteration count and enable VTK output.
+  --sieve-hole-mm N       Set the requested sieve hole diameter in millimetres.
+  --flow-velocity-ms N    Set the characteristic flow velocity in m/s.
   --skip-system-packages  Skip brew-based dependency installation.
   --force-clone           Ignore the current checkout and clone wx_bgi_graphics into /tmp.
   --help                  Show this help text.
@@ -36,11 +40,39 @@ fail() {
 test_mode=0
 skip_system_packages=0
 force_clone=0
+declare -a demo_args=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --test)
             test_mode=1
+            ;;
+        --vtk|--vtk=*)
+            demo_args+=("$1")
+            ;;
+        --vtk-iterations)
+            [[ $# -ge 2 ]] || fail "--vtk-iterations requires a positive integer argument"
+            demo_args+=("$1" "$2")
+            shift
+            ;;
+        --vtk-iterations=*)
+            demo_args+=("$1")
+            ;;
+        --sieve-hole-mm)
+            [[ $# -ge 2 ]] || fail "--sieve-hole-mm requires a numeric argument"
+            demo_args+=("$1" "$2")
+            shift
+            ;;
+        --sieve-hole-mm=*)
+            demo_args+=("$1")
+            ;;
+        --flow-velocity-ms|--flow-ms)
+            [[ $# -ge 2 ]] || fail "--flow-velocity-ms requires a numeric argument"
+            demo_args+=("$1" "$2")
+            shift
+            ;;
+        --flow-velocity-ms=*|--flow-ms=*)
+            demo_args+=("$1")
             ;;
         --skip-system-packages)
             skip_system_packages=1
@@ -188,11 +220,11 @@ main() {
 
     if [[ "${test_mode}" -eq 1 ]]; then
         log "running test mode"
-        exec "${demo_bin}" --test
+        exec "${demo_bin}" --test "${demo_args[@]}"
     fi
 
     log "running interactive demo"
-    exec "${demo_bin}" --smooth
+    exec "${demo_bin}" --smooth "${demo_args[@]}"
 }
 
 main "$@"

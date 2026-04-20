@@ -132,7 +132,14 @@ coupled 3D DDS/OpenLB duct case:
    orbit view of the DDS geometry
 5. switch the geometry panel between `--wireframe`, `--flat`, and `--smooth`
    from the keyboard with `1`, `2`, and `3`
-6. keep the demo running until the user presses `Esc` or closes the window
+6. optionally emit ParaView-friendly VTK output with `--vtk` (default 100
+   iterations) or `--vtk-iterations N`
+7. optionally change the requested sieve hole diameter with `--sieve-hole-mm N`;
+   the demo scales the sieve row/column count from that request and then snaps
+   the effective hole size to a lattice-safe value
+8. optionally change the characteristic flow velocity with
+   `--flow-velocity-ms N` (default `0.06`)
+9. keep the demo running until the user presses `Esc` or closes the window
 
 `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh` bootstraps the same demo
 on Debian, Ubuntu, and Debian/Ubuntu-based WSL2 environments. It can install
@@ -178,6 +185,10 @@ For the one-command Linux bootstrap path, run:
 
 ```bash
 examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --vtk
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --vtk-iterations 3000
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --sieve-hole-mm 17.3
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh --flow-velocity-ms 0.04
 ```
 
 For a short build-and-smoke-check instead of the indefinite interactive run:
@@ -190,6 +201,10 @@ On macOS, use:
 
 ```bash
 examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --vtk
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --vtk-iterations 3000
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --sieve-hole-mm 17.3
+examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --flow-velocity-ms 0.04
 ```
 
 Or the short validation mode:
