@@ -51,7 +51,7 @@ constexpr T kCharPhysLength  = 0.10;
 constexpr T kCharPhysVelocity = 0.06;
 constexpr T kPhysViscosity   = 0.0006;
 constexpr T kPhysDensity     = 1.0;
-constexpr T kCharLatticeU    = 0.04;
+constexpr T kCharLatticeU    = 0.02;
 constexpr int kResolution    = 5;
 
 constexpr int kWindowMargin   = 12;
@@ -63,6 +63,7 @@ constexpr int kFlowPanelHeight = 220;
 constexpr int kHudPanelWidth  = 320;
 constexpr int kLegendWidthPx = 18;
 constexpr std::size_t kRampSteps = 180;
+constexpr T kInflowPeakFactor = 1.5;
 constexpr int kModeWireframe = WXBGI_SOLID_WIREFRAME;
 constexpr int kModeFlat      = WXBGI_SOLID_FLAT;
 constexpr int kModeSmooth    = WXBGI_SOLID_SMOOTH;
@@ -454,9 +455,9 @@ void prepareLattice(const UnitConverter<T, DESCRIPTOR> &converter,
 
     boundary::set<boundary::BounceBack>(lattice, geometry, kMatWall);
     boundary::set<boundary::BounceBack>(lattice, geometry, kMatSieve);
-    boundary::set<boundary::LocalVelocity>(lattice, geometry, kMatInflow);
-    boundary::set<boundary::LocalPressure>(lattice, geometry, kMatOutflow);
-    boundary::set<boundary::LocalPressure>(lattice, geometry, kMatSideVent);
+    boundary::set<boundary::InterpolatedVelocity>(lattice, geometry, kMatInflow);
+    boundary::set<boundary::InterpolatedPressure>(lattice, geometry, kMatOutflow);
+    boundary::set<boundary::InterpolatedPressure>(lattice, geometry, kMatSideVent);
 
     AnalyticalConst3D<T, T> rhoF(1);
     const std::vector<T> zeroVelocity(3, T(0));
@@ -486,7 +487,7 @@ void updateBoundaryValues(std::size_t iT,
     const T smoothRamp = ramp * ramp * (3. - 2. * ramp);
 
     std::vector<T> maxVelocity(3, T(0));
-    maxVelocity[0] = 2.25 * converter.getCharLatticeVelocity() * smoothRamp;
+    maxVelocity[0] = kInflowPeakFactor * converter.getCharLatticeVelocity() * smoothRamp;
 
     const T distanceToWall = converter.getPhysDeltaX() * 0.5;
     RectanglePoiseuille3D<T> poiseuille(geometry,
@@ -506,6 +507,16 @@ int sampleMaterialAt(const SuperGeometry<T, 3> &geometry, T x, T y, T z)
     if (!latticeR)
         return -1;
     return geometry.get(*latticeR);
+}
+
+bool allFinite(const T *values, int count)
+{
+    for (int i = 0; i < count; ++i)
+    {
+        if (!std::isfinite(static_cast<double>(values[i])))
+            return false;
+    }
+    return true;
 }
 
 float sampleLongitudinalSection(SuperLattice<T, DESCRIPTOR> &lattice,
@@ -542,11 +553,15 @@ float sampleLongitudinalSection(SuperLattice<T, DESCRIPTOR> &lattice,
             const int input[4] = {0, x, y, sliceZ};
             if (!velocity(output, input))
                 continue;
+            if (!allFinite(output, 3))
+                continue;
 
             const float vx = static_cast<float>(output[0]);
             const float vy = static_cast<float>(output[1]);
             const float vz = static_cast<float>(output[2]);
             const float magnitude = std::sqrt(vx * vx + vy * vy + vz * vz);
+            if (!std::isfinite(magnitude))
+                continue;
 
             scalar[scalarIdx] = magnitude;
             vectors[vectorIdx + 0] = vx;
@@ -811,8 +826,8 @@ int main(int argc, char **argv)
     std::vector<float> scalar(static_cast<std::size_t>(sliceCols * sliceRows), 0.f);
     std::vector<float> vectors(static_cast<std::size_t>(sliceCols * sliceRows * 2), 0.f);
 
-    const int maxFrames = testMode ? 6 : 0;
-    const int stepsPerFrame = testMode ? 8 : 2;
+    const int maxFrames = testMode ? 2 : 0;
+    const int stepsPerFrame = testMode ? 704 : 2;
     const int sliceIndexMin = 1;
     const int sliceIndexMax = std::max(sliceIndexMin, latticeZ - 2);
     int sliceZ = std::clamp(latticeZ / 2, sliceIndexMin, sliceIndexMax);
@@ -836,22 +851,17 @@ int main(int argc, char **argv)
 
         for (int step = 0; step < stepsPerFrame; ++step, ++iT)
         {
-            if (wxbgi_poll_events() < 0)
-                goto finished;
-            if (handleRealtimeInput(inputLatch, solidMode, flowCamAzimuthDeg, flowCamElevationDeg,
-                                    sliceZ, sliceIndexMin, sliceIndexMax))
-                goto finished;
+            if (!testMode || (step % 16) == 0)
+            {
+                if (wxbgi_poll_events() < 0)
+                    goto finished;
+                if (handleRealtimeInput(inputLatch, solidMode, flowCamAzimuthDeg, flowCamElevationDeg,
+                                        sliceZ, sliceIndexMin, sliceIndexMax))
+                    goto finished;
+            }
             updateBoundaryValues(iT, converter, geometry, lattice);
             lattice.collideAndStream();
         }
-
-        const DemoLayout layout = computeLayout(sliceCols, sliceRows);
-        updatePreviewCameraOrbit(frame, layout.previewW);
-        wxbgi_cam_set_screen_viewport("pipe3d_flow3d",
-                                      layout.flowLeft,
-                                      layout.flowTop,
-                                      layout.flowW,
-                                      kFlowPanelHeight);
 
         const float sliceValueMax = std::max(sampleLongitudinalSection(lattice,
                                                                        converter,
@@ -862,44 +872,62 @@ int main(int argc, char **argv)
                                                                        scalar,
                                                                        vectors),
                                               1e-6f);
-        const float maxPhysVelocity =
-            static_cast<float>(converter.getPhysVelocity(lattice.getStatistics().getMaxU()));
-        maxObserved = std::max(maxObserved, maxPhysVelocity);
+        const T latticeMaxU = lattice.getStatistics().getMaxU();
+        if (testMode)
+            require(std::isfinite(static_cast<double>(latticeMaxU)) && latticeMaxU < T(0.2),
+                    "3D OpenLB flow diverged");
+        const float maxPhysVelocity = std::isfinite(static_cast<double>(latticeMaxU))
+            ? static_cast<float>(converter.getPhysVelocity(latticeMaxU))
+            : 0.f;
+        if (std::isfinite(maxPhysVelocity))
+            maxObserved = std::max(maxObserved, maxPhysVelocity);
         const float sliceZPhys = static_cast<float>(converter.getPhysLength(sliceZ));
-        rebuildFlowPerspectiveScene(converter, sliceCols, sliceRows, scalar, sliceValueMax, sliceZPhys);
+        const bool renderFrame = !testMode || (static_cast<int>(frame) + 1 == maxFrames);
+        if (renderFrame)
+        {
+            const DemoLayout layout = computeLayout(sliceCols, sliceRows);
+            updatePreviewCameraOrbit(frame, layout.previewW);
+            wxbgi_cam_set_screen_viewport("pipe3d_flow3d",
+                                          layout.flowLeft,
+                                          layout.flowTop,
+                                          layout.flowW,
+                                          kFlowPanelHeight);
+            rebuildFlowPerspectiveScene(converter, sliceCols, sliceRows, scalar, sliceValueMax, sliceZPhys);
 
-        cleardevice();
-        wxbgi_render_dds("pipe3d_preview");
-        wxbgi_field_draw_scalar_grid(layout.fieldLeft, layout.fieldTop,
-                                     sliceCols, sliceRows,
-                                     scalar.data(), static_cast<int>(scalar.size()),
-                                     kFieldCellPx,
-                                     0.f, sliceValueMax,
-                                     WXBGI_FIELD_PALETTE_TURBO);
-        wxbgi_field_draw_vector_grid(layout.fieldLeft, layout.fieldTop,
-                                     sliceCols, sliceRows,
-                                     vectors.data(), static_cast<int>(vectors.size()),
-                                     kFieldCellPx,
-                                     12.f, 3, WHITE);
-        wxbgi_field_draw_scalar_legend(layout.legendLeft,
-                                       layout.fieldTop,
-                                       kLegendWidthPx,
-                                       std::max(48, sliceRows * kFieldCellPx - 32),
-                                       0.f, sliceValueMax,
-                                       WXBGI_FIELD_PALETTE_TURBO,
-                                       "speed");
-        wxbgi_render_dds("pipe3d_flow3d");
-        drawHud(sliceZ, sliceZPhys, sliceIndexMin, sliceIndexMax, layout.hudLeft, layout.hudTop, layout.hudH, sliceValueMax, maxPhysVelocity, iT,
-                materializeStats, solidMode, sieveLayout);
+            cleardevice();
+            wxbgi_render_dds("pipe3d_preview");
+            wxbgi_field_draw_scalar_grid(layout.fieldLeft, layout.fieldTop,
+                                         sliceCols, sliceRows,
+                                         scalar.data(), static_cast<int>(scalar.size()),
+                                         kFieldCellPx,
+                                         0.f, sliceValueMax,
+                                         WXBGI_FIELD_PALETTE_TURBO);
+            wxbgi_field_draw_vector_grid(layout.fieldLeft, layout.fieldTop,
+                                         sliceCols, sliceRows,
+                                         vectors.data(), static_cast<int>(vectors.size()),
+                                         kFieldCellPx,
+                                         12.f, 3, WHITE);
+            wxbgi_field_draw_scalar_legend(layout.legendLeft,
+                                           layout.fieldTop,
+                                           kLegendWidthPx,
+                                           std::max(48, sliceRows * kFieldCellPx - 32),
+                                           0.f, sliceValueMax,
+                                           WXBGI_FIELD_PALETTE_TURBO,
+                                           "speed");
+            wxbgi_render_dds("pipe3d_flow3d");
+            drawHud(sliceZ, sliceZPhys, sliceIndexMin, sliceIndexMax, layout.hudLeft, layout.hudTop, layout.hudH, sliceValueMax, maxPhysVelocity, iT,
+                    materializeStats, solidMode, sieveLayout);
 
-        if (!wxbgi_openlb_present())
-            break;
+            if (!wxbgi_openlb_present())
+                break;
+        }
         ++frame;
     }
 
 finished:
     if (testMode)
     {
+        require(iT >= 1300, "3D OpenLB test mode did not reach the stability window");
         require(iT > 0, "3D OpenLB loop did not advance");
         require(maxObserved > 0.f, "3D OpenLB flow never accelerated");
     }

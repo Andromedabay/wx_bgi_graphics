@@ -2,6 +2,7 @@
 #include "wx_bgi_ext.h"
 
 #include <array>
+#include <limits>
 #include <cstdio>
 
 using namespace bgi;
@@ -40,6 +41,26 @@ int main()
     }
 
     cleardevice();
+    const std::array<float, cols * rows> scalarWithNaN = {{
+        -1.0f, -0.5f,  0.0f,  0.5f,
+        -0.8f, std::numeric_limits<float>::quiet_NaN(), 0.2f,  0.8f,
+        -0.6f, -0.1f,  0.1f,  0.6f,
+        -0.4f,  0.0f,  0.4f,  1.0f
+    }};
+    if (wxbgi_field_draw_scalar_grid(4, 4, cols, rows,
+                                     scalarWithNaN.data(), static_cast<int>(scalarWithNaN.size()),
+                                     cell, 0.0f, 0.0f, WXBGI_FIELD_PALETTE_TURBO) != 1)
+    {
+        std::fprintf(stderr, "FAIL: scalar grid rejected non-finite samples\n");
+        return 1;
+    }
+    if (getpixel(4 + 2 * cell + cell / 2, 4 + cell / 2) == BLACK)
+    {
+        std::fprintf(stderr, "FAIL: scalar grid stopped painting finite cells near non-finite samples\n");
+        return 1;
+    }
+
+    cleardevice();
     const std::array<float, cols * rows * 2> vectors = {{
          1.0f,  0.0f,  0.5f,  0.0f,  0.0f,  0.0f, -0.5f,  0.0f,
          0.0f,  1.0f,  0.0f,  0.5f,  0.0f,  0.0f,  0.0f, -0.5f,
@@ -58,6 +79,23 @@ int main()
     if (getpixel(10, 8) != WHITE)
     {
         std::fprintf(stderr, "FAIL: vector glyph not drawn at expected shaft pixel\n");
+        return 1;
+    }
+
+    cleardevice();
+    std::array<float, cols * rows * 2> vectorsWithInvalid = vectors;
+    vectorsWithInvalid[2] = std::numeric_limits<float>::infinity();
+    vectorsWithInvalid[3] = std::numeric_limits<float>::quiet_NaN();
+    if (wxbgi_field_draw_vector_grid(4, 4, cols, rows,
+                                     vectorsWithInvalid.data(), static_cast<int>(vectorsWithInvalid.size()),
+                                     cell, 0.7f, 1, WHITE) != 1)
+    {
+        std::fprintf(stderr, "FAIL: vector grid rejected non-finite samples\n");
+        return 1;
+    }
+    if (getpixel(10, 8) != WHITE)
+    {
+        std::fprintf(stderr, "FAIL: vector grid stopped drawing valid arrows near non-finite samples\n");
         return 1;
     }
 

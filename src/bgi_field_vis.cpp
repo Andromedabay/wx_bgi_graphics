@@ -131,6 +131,8 @@ namespace
 
     int paletteIndexFor(float value, float minValue, float maxValue)
     {
+        if (!std::isfinite(value))
+            return kFieldPaletteBase;
         const float denom = maxValue - minValue;
         const float t = (denom > 1e-12f)
             ? (value - minValue) / denom
@@ -144,9 +146,35 @@ namespace
     {
         if (count <= 0)
             return;
-        auto [minIt, maxIt] = std::minmax_element(values, values + count);
-        minValue = *minIt;
-        maxValue = *maxIt;
+
+        bool foundFinite = false;
+        float minSeen = 0.0f;
+        float maxSeen = 0.0f;
+        for (int i = 0; i < count; ++i)
+        {
+            const float value = values[i];
+            if (!std::isfinite(value))
+                continue;
+            if (!foundFinite)
+            {
+                minSeen = value;
+                maxSeen = value;
+                foundFinite = true;
+                continue;
+            }
+            minSeen = std::min(minSeen, value);
+            maxSeen = std::max(maxSeen, value);
+        }
+
+        if (!foundFinite)
+        {
+            minValue = 0.0f;
+            maxValue = 1.0f;
+            return;
+        }
+
+        minValue = minSeen;
+        maxValue = maxSeen;
         if (!(maxValue > minValue))
             maxValue = minValue + 1.0f;
     }
@@ -177,6 +205,8 @@ namespace
 
     std::string formatValue(float value)
     {
+        if (!std::isfinite(value))
+            return "n/a";
         char buf[48] = {};
         std::snprintf(buf, sizeof(buf), "%.4g", static_cast<double>(value));
         return std::string(buf);
@@ -208,7 +238,8 @@ BGI_API int BGI_CALL wxbgi_field_draw_scalar_grid(int left, int top,
         for (int col = 0; col < cols; ++col)
         {
             const int idx = row * cols + col;
-            const int color = paletteIndexFor(values[idx], minValue, maxValue);
+            const float value = std::isfinite(values[idx]) ? values[idx] : minValue;
+            const int color = paletteIndexFor(value, minValue, maxValue);
             const int x0 = left + col * cellSizePx;
             const int y0 = top  + row * cellSizePx;
             if (cellSizePx == 1)
@@ -246,8 +277,10 @@ BGI_API int BGI_CALL wxbgi_field_draw_vector_grid(int left, int top,
             const int idx = (row * cols + col) * 2;
             const float vx = vectorsXY[idx + 0];
             const float vy = vectorsXY[idx + 1];
+            if (!std::isfinite(vx) || !std::isfinite(vy))
+                continue;
             const float mag = std::sqrt(vx * vx + vy * vy);
-            if (mag < 1e-6f)
+            if (!std::isfinite(mag) || mag < 1e-6f)
                 continue;
 
             const int cx = left + col * cellSizePx + cellSizePx / 2;
