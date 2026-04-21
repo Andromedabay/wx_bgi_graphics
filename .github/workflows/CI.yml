@@ -35,6 +35,17 @@ jobs:
         shell: pwsh
         run: choco install doxygen.install -y
 
+      - name: Install epstopdf (MiKTeX utility)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Ensure MiKTeX is installed and epstopdf utility is available
+          if (-not (Get-Command miktexsetup -ErrorAction SilentlyContinue)) {
+            choco install miktex -y
+          }
+          miktexsetup finish
+          miktex-console --package-install epstopdf --yes
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
