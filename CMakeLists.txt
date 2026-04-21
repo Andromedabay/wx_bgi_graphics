@@ -435,6 +435,15 @@ if(WXBGI_ENABLE_WX)
                     $<TARGET_FILE:wx_bgi_opengl>
                     $<TARGET_FILE_DIR:wxbgi_openlb_pipe_3d_demo>
         )
+
+        add_executable(wxbgi_openlb_pipe_3d_wx_slider_demo examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_wx_slider_demo.cpp)
+        target_link_libraries(wxbgi_openlb_pipe_3d_wx_slider_demo PRIVATE wx_bgi_wx openlb_support)
+        add_custom_command(
+            TARGET wxbgi_openlb_pipe_3d_wx_slider_demo POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:wx_bgi_opengl>
+                    $<TARGET_FILE_DIR:wxbgi_openlb_pipe_3d_wx_slider_demo>
+        )
     endif()
 endif()
 
@@ -761,6 +770,8 @@ if(BUILD_TESTING)
             set_tests_properties(wxbgi_openlb_coupled_smoke PROPERTIES TIMEOUT 20)
             add_test(NAME wxbgi_openlb_pipe_3d_demo COMMAND $<TARGET_FILE:wxbgi_openlb_pipe_3d_demo> --test)
             set_tests_properties(wxbgi_openlb_pipe_3d_demo PROPERTIES TIMEOUT 150)
+            add_test(NAME wxbgi_openlb_pipe_3d_wx_slider_demo COMMAND $<TARGET_FILE:wxbgi_openlb_pipe_3d_wx_slider_demo> --test)
+            set_tests_properties(wxbgi_openlb_pipe_3d_wx_slider_demo PROPERTIES TIMEOUT 150)
         endif()
         add_test(NAME wxbgi_set_operations_demo_cpp COMMAND $<TARGET_FILE:wxbgi_set_operations_demo_cpp> --test)
         set_tests_properties(wxbgi_set_operations_demo_cpp PROPERTIES TIMEOUT 20)
@@ -1396,10 +1407,13 @@ if(WXBGI_ENABLE_WX)
                     ${CMAKE_BINARY_DIR}/openlb_bridge
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_wx_slider_demo.cpp
                     ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh
                     ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo.sh
+                    ${CMAKE_SOURCE_DIR}/examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo_macos.sh
                     ${CMAKE_BINARY_DIR}/openlb_bridge/openlb-demo
-            DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo wxbgi_openlb_pipe_3d_demo
+            DEPENDS wx_bgi_opengl wxbgi_openlb_live_demo wxbgi_openlb_pipe_3d_demo wxbgi_openlb_pipe_3d_wx_slider_demo
             COMMENT "Staging wx_bgi OpenLB bridge assets in ${CMAKE_BINARY_DIR}/openlb_bridge"
         )
     endif()

@@ -151,6 +151,14 @@ demo or the demo's short `--test` mode.
 macOS, using Homebrew-provided `wxwidgets` and `glfw` instead of FetchContent
 for the windowing dependencies.
 
+`examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_wx_slider_demo.cpp` is a wxWidgets
+variant of the same 3D pipe demo. It embeds the BGI renderer inside a custom
+`wxFrame`, adds a narrow left control panel, and uses a vertical slider to
+change the requested inflow velocity live while the solver is running. OpenLB
+supports this pattern for the demo because the inlet boundary is recomputed each
+simulation tick from the current requested physical velocity instead of being
+hard-wired at startup.
+
 ### 4. Optional build and staging support
 
 OpenLB support is **opt-in**:
@@ -211,6 +219,23 @@ Or the short validation mode:
 
 ```bash
 examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh --test
+```
+
+For the wx slider variant, build and run the dedicated target directly:
+
+```bash
+cmake --build build_openlb --target wxbgi_openlb_pipe_3d_wx_slider_demo -j
+./build_openlb/wxbgi_openlb_pipe_3d_wx_slider_demo
+./build_openlb/wxbgi_openlb_pipe_3d_wx_slider_demo --test
+```
+
+Or use the matching bootstrap scripts:
+
+```bash
+examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo.sh
+examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo.sh --flow-velocity-ms 0.04 --vtk
+examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo_macos.sh
+examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo_macos.sh --test
 ```
 
 ---

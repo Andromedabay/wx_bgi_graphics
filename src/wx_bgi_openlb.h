@@ -75,6 +75,21 @@ static inline void wxbgi_openlb_begin_session(int width, int height, const char*
 }
 
 /**
+ * @brief Initialise wx_bgi for use inside a caller-owned wxWidgets frame/canvas.
+ *
+ * Use this helper when your application already owns the wxWidgets event loop
+ * and embeds `wxbgi::WxBgiCanvas` inside a custom `wxFrame`. It prepares the
+ * BGI page buffers for the canvas size without creating a standalone frame.
+ *
+ * @param[in] width  Initial embedded canvas width in pixels (must be > 0).
+ * @param[in] height Initial embedded canvas height in pixels (must be > 0).
+ */
+static inline void wxbgi_openlb_begin_canvas_session(int width, int height)
+{
+    wxbgi_wx_init_for_canvas(width, height);
+}
+
+/**
  * @brief Process pending GUI events and report whether the simulation loop should
  *        continue.
  *

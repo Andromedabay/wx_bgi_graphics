@@ -326,6 +326,9 @@ void renderPageAsTexture(int w, int h, int vpW, int vpH)
     // from page dimensions on high-DPI displays).
     const int finalVpW = (vpW > 0) ? vpW : w;
     const int finalVpH = (vpH > 0) ? vpH : h;
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_TRUE);
     glViewport(0, 0, finalVpW, finalVpH);
     glClearColor(bg.r / 255.f, bg.g / 255.f, bg.b / 255.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -385,6 +388,7 @@ void renderPageAsTextureAlpha(int w, int h, int vpW, int vpH)
 
     const int finalVpW = (vpW > 0) ? vpW : w;
     const int finalVpH = (vpH > 0) ? vpH : h;
+    glDisable(GL_SCISSOR_TEST);
     glViewport(0, 0, finalVpW, finalVpH);
 
     // Alpha blending: overlay pixels appear on top; transparent pixels are no-ops.

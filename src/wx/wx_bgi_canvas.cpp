@@ -83,6 +83,8 @@ WxBgiCanvas::WxBgiCanvas(wxWindow* parent, wxWindowID id,
     : wxGLCanvas(parent, id, kGLAttrs, pos, size,
                  style | wxWANTS_CHARS | wxFULL_REPAINT_ON_RESIZE, name)
 {
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+
     // NOTE: No GL work here.  wxGLContext is created lazily on the first paint
     // (following the official wxWidgets OpenGL sample pattern) so that a valid
     // context is always current before any GL call is made.
