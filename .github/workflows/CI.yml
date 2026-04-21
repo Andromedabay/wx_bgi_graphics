@@ -44,7 +44,7 @@ jobs:
             choco install miktex --no-progress -y
           }
           $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
-          $env:PATH = \"$miktexBin;$env:PATH\"
+          refreshenv
           miktexsetup finish
           miktex-console --package-install epstopdf --yes
 
