@@ -41,8 +41,10 @@ jobs:
         run: |
           # Ensure MiKTeX is installed and epstopdf utility is available
           if (-not (Get-Command miktexsetup -ErrorAction SilentlyContinue)) {
-            choco install miktex -y
+            choco install miktex --no-progress -y
           }
+          $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
+          $env:PATH = \"$miktexBin;$env:PATH\"
           miktexsetup finish
           miktex-console --package-install epstopdf --yes
 
