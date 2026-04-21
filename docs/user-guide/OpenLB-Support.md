@@ -352,7 +352,7 @@ while (running) {
     wxYield();   // allow slider to repaint
 }
 ```
-⚠️ This is a last resort.
+(!) This is a last resort.
 It works, but can cause reentrancy issues. Upon return from the YIELD, make sure to redirect to the control where you left off in your simulation loop.
 
 ---

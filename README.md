@@ -1,3 +1,5 @@
+\mainpage wx_BGI_Graphics
+
 # wx_BGI_Graphics
 
 `wx_BGI_Graphics` is a cross-platform shared library that keeps the classic
@@ -57,7 +59,8 @@ tools include Doxygen, LaTeX/MiKTeX, FreePascal, and Python 3.
 
 The documentation is organized into two main hierarchies.
 
-### User Guide
+
+\section user-guide User-Guide
 
 Start here if you want to build the library, run it, and use its public
 features in applications.
@@ -65,7 +68,8 @@ features in applications.
 - **[User Guide index](./docs/user-guide/README.md)**
 - **[Getting Started](./docs/user-guide/getting-started.md)**
 
-### Developer Guide
+
+\section developer-guide Developer-Guide
 
 Start here if you want to understand how the project is built, how the major
 subsystems are organized, how tests are structured, and how the docs pipeline is
@@ -75,6 +79,7 @@ generated.
 - **[Architecture Overview](./docs/developer-guide/architecture-overview.md)**
 - **[OpenLB Bridge Plan](./docs/developer-guide/openlb-bridge-plan.md)**
 - **[Documentation Pipeline](./docs/developer-guide/documentation-pipeline.md)**
+
 
 ## Public Headers
 

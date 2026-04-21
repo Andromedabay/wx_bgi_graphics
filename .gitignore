@@ -17,3 +17,4 @@ libimp*.a
 *.fpc
 *.res
 **/tmp
+**/\@DOXYGEN_OUTPUT_DIR\@
