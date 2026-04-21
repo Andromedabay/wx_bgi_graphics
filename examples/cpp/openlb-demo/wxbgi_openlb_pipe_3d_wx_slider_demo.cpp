@@ -1380,7 +1380,7 @@ void PipeDemoFrame::OnFlowSlider(wxCommandEvent &evt)
 {
     evt.Skip();
     m_requestedFlowVelocity = sliderToFlowVelocity(evt.GetInt());
-    std::cout << "SLIDER EVT: " << evt.GetInt() << std::endl;
+    //std::cout << "SLIDER EVT: " << evt.GetInt() << std::endl;
     //m_flowSlider->SetValue(flowVelocityToSlider(m_requestedFlowVelocity));
     UpdateFlowLabel();
 }

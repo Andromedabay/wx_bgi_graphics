@@ -1,11 +1,11 @@
 # OpenLB Bridge Plan and Linux Handoff
 
 This page captures the current DDS-to-OpenLB plan and status in a repo-tracked
-location so work can continue on another computer.
+location so work can continue on another computer or a later time.
 
 ## Current status
 
-Implemented in this branch:
+Implemented:
 
 - DDS `externalAttributes` on retained objects
 - public DDS metadata API for setting, reading, clearing, and enumerating
@@ -33,14 +33,14 @@ Implemented in this branch:
 - DDS/OpenLB bridge tests
 - user-facing docs for the new workflow
 
-## Linux validation status
+## Linux validation
 
-Stage 3 and Stage 4 are now running on Linux against the latest public OpenLB
+Following design strategy works on Linux against the latest public OpenLB
 release repository checkout.
 
 Validated flows:
 
-1. author retained DDS geometry and tag it with `openlb.*` metadata
+1. custome designed and retained DDS geometry and tag it with `openlb.*` metadata
 2. materialize that retained geometry onto an OpenLB `SuperGeometry<T,2>` using
    `wxbgi_openlb_materialize_super_geometry_2d(...)`
 3. run a compact 2D channel + obstacle case in
@@ -64,15 +64,6 @@ Conclusion: the DDS bridge MVP and the fully coupled 2D Linux path are working
 in this repository, but native Windows/MSVC remains blocked by upstream/toolchain
 compatibility.
 
-## Remaining work
-
-### Stage 5 — Follow-on validation
-
-Optional but recommended next steps:
-
-- add a dedicated 3D materialization regression test
-- add extra coupled benchmark coverage and/or a second 3D case
-- investigate whether the same helper/demo path works on macOS without changes
 
 ## Important files
 

@@ -290,6 +290,71 @@ The current support intentionally does **not** do the following:
 In other words: this repo currently provides the **viewer/runtime bridge**, not
 a full OpenLB binding layer.
 
+## Yielding CPU Control or Multi-Threading
+
+### The Constraint
+wxWidgets is single-threaded for UI.
+If you create something like:
+```C
+//Sample-only Not intended as actual working code
+while (simulationRunning) {
+    lattice.collideAndStream();
+    updateVisualization();
+}
+```
+inside:
+• 	the frame constructor
+• 	a button handler
+• 	a slider handler
+• 	a timer handler
+• 	or anywhere in the main thread
+…then wxWidgets never gets CPU time to repaint the slider.
+
+### How to fix it (without pausing animation)
+You have three correct options:
+
+✔ Option 1 — Run OpenLB in a worker thread (recommended)
+Move your simulation loop into a **std::thread** :
+```C
+//Sample-only Not intended as actual working code
+std::thread simThread([this] {
+    while (running) {
+        lattice.collideAndStream();
+        // signal GUI to refresh
+        wxQueueEvent(this, new wxCommandEvent(EVT_SIM_UPDATE));
+    }
+});
+simThread.detach();
+```
+Then your GUI stays responsive.
+
+✔ Option 2 — Use a wxTimer to “tick” OpenLB
+This is the simplest approach.
+```C
+//Sample-only Not intended as actual working code
+void MyFrame::OnTimer(wxTimerEvent&)
+{
+    lattice.collideAndStream();
+    glCanvas->Refresh(false);
+}
+```
+This ensures:
+• 	GUI thread stays alive
+• 	Slider moves normally
+• 	OpenLB runs at ~60 FPS
+
+✔ Option 3 — Yield to the GUI inside your simulation loop
+If you absolutely must run OpenLB in the main thread:
+```C
+//Sample-only Not intended as actual working code
+while (running) {
+    lattice.collideAndStream();
+    wxYield();   // allow slider to repaint
+}
+```
+⚠️ This is a last resort.
+It works, but can cause reentrancy issues. Upon return from the YIELD, make sure to redirect to the control where you left off in your simulation loop.
+
 ---
 
 ## Recommended integration model
@@ -305,6 +370,10 @@ Use `wx_bgi` as the interactive visualization frontend:
 5. publish reduced scalar/vector data for display
 6. draw using the `wxbgi_field_*` helpers
 7. keep the GUI responsive with `wxbgi_openlb_pump()` / `wxbgi_openlb_present()`
+8. when using wxWidgets controls it is important to use mult-threaded programming or
+   have suitable wxYield() method calls, to yield program-execution thread-control
+   to wxWidgets GUI Controls. See the Note ( ** Yielding CPU Control or Multi-Threading ** ) above,
+   that describes this in detail. 
 
 If you only need offline classification rather than direct `SuperGeometry`
 materialization, the lower-level C bridge functions
@@ -367,7 +436,7 @@ Practical consequence:
 
 ---
 
-## Demo screenshot
+## Demo screenshots
 
 > `examples/cpp/wxbgi_openlb_live_demo.cpp`
 
@@ -376,3 +445,22 @@ Practical consequence:
 The demo shows the current viewer pattern: a live false-colour scalar field,
 decimated vector arrows, and a scalar legend rendered in real time inside the
 wx-backed `wx_bgi` window.
+
+> `examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_demo.cpp`
+> `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo.sh` - BASH script to build and run it
+> `examples/cpp/openlb-demo/run_openlb_pipe_3d_demo_macos.sh` - BASH script for macOS
+
+![OpenLB Pipe-Flow Demo](../../images/OpenLB-Pipe-demo.png)
+
+The demo shows the GLFW (WXBGI_SYSTEM_GLFW=ON) based Frames from wx_bgi_graphics being setup and used
+with OpenLB driving C/C++ program.
+
+> `examples/cpp/openlb-demo/wxbgi_openlb_pipe_3d_wx_slider_demo.cpp`
+> `examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo.sh` - BASH script to build and run it
+> `examples/cpp/openlb-demo/run_openlb_pipe_3d_wx_slider_demo_macos.sh` - BASH script for macOS
+
+![OpenLB Pipe-Flow Live-Controll Demo](../../images/OpenLB-Slider-Pipe-demo.png)
+
+The demo shows the wxWidgets based Frames from wx_bgi_graphics being setup and used
+with OpenLB driving C/C++ program. Plus it introduces a Slider to live-control 
+flow velocity during simulation.

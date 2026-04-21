@@ -10,32 +10,20 @@ EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = NO
 EXTRACT_LOCAL_CLASSES  = NO
 
-INPUT                  = "@CMAKE_SOURCE_DIR@/README.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/user-guide/README.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/user-guide/getting-started.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/README.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/architecture-overview.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/documentation-pipeline.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Building.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Tests.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/user-guide/Tutorial.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/WxWidgets.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/user-guide/OpenLB-Support.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/DDS.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/Object-Operation.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/user-guide/VisualAids.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/user-guide/ScreenShots.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Camera3D_Map.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/Camera2D_Map.md" \
-                         "@CMAKE_SOURCE_DIR@/docs/developer-guide/InputsProcessing.md" \
-                         "@CMAKE_SOURCE_DIR@/src/wx_bgi.h" \
-                         "@CMAKE_SOURCE_DIR@/src/wx_bgi_ext.h" \
-                         "@CMAKE_SOURCE_DIR@/src/wx_bgi_3d.h" \
-                         "@CMAKE_SOURCE_DIR@/src/wx_bgi_dds.h" \
-                         "@CMAKE_SOURCE_DIR@/src/bgi_types.h" \
-                         "@CMAKE_SOURCE_DIR@/examples/bgidemo-pascal/README.md"
-FILE_PATTERNS          = *.h *.md
-RECURSIVE              = NO
+
+INPUT = \
+  @CMAKE_SOURCE_DIR@/README.md \
+  @CMAKE_SOURCE_DIR@/docs/user-guide \
+  @CMAKE_SOURCE_DIR@/docs/developer-guide \
+  @CMAKE_SOURCE_DIR@/docs \
+  @CMAKE_SOURCE_DIR@/src \
+  @CMAKE_SOURCE_DIR@/examples/bgidemo-pascal
+
+FILE_PATTERNS = *.h *.md
+RECURSIVE = YES
+
+LAYOUT_FILE = @CMAKE_SOURCE_DIR@/docs/DoxygenLayout.xml
+
 IMAGE_PATH             = "@CMAKE_SOURCE_DIR@/images"
 USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"
 
