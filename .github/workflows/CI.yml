@@ -44,10 +44,6 @@ jobs:
             choco install miktex --no-progress -y
           }
           echo "$env:PATH" | Select-String 'MiKTeX' || echo 'MiKTeX not found in PATH.'
-          $registeredPath = (Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\miktexsetup.exe' -ErrorAction SilentlyContinue).GetValue('')
-          if (-not $registeredPath) {
-            echo 'MiKTeX not found in registry.'
-          }
           $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
           $env:PATH = "$miktexBin;$env:PATH"
           miktexsetup finish
