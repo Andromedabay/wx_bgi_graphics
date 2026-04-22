@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<doxygenlayout version="1.0">
+  <navindex>
+    <mainpage visible="yes" title="Main Page" />
+    <section refid="user-guide" title="User-Guide" />
+    <section refid="developer-guide" title="Developer-Guide" />
+    <modules visible="yes" />
+    <classes visible="yes" />
+    <namespaces visible="yes" />
+    <files visible="yes" />
+    <groups visible="yes" />
+    <pages visible="yes" />
+    <examples visible="yes" />
+    <dirs visible="yes" />
+    <hierarchy visible="yes" />
+    <functions visible="yes" />
+    <variables visible="yes" />
+    <typedefs visible="yes" />
+    <enums visible="yes" />
+    <enumvalues visible="yes" />
+    <defines visible="yes" />
+    <friends visible="yes" />
+    <related visible="yes" />
+    <concepts visible="yes" />
+    <topics visible="yes" />
+  </navindex>
+</doxygenlayout>

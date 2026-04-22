@@ -1,7 +1,7 @@
 PROJECT_NAME           = "wx_BGI_Graphics"
 PROJECT_BRIEF          = "Classic BGI-compatible graphics API with modern OpenGL extension API"
 OUTPUT_DIRECTORY       = "@DOXYGEN_OUTPUT_DIR@"
-CREATE_SUBDIRS         = NO
+CREATE_SUBDIRS         = YES
 ALLOW_UNICODE_NAMES    = NO
 
 OPTIMIZE_OUTPUT_FOR_C  = YES
@@ -22,7 +22,7 @@ INPUT = \
 FILE_PATTERNS = *.h *.md
 RECURSIVE = YES
 
-LAYOUT_FILE = @CMAKE_SOURCE_DIR@/docs/DoxygenLayout.xml
+LAYOUT_FILE = @CMAKE_SOURCE_DIR@/docs/DoxygenLayout.xml  # Custom layout for navigation/chapters
 
 IMAGE_PATH             = "@CMAKE_SOURCE_DIR@/images"
 USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"
@@ -48,6 +48,6 @@ WARN_IF_UNDOCUMENTED   = NO
 WARN_IF_DOC_ERROR      = YES
 
 STRIP_FROM_PATH        = "@CMAKE_SOURCE_DIR@"
-FULL_PATH_NAMES        = YES
+FULL_PATH_NAMES        = NO
 SORT_MEMBER_DOCS       = YES
 SORT_BRIEF_DOCS        = YES

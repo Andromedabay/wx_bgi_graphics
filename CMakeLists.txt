@@ -623,12 +623,27 @@ if(DOXYGEN_FOUND)
         VERBATIM
     )
 
+    # Copy topics.tex to the Doxygen LaTeX output directory after docs are generated
+    add_custom_command(
+        OUTPUT ${DOXYGEN_OUTPUT_DIR}/latex/topics.tex
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/docs/topics.tex
+                ${DOXYGEN_OUTPUT_DIR}/latex/topics.tex
+        DEPENDS ${CMAKE_SOURCE_DIR}/docs/topics.tex
+    )
+
+    add_custom_target(
+        copy_topics_tex ALL
+        DEPENDS ${DOXYGEN_OUTPUT_DIR}/latex/topics.tex
+    )
+
     if(PDFLATEX_COMPILER)
         if(WIN32)
             add_custom_target(
                 api_docs_pdf
                 COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
                 COMMAND ${CMAKE_COMMAND} -E chdir ${DOXYGEN_OUTPUT_DIR}/latex make.bat
+                DEPENDS copy_topics_tex
                 COMMENT "Generating Doxygen PDF documentation"
                 VERBATIM
             )
@@ -637,6 +652,7 @@ if(DOXYGEN_FOUND)
                 api_docs_pdf
                 COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
                 COMMAND ${CMAKE_COMMAND} -E chdir ${DOXYGEN_OUTPUT_DIR}/latex ${CMAKE_MAKE_PROGRAM}
+                DEPENDS copy_topics_tex
                 COMMENT "Generating Doxygen PDF documentation"
                 VERBATIM
             )

@@ -35,6 +35,20 @@ jobs:
         shell: pwsh
         run: choco install doxygen.install -y
 
+      - name: Install epstopdf (MiKTeX utility)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Ensure MiKTeX is installed and epstopdf utility is available
+          if (-not (Get-Command miktexsetup -ErrorAction SilentlyContinue)) {
+            choco install miktex --no-progress -y
+          }
+          echo "$env:PATH" | Select-String 'MiKTeX' || echo 'MiKTeX not found in PATH.'
+          $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
+          echo "$miktexBin" | Out-File -FilePath "$env:GITHUB_PATH" -Encoding utf8 -Append          
+          & "$miktexBin\mpm.exe" --admin --install=epstopdf
+          Get-Command epstopdf
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -143,6 +157,20 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: choco install doxygen.install -y
+
+      - name: Install epstopdf (MiKTeX utility)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Ensure MiKTeX is installed and epstopdf utility is available
+          if (-not (Get-Command miktexsetup -ErrorAction SilentlyContinue)) {
+            choco install miktex --no-progress -y
+          }
+          echo "$env:PATH" | Select-String 'MiKTeX' || echo 'MiKTeX not found in PATH.'
+          $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
+          echo "$miktexBin" | Out-File -FilePath "$env:GITHUB_PATH" -Encoding utf8 -Append          
+          & "$miktexBin\mpm.exe" --admin --install=epstopdf
+          Get-Command epstopdf
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
