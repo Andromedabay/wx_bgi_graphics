@@ -46,8 +46,8 @@ jobs:
           echo "$env:PATH" | Select-String 'MiKTeX' || echo 'MiKTeX not found in PATH.'
           $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
           $env:PATH = "$miktexBin;$env:PATH"
-          miktexsetup finish
-          miktex-console --package-install epstopdf --yes
+          & "$miktexBin\mpm.exe" --admin --install=epstopdf
+          Get-Command epstopdf
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
