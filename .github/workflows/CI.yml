@@ -45,8 +45,7 @@ jobs:
           }
           echo "$env:PATH" | Select-String 'MiKTeX' || echo 'MiKTeX not found in PATH.'
           $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
-          # Persist MiKTeX bin directory to the system PATH for subsequent steps
-          echo "$miktexBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append          
+          echo "$miktexBin" | Out-File -FilePath "$env:GITHUB_PATH" -Encoding utf8 -Append          
           & "$miktexBin\mpm.exe" --admin --install=epstopdf
           Get-Command epstopdf
 
@@ -169,8 +168,7 @@ jobs:
           }
           echo "$env:PATH" | Select-String 'MiKTeX' || echo 'MiKTeX not found in PATH.'
           $miktexBin = 'C:\Program Files\MiKTeX\miktex\bin\x64'
-          # Persist MiKTeX bin directory to the system PATH for subsequent steps
-          echo "$miktexBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append          
+          echo "$miktexBin" | Out-File -FilePath "$env:GITHUB_PATH" -Encoding utf8 -Append          
           & "$miktexBin\mpm.exe" --admin --install=epstopdf
           Get-Command epstopdf
 
