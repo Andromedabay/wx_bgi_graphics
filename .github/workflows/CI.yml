@@ -174,7 +174,7 @@ jobs:
             artifact_prefix: pack_s_wxwidg
             enable_wx: ON
             system_wx: ON
-            system_glfw: ON
+            system_glfw: OFF
           - os: ubuntu-latest
             variant: no_wxwidgets
             build_dir: build_n
