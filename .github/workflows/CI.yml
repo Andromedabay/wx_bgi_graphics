@@ -243,9 +243,14 @@ jobs:
         if: runner.os == 'Linux' && matrix.system_wx == true
         run: |
           sudo apt-get install -y libwxbase3.2-dev libwxgtk3.2-dev wx-common
-          # Note: If using an older Ubuntu runner version like Ubuntu 20.04 or 22.04 where 3.2 isn't default, 
-          # use libwxgtk3.0-gtk3-dev instead:
-          # sudo apt-get install -y libwxgtk3.0-gtk3-dev
+
+      - name: Verify wxWidgets Installation (Linux, system_wx)
+        if: runner.os == 'Linux' && matrix.system_wx == true
+        run: |
+          which wx-config
+          wx-config --version
+          wx-config --selected-config
+          wxWidgets_CONFIG_EXECUTABLE=/usr/bin/wx-config
 
       - name: Install System GLFW (Linux, system_glfw)
         if: runner.os == 'Linux' && matrix.system_glfw == true
@@ -332,13 +337,14 @@ jobs:
           fi
           if [ "$SYSTEM_WX" = "ON" ]; then
             args+=(-DWXBGI_SYSTEM_WX=ON)
+            args+=(-DwxWidgets_CONFIG_EXECUTABLE=$(which wx-config))
           fi
           if [ "$SYSTEM_GLFW" = "ON" ]; then
             args+=(-DWXBGI_SYSTEM_GLFW=ON)
           fi
           cmake "${args[@]}"
 
-      - name: Build
+       - name: Build
         if: runner.os == 'Windows'
         shell: pwsh
         env:
